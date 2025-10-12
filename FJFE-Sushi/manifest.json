@@ -1,0 +1,65 @@
+{
+    "manifest_version": 2,
+    "name": "Sushi FJ Feature Extender",
+    "description": "Bunch of helper stuff.",
+    "version": "0.4.0",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "sushi-fj-tweaker@nonsense.com",
+            "strict_min_version": "68.0"
+        }
+    },
+    "permissions": [
+        "storage",
+        "https://funnyjunk.com/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://funnyjunk.com/*"
+            ],
+            "js": [
+                "content/info.js",
+                "content/sel.js",
+                "content/slick.js",
+                "content/modjs.js",
+                "content/ratetrack.js",
+                "content/schide.js",
+                "content/sccustom.js",
+                "content/userpop.js",
+                "content/nextmove.js",
+                "content/remtz.js",
+                "content/textcheck.js",
+                "content/walcorn.js",
+                "content/funnyjunkModifier.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "browser_action": {
+        "default_title": "Sushi FJ Feature Extender",
+        "default_icon": {
+            "128": "icons/icon128.png"
+        }
+    },
+    "background": {
+        "scripts": [
+            "background.js"
+        ]
+    },
+    "icons": {
+        "128": "icons/icon128.png"
+    },
+    "web_accessible_resources": [
+        "icons/*.png",
+        "icons/*.mp3",
+        "icons/fjinfo.png",
+        "icons/hehe.png",
+        "icons/hidden.png",
+        "icons/icon128.png",
+        "icons/gnome.mp3",
+        "icons/gnome.png",
+        "icons/runescape.png",
+        "icons/vanish.mp3"
+    ]
+}

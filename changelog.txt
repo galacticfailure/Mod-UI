@@ -1,0 +1,69 @@
+0.4.0
+- Heavy bugfixing in Sushi branch
+- Sushi branch Walcorn mode adjustments
+- Removed clicker in Sushi branch, including graphics
+- Sushi branch settings menu adjustments
+- Main and Phaser bugfixing
+
+0.3.3
+- Fixed audio cutoff when navigating between pages with Walcorn mode enabled
+- Fixed layering issue with clicker game
+- Changed extension to not function while not logged in as moderator
+- Updated Sushi branch compatibility
+
+0.3.2
+- Updated Phaser and Sushi
+- Moved shortcut hider
+- Added Shortcut Customizer
+- Fixed bug with text checker, was layering multiple words on top of each other
+- Added custom profile messages
+- Adjusted text check list
+- Changed Walcorn sounds to only play during popups
+
+0.3.1
+- Brought Phaser and Sushi branches up to par with Main branch
+- Added something special
+- Added pin button to rate tracker
+- Moved rates tracked to extension memory
+- Added additional flag-related buttons to right-click info
+- Against all good sense, added Walcorn mode
+- Added category buttons to options menu
+
+0.3.0
+- Added SLICK
+- Added right-click More Info option
+- Added Check Text
+- Added animations to Rate Counter and Avoid Next
+- Removed Save and Close buttons in Tweaker menu in favor of live updates
+
+0.2.3
+- Adjusted Tweaker menu layering
+- Disabled numpad shortcuts while Hide Rate Shortcuts is enabled
+- Adjusted Rate Counter logic
+
+0.2.2
+- Added info buttons to Tweaker menu and ModJS
+- Updated Tweaker button to no longer overlay enlarged images
+- Added hehe
+
+0.2.1
+- Removed Check for Updates button
+- 404'd GitHub due to security concerns
+- Removed tab title switcher
+- Added feature documentation
+- Disabled Avoid Next and Track Rates by default
+
+0.2.0
+- Broke extension into Main, Sushi, and Phaser branches
+- Locked Rate Counter to scroll
+- Moved Tweaker to side menu
+- Updated GitHub components
+
+0.1.2
+- Reworked Rate Counter, including the ability to drag the menu around
+- Fixed bug with Stop Username Popups where the user menu would re-open when clicking elsewhere
+
+0.1.1
+- Fixed spacing error when hiding Shortcuts
+- Added ModJS Extras
+
