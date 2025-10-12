@@ -27,7 +27,7 @@
   ];
 
   const META_LIST = [
-    'admin', 'fj', 'funnyjunk', 'mods'
+    'admin', 'fj', 'funnyjunk'
   ];
 
   let isEnabled = false;
