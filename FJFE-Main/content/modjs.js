@@ -11,16 +11,16 @@
     fadeContributorsOnSFWMOD: 'Unknown.',
     forceUnratedNext: 'Unknown.',
     TESTENTRY: 'Unknown.',
-    execModFJMemeTools: 'Tools for Level 8+ moderators. Enable DiscordResolver it is required if you use this.',
-    flagNotice: 'Shows important information left by other mods when trying to flag content.',
-    adminIsABigNigger: 'Adds some custom styles to make things a bit prettier?',
+    execModFJMemeTools: 'Tools for Level 8+ moderators.',
+    flagNotice: 'Shows important information left by other mods when trying to flag content or comments.',
+    adminIsABigNigger: 'Adds some custom styles to make things a bit prettier',
     commentLinker: 'Debugging tool, adds a button to get the comment ID without having to inspect element. Worthless for most mods.',
     userHistory: 'Grants access to user history buttons on profiles.',
     permaBan: 'Adds a permaban button on user profiles, must have explicit access granted by Posttwo.',
     contentReview: 'Used by instructors to review content rated by students.',
     userFlagPatrolTicker: 'Adds a counter to the navbar that shows the number of user flags that need to be reviewed. Enable only if you take care of user flags on FJMeme.',
     HideShitpostNotes: 'Hides mod notes marked as shitposts.',
-    outboundCase: 'Allows you to make a modcase directly on FJ insteaf of on fjme.me.',
+    outboundCase: 'Allows you to send messages through fjmodbot directly on FJ instead of on fjme.me.',
     getUserFlagHistory: 'Enables you to see which user flags a user has made, useful for checking if a user is abusing the function.',
     SYNCTEST2: 'Defunct.',
     stringFlagDANGER: "Allows you to mass flag comments matching a string. Don't.",
@@ -35,14 +35,33 @@
     disableBoardCSSNOHELPER: 'Unknown.',
     discordResolver: 'Button to find FJMeme accounts connected to the user. Required if you use execModFJMemeTools.',
     ocHelper: 'Unknown.',
-    arrive2UNLESSASKED: 'Mod.js will not work without this. Allegedly.',
+    arrive2UNLESSASKED: 'Mod.js will not work without this.',
     djTools: "Don't.",
     massFlagUserComments: 'Enables you to use the mass flag comments tool on SFW comment pages, very useful for spam flags.',
     showImageSpoilers: "Automatically reveals image which have been 'spoilered'.",
     admincsstest: 'Unknown.',
-    makeToolsPretty: 'Unknown. Allegedly pretties up some tools? Maybe defunct.',
+    makeToolsPretty: 'Makes some modjs like ModHelp pretty.',
     showTextSpoilers: 'Auto-shows text spoilers.'
   };
+
+  const brokenJS = [
+    'admincsstest', 
+    'djTools', 
+    'stringFlagDANGER', 
+    'banRequestForm', 
+    'banRequestTicker', 
+    'ComplaintBETA', 
+    'disableBoardCSSNOHELPER',
+    'fadeContributorsOnSFWMOD',
+    'forceUnratedNext',
+    'mentionModsNOHELPER',
+    'ocHelper', 
+    'permaBan',
+    'SYNCTEST2', 
+    'TESTENTRY', 
+    'makeToolsPretty', 
+    'New7902', 
+    'userFlagPatrolTicker'];
 
   let observer = null;
   let featureEnabled = true;
@@ -147,6 +166,11 @@
       const labelText = label.textContent.trim();
       const key = labelText.includes(':') ? labelText.split(':')[1].trim() : '';
       const infoTarget = key ? Object.keys(INFO_COPY).find(k => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')) : undefined;
+
+      if (infoTarget && brokenJS.includes(infoTarget)) {
+        label.remove();
+        return;
+      }
 
       const labelTitle = (label.textContent || '').replace(/\s+/g, ' ').trim() || key || 'Details';
       const infoCopy = infoTarget ? INFO_COPY[infoTarget] : undefined;
