@@ -1,3 +1,10 @@
+0.5.0
+- Clicker overhaul
+- Added API check to verify mod status
+- Added misrate warning function
+- Updated Phaser and Sushi with latest fixes
+- Added ModJS hiding functions
+
 0.4.0
 - Heavy bugfixing in Sushi branch
 - Sushi branch Walcorn mode adjustments

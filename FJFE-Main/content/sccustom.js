@@ -1,21 +1,5 @@
   
-  const FJFE_MODSO_OK = (() => {
-    try {
-      const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-      return !!link && (link.textContent || '').trim() === 'ModSo';
-    } catch (_) {
-      return false;
-    }
-
-  })();
-
   
-  
-  
-  if (typeof window.fjCustomShortcutsDebugSuppressNext !== 'boolean') {
-    
-    window.fjCustomShortcutsDebugSuppressNext = false;
-  }
 
   const originalButtonState = window.fjCustomShortcutOriginals || {};
   window.fjCustomShortcutOriginals = originalButtonState;
@@ -26,12 +10,16 @@
   
   function formatHotkeyDisplay(label) {
     try {
-      if (!label || typeof label !== 'string') return '';
+      if (!label || typeof label !== 'string') {
+        return '';
+      }
       
       const m = /^Numpad([0-9])$/.exec(label);
-      if (m) return m[1];
+      if (m) {
+        return m[1];
+      }
       return label;
-    } catch (_) {
+    } catch (err) {
       return '';
     }
 
@@ -41,32 +29,47 @@
   function getEffectiveHotkeyLabelForRow(customSettings, i) {
     const row = customSettings && customSettings[i];
     const result = (row && row.hotkeyLabel) ? row.hotkeyLabel : ('Numpad' + i);
-    console.debug(`[sccustom] getEffectiveHotkeyLabelForRow(${i}):`, { row, result });
     return result;
   }
 
   
   function hotkeyConflicts(customSettings, label, excludeRowIdx, excludeNext) {
-    if (!label) return false;
+    if (!label) {
+      return false;
+    }
+    let conflictFound = false;
     
     for (let j = 1; j <= 8; j++) {
-      if (excludeRowIdx && j === excludeRowIdx) continue;
-      if (getEffectiveHotkeyLabelForRow(customSettings, j) === label) return true;
+      if (excludeRowIdx && j === excludeRowIdx) {
+        continue;
+      }
+      const effective = getEffectiveHotkeyLabelForRow(customSettings, j);
+      if (effective === label) {
+        conflictFound = true;
+        break;
+      }
     }
-    if (!excludeNext) {
+    if (!conflictFound && !excludeNext) {
       const nextLabel = (customSettings && customSettings.nextUnratedHotkeyLabel) || 'Numpad9';
-      if (nextLabel === label) return true;
+      if (nextLabel === label) conflictFound = true;
     }
-    return false;
+    return conflictFound;
   }
 
   
   function updateNextUnratedShortKeyUI() {
     try {
       let customSettings = {};
-      try { customSettings = JSON.parse(localStorage.getItem('fjCustomShortcuts') || '{}'); } catch (_) {}
+      try {
+        const raw = localStorage.getItem('fjCustomShortcuts');
+        customSettings = JSON.parse(raw || '{}');
+      } catch (err) {
+        customSettings = {};
+      }
       const nextBtn = document.getElementById('skinGuide');
-      if (!nextBtn) return;
+      if (!nextBtn) {
+        return;
+      }
       let shortKey = nextBtn.querySelector('.shortKey');
       if (!shortKey) {
         shortKey = document.createElement('div');
@@ -75,7 +78,8 @@
       }
       const label = (customSettings && customSettings.nextUnratedHotkeyLabel) || 'Numpad9';
       shortKey.textContent = formatHotkeyDisplay(label) || '9';
-    } catch (_) {}
+    } catch (err) {
+    }
   }
 
   
@@ -93,7 +97,8 @@
           delete originalButtonState[btn.id];
         }
       });
-    } catch (_) {}
+    } catch (err) {
+    }
   }
 
   
@@ -120,7 +125,8 @@
       span.className = suffixClass;
       span.textContent = suffixStr;
       el.appendChild(span);
-    } catch (_) {}
+    } catch (err) {
+    }
   }
 
   function applyCustomShortcutsHijack() {
@@ -128,21 +134,18 @@
     try {
       const st = window.fjTweakerSettings || {};
       if (st.hideShortcuts === true || st.hideRateShortcuts === false) {
-        console.debug('[sccustom] Shortcuts disabled; restoring originals and skipping hijack');
         restoreOriginalButtons();
         
         
       }
-    } catch (_) {}
-    console.debug('[sccustom] applyCustomShortcutsHijack called');
+    } catch (err) {
+    }
     const buttons = getCustomShortcutButtons();
-    console.debug('[sccustom] Buttons mapped:', buttons);
     
     let customSettings = {};
     try {
       customSettings = JSON.parse(localStorage.getItem('fjCustomShortcuts') || '{}');
     } catch (e) { customSettings = {}; }
-    console.debug('[sccustom] Loaded customSettings:', customSettings);
 
     
     (function ensureShortKeyCenteringStyles() {
@@ -174,7 +177,6 @@
           if (btn.accessKey) {
             window.fjOriginalAccessKeys[btn.id] = btn.accessKey;
             btn.accessKey = '';
-            console.debug(`[sccustom] Disabled accessKey for button ${i}: ${window.fjOriginalAccessKeys[btn.id]}`);
           }
         }
       });
@@ -209,10 +211,12 @@
       
       try {
         const st = window.fjTweakerSettings || {};
-        if (st.hideShortcuts === true || st.hideRateShortcuts === false) return;
-      } catch (_) {}
+        if (st.hideShortcuts === true || st.hideRateShortcuts === false) {
+          return;
+        }
+      } catch (err) {
+      }
       if (!btn) {
-        console.debug(`[sccustom] Button ${idx+1} not found in DOM`);
         return;
       }
       
@@ -242,12 +246,6 @@
       const customHotkey = settings.hotkeyLabel;
       const defaultHotkey = `Numpad${idx+1}`;
       const hasCustomHotkey = customHotkey && customHotkey !== defaultHotkey;
-
-      console.debug(`[sccustom] Button ${idx+1} hotkey analysis:`, {
-        custom: customHotkey,
-        default: defaultHotkey,
-        hasCustom: hasCustomHotkey
-      });
       
       let el = btn;
       try {
@@ -256,6 +254,10 @@
         el = fresh;
       } catch (cloneErr) {
         el = btn; 
+      }
+      try {
+        if (el && el.dataset) el.dataset.sccustomSlot = String(idx + 1);
+      } catch (slotErr) {
       }
 
       
@@ -290,7 +292,6 @@
       
       
       if (hasCustomHotkey) {
-        console.debug(`[sccustom] Button ${idx+1} has custom hotkey, removing ALL onclick handlers`);
         
         const cleanEl = el.cloneNode(true);
         el.parentNode.replaceChild(cleanEl, el);
@@ -376,7 +377,6 @@
         e.stopPropagation();
         try {
           const settingsForBtn = customSettings[idx+1] || {};
-          console.log(`[sccustom] Button ${idx+1} clicked. Settings:`, settingsForBtn);
           
 
           
@@ -386,85 +386,66 @@
           const selCatImmediate = (settingsForBtn.cat && settingsForBtn.cat !== 'None') ? settingsForBtn.cat : null;
 
           
-          const suppress = window.fjCustomShortcutsDebugSuppressNext === true;
-          if (!suppress) {
-            
-            try {
-              if (selCatImmediate && catMap[selCatImmediate] && catBtns[catMap[selCatImmediate].id]) {
-                console.log(`[sccustom] Clicking category control: ${selCatImmediate}`);
-                catBtns[catMap[selCatImmediate].id].click();
-              }
-            } catch (_) {}
-
-            
-            setTimeout(() => {
-              if (desiredSkin && skinBtnIds[desiredSkin-1]) {
-                const skinBtn = document.getElementById(skinBtnIds[desiredSkin-1]);
-                if (skinBtn) {
-                  console.log(`[sccustom] Clicking skin button: ${skinBtnIds[desiredSkin-1]}`);
-                  skinBtn.click();
-                } else {
-                  console.log(`[sccustom] Skin button not found: ${skinBtnIds[desiredSkin-1]}`);
-                }
-              } else {
-                console.log(`[sccustom] No skin action for button ${idx+1}`);
-              }
-            }, 40);
-
-            setTimeout(() => {
-              if (desiredPc && pcBtnIds[desiredPc-1]) {
-                const pcBtn = document.getElementById(pcBtnIds[desiredPc-1]);
-                if (pcBtn) {
-                  console.log(`[sccustom] Clicking pc button: ${pcBtnIds[desiredPc-1]}`);
-                  pcBtn.click();
-                } else {
-                  console.log(`[sccustom] PC button not found: ${pcBtnIds[desiredPc-1]}`);
-                }
-              } else {
-                console.log(`[sccustom] No pc action for button ${idx+1}`);
-              }
-            }, 80);
-
-            
-            if (settingsForBtn.noIndex && noIndexBtn) {
-              const readNIState = () => {
-                try {
-                  const oc = noIndexBtn.getAttribute('onclick') || '';
-                  let currentNI = null;
-                  if (/,\s*0\s*,/.test(oc)) currentNI = true; 
-                  else if (/,\s*1\s*,/.test(oc)) currentNI = false; 
-                  if (currentNI === null) {
-                    const txt = (noIndexBtn.textContent || '').toLowerCase();
-                    if (txt.includes('manually no indexed') || txt.includes('auto: no indexed')) currentNI = true;
-                    else if (txt.includes('no index')) currentNI = false;
-                  }
-                  return currentNI;
-                } catch (_) {
-                  return null;
-                }
-
-              };
-              const ensureNoIndexOn = (attempt) => {
-                const current = readNIState();
-                if (current === true) {
-                  console.log('[sccustom] NoIndex is ON before quickM');
-                  return;
-                }
-                if (attempt <= 0) {
-                  console.warn('[sccustom] NoIndex did not turn ON before quickM');
-                  return;
-                }
-                try {
-                  console.log(`[sccustom] Toggling NoIndex ON (attempt ${attempt})`);
-                  noIndexBtn.click();
-                } catch (_) {}
-                setTimeout(() => ensureNoIndexOn(attempt - 1), 140);
-              };
-              
-              setTimeout(() => ensureNoIndexOn(3), 140);
+          
+          try {
+            if (selCatImmediate && catMap[selCatImmediate] && catBtns[catMap[selCatImmediate].id]) {
+              catBtns[catMap[selCatImmediate].id].click();
             }
-          } else {
-            console.log('[sccustom] Debug suppression active: Skipping skin/pc clicks.');
+          } catch (_) {}
+
+          
+          setTimeout(() => {
+            if (desiredSkin && skinBtnIds[desiredSkin-1]) {
+              const skinBtn = document.getElementById(skinBtnIds[desiredSkin-1]);
+              if (skinBtn) {
+                skinBtn.click();
+              }
+            }
+          }, 40);
+
+          setTimeout(() => {
+            if (desiredPc && pcBtnIds[desiredPc-1]) {
+              const pcBtn = document.getElementById(pcBtnIds[desiredPc-1]);
+              if (pcBtn) {
+                pcBtn.click();
+              }
+            }
+          }, 80);
+
+          
+          if (settingsForBtn.noIndex && noIndexBtn) {
+            const readNIState = () => {
+              try {
+                const oc = noIndexBtn.getAttribute('onclick') || '';
+                let currentNI = null;
+                if (/,\s*0\s*,/.test(oc)) currentNI = true; 
+                else if (/,\s*1\s*,/.test(oc)) currentNI = false; 
+                if (currentNI === null) {
+                  const txt = (noIndexBtn.textContent || '').toLowerCase();
+                  if (txt.includes('manually no indexed') || txt.includes('auto: no indexed')) currentNI = true;
+                  else if (txt.includes('no index')) currentNI = false;
+                }
+                return currentNI;
+              } catch (_) {
+                return null;
+              }
+
+            };
+            const ensureNoIndexOn = (attempt) => {
+              const current = readNIState();
+              if (current === true) {
+                return;
+              }
+              if (attempt <= 0) {
+                return;
+              }
+              try {
+                noIndexBtn.click();
+              } catch (_) {}
+              setTimeout(() => ensureNoIndexOn(attempt - 1), 140);
+            };
+            
+            setTimeout(() => ensureNoIndexOn(3), 140);
           }
 
           
@@ -475,237 +456,140 @@
             let quickMArg = null;
             
             const selCat = (settingsForBtn.cat && settingsForBtn.cat !== 'None') ? settingsForBtn.cat : null;
-            let debugInfo = {
-              idx,
-              btnId: el.id,
-              btnClass: el.className,
-              btnHTML: el.outerHTML,
-              origOnclick: orig ? orig.onclick : null,
-              currentOnclick: el.getAttribute('onclick'),
-              settings: settingsForBtn,
-              selCat,
-              catMap: selCat ? (catMap[selCat] || null) : null,
-              skin: settingsForBtn.skin || null,
-              pc: settingsForBtn.pc || null,
-              noIndex: settingsForBtn.noIndex,
-              dataQuickM: el.dataset ? el.dataset.sccustomQuickm : undefined,
-              scheduleMs
-            };
             
             if (selCat && catMap[selCat]) {
               quickMArg = catMap[selCat].long;
-              debugInfo.quickMArgFromCat = quickMArg;
             }
             
             if (!quickMArg && el.dataset && el.dataset.sccustomQuickm) {
               quickMArg = el.dataset.sccustomQuickm;
-              debugInfo.quickMArgFromDataAttr = quickMArg;
             }
             if (!quickMArg && orig && orig.onclick) {
               const m = orig.onclick.match(/quickM\(['"]([^'\"]+)['"]/);
               quickMArg = m ? m[1] : null;
-              debugInfo.quickMArgFromOrig = quickMArg;
             }
             
             let useNoIndex = (settingsForBtn.noIndex === true);
-            debugInfo.useNoIndex = useNoIndex;
             if (quickMArg) {
-              debugInfo.quickMArgPreNoIndex = quickMArg;
               if (useNoIndex && !/\/n$/.test(quickMArg)) quickMArg += '/n';
               if (!useNoIndex && /\/n$/.test(quickMArg)) quickMArg = quickMArg.replace(/\/n$/, '');
-              debugInfo.quickMArgFinal = quickMArg;
-              
-              if (window.fjCustomShortcutsDebugSuppressNext === true) {
-                debugInfo.suppressed = true;
-                try {
-                  if (selCat && catMap[selCat] && catBtns[catMap[selCat].id]) {
-                    console.log(`[sccustom][suppressed] Clicking category control for: ${selCat}`);
-                    catBtns[catMap[selCat].id].click();
-                    debugInfo.categoryAppliedToUI = selCat;
-                  }
-                  
-                  if (desiredSkin && skinBtnIds[desiredSkin-1]) {
-                    const skinBtn = document.getElementById(skinBtnIds[desiredSkin-1]);
-                    if (skinBtn) {
-                      console.log(`[sccustom][suppressed] Clicking skin button: ${skinBtnIds[desiredSkin-1]}`);
-                      skinBtn.click();
-                    } else {
-                      console.log(`[sccustom][suppressed] Skin button not found: ${skinBtnIds[desiredSkin-1]}`);
-                    }
-                  }
-                  if (desiredPc && pcBtnIds[desiredPc-1]) {
-                    const pcBtn = document.getElementById(pcBtnIds[desiredPc-1]);
-                    if (pcBtn) {
-                      console.log(`[sccustom][suppressed] Clicking pc button: ${pcBtnIds[desiredPc-1]}`);
-                      pcBtn.click();
-                    } else {
-                      console.log(`[sccustom][suppressed] PC button not found: ${pcBtnIds[desiredPc-1]}`);
-                    }
-                  }
-                  
-                  try {
-                    if (noIndexBtn) {
-                      const desiredNI = !!settingsForBtn.noIndex;
-                      const oc = noIndexBtn.getAttribute('onclick') || '';
-                      
-                      let currentNI = null;
-                      if (/\,\s*0\s*,/.test(oc)) currentNI = true; 
-                      else if (/\,\s*1\s*,/.test(oc)) currentNI = false; 
-                      
-                      if (currentNI === null) {
-                        const txt = (noIndexBtn.textContent || '').toLowerCase();
-                        if (txt.includes('manually no indexed')) currentNI = true;
-                        else if (txt.includes('no index')) currentNI = false;
-                      }
-                      if (currentNI !== null && currentNI !== desiredNI) {
-                        console.log(`[sccustom][suppressed] Toggling NoIndex to ${desiredNI ? 'ON' : 'OFF'}`);
-                        noIndexBtn.click();
-                        debugInfo.noIndexAppliedToUI = desiredNI;
-                      } else {
-                        debugInfo.noIndexAlreadyMatching = desiredNI;
-                      }
-                    }
-                  } catch (niErr) {
-                    debugInfo.noIndexUIError = niErr;
-                  }
-                  
-                  updateShortcutSuffix(el, desiredSkin || skinForLabel, desiredPc || pcForLabel, !!settingsForBtn.noIndex);
-                } catch (catErr) {
-                  debugInfo.categoryUIError = catErr;
-                }
-                console.log('[sccustom][pre-click][suppressed] Debug info:', debugInfo);
-                setTimeout(() => {
-                  console.debug('[sccustom][post-click][suppressed] Debug info:', debugInfo);
-                }, 50);
-                return; 
-              }
               
               const newOnclick = `quickM('${quickMArg}', this)`;
-              const prevOnclick = el.getAttribute('onclick');
-              debugInfo.prevOnclick = prevOnclick;
-              debugInfo.newOnclick = newOnclick;
               try {
                 el.setAttribute('onclick', newOnclick);
-                debugInfo.onclickSet = true;
               } catch (err) {
-                debugInfo.onclickSet = false;
-                debugInfo.onclickSetError = err;
               }
               
               try {
                 el.removeEventListener('click', handleClick, true);
-                debugInfo.hijackRemoved = true;
               } catch (err) {
-                debugInfo.hijackRemoved = false;
-                debugInfo.hijackRemoveError = err;
               }
               
               try {
                 el.click();
-                debugInfo.nativeClick = true;
               } catch (err) {
-                debugInfo.nativeClick = false;
-                debugInfo.nativeClickError = err;
               }
               
               setTimeout(() => {
                 try {
                   el.removeAttribute('onclick');
-                  debugInfo.onclickRemoved = true;
                 } catch (err) {
-                  debugInfo.onclickRemoved = false;
-                  debugInfo.onclickRemoveError = err;
                 }
                 
                 try {
                   el.addEventListener('click', handleClick, true);
                   buttonHandlers.set(el, handleClick);
-                  debugInfo.hijackRestored = true;
                 } catch (err) {
-                  debugInfo.hijackRestored = false;
-                  debugInfo.hijackRestoreError = err;
                 }
-                console.debug('[sccustom][post-click] Debug info:', debugInfo);
               }, 150);
-              console.log('[sccustom][pre-click] Debug info:', debugInfo);
-            } else {
-              debugInfo.noQuickMArg = true;
-              console.log('[sccustom][no-quickMArg] Debug info:', debugInfo);
             }
           }, scheduleMs);
         } catch (err) {
-          console.error('[sccustom] Click handler error:', err);
         }
       };
 
       
       el.addEventListener('click', handleClick, true);
       buttonHandlers.set(el, handleClick);
-      console.debug(`[sccustom] Button ${idx+1} hijacked and updated:`, el.outerHTML);
     });
   }
 
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', applyCustomShortcutsHijack);
-    } else {
-      applyCustomShortcutsHijack();
-    }
-    document.addEventListener('fjTweakerSettingsChanged', applyCustomShortcutsHijack);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyCustomShortcutsHijack);
+  } else {
+    applyCustomShortcutsHijack();
   }
+  document.addEventListener('fjTweakerSettingsChanged', applyCustomShortcutsHijack);
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', updateNextUnratedShortKeyUI);
-    } else {
-      updateNextUnratedShortKeyUI();
-    }
-    document.addEventListener('fjTweakerSettingsChanged', updateNextUnratedShortKeyUI);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateNextUnratedShortKeyUI);
+  } else {
+    updateNextUnratedShortKeyUI();
   }
+  document.addEventListener('fjTweakerSettingsChanged', updateNextUnratedShortKeyUI);
   
   function getCustomShortcutButtons() {
   let buttons = [];
+  const markSlot = (btn, slot) => {
+    if (!btn) return btn;
+    try {
+      if (btn.dataset) {
+        btn.dataset.sccustomSlot = String(slot);
+      }
+    } catch (err) {
+    }
+    return btn;
+  };
+  const ensureShortKey = (btn, slot) => {
+    if (!btn) return btn;
+    let shortKey = btn.querySelector('.shortKey');
+    if (!shortKey) {
+      shortKey = document.createElement('div');
+      shortKey.className = 'shortKey';
+      shortKey.textContent = slot.toString();
+      btn.insertBefore(shortKey, btn.firstChild);
+    } else if (!shortKey.textContent || !shortKey.textContent.trim()) {
+      shortKey.textContent = slot.toString();
+    }
+    return btn;
+  };
   
   const desktopBtns = Array.from(document.querySelectorAll('.ctButton4.desktopRate'));
   const mobileBtns = Array.from(document.querySelectorAll('.ctButton4.mobQuickRate'));
-  if (desktopBtns.length >= 6) {
-    console.debug('[sccustom] getCustomShortcutButtons: Using desktopRate buttons');
+  const desktopWorking = desktopBtns.filter(btn => !btn.classList.contains('fj-customize-btn'));
+  if (desktopWorking.length >= 6) {
     
     for (let i = 1; i <= 6; ++i) {
       const btn = document.querySelector('.ctButton4.desktopRate#rate'+i+'key');
-      if (!btn) console.debug(`[sccustom] getCustomShortcutButtons: desktop rate${i}key not found`);
-      buttons.push(btn || null);
+      const marked = markSlot(btn, i);
+      buttons.push(marked || null);
     }
     
-    const noIdBtns = desktopBtns.filter(btn => !/^rate\dkey$/.test(btn.id));
-    const btn7 = noIdBtns.find(btn => btn.querySelector('.shortKey') && btn.querySelector('.shortKey').textContent.trim() === '7');
-    const btn8 = noIdBtns.find(btn => btn.querySelector('.shortKey') && btn.querySelector('.shortKey').textContent.trim() === '8');
-    if (!btn7) console.debug('[sccustom] getCustomShortcutButtons: desktop btn7 not found');
-    if (!btn8) console.debug('[sccustom] getCustomShortcutButtons: desktop btn8 not found');
+    const noIdBtns = desktopWorking.filter(btn => !/^rate\dkey$/.test(btn.id));
+    const btn7Candidate = markSlot(noIdBtns[0] || null, 7);
+    const btn8Candidate = markSlot(noIdBtns[1] || null, 8);
+    const btn7 = ensureShortKey(btn7Candidate, 7);
+    const btn8 = ensureShortKey(btn8Candidate, 8);
     buttons.push(btn7 || null);
     buttons.push(btn8 || null);
   } else if (mobileBtns.length >= 6) {
-    console.debug('[sccustom] getCustomShortcutButtons: Using mobQuickRate buttons');
     for (let i = 1; i <= 6; ++i) {
       const btn = document.querySelector('.ctButton4.mobQuickRate#rate'+i+'key');
-      if (!btn) console.debug(`[sccustom] getCustomShortcutButtons: mobile rate${i}key not found`);
-      buttons.push(btn || null);
+      const marked = markSlot(btn, i);
+      buttons.push(marked || null);
     }
     
     buttons.push(null);
     buttons.push(null);
   } else {
-    console.debug('[sccustom] getCustomShortcutButtons: No quickM buttons found');
     for (let i = 0; i < 8; ++i) buttons.push(null);
   }
   return buttons;
   }
   
   function createCustomShortcutsMenu() {
-    console.debug('[sccustom] createCustomShortcutsMenu called');
     if (document.getElementById('fj-sccustom-menu-host')) {
-      console.debug('[sccustom] Menu already open (host exists)');
       return;
     }
 
@@ -756,7 +640,6 @@
   style.textContent = `#fj-sccustom-menu label { white-space: nowrap; } #fj-sccustom-menu input[type=checkbox] { accent-color: #822ef6; }`;
   menu.appendChild(style);
     host.appendChild(menu);
-    console.debug('[sccustom] Menu host and container appended');
 
     
     const CUSTOM_KEY = 'fjCustomShortcuts';
@@ -766,7 +649,6 @@
     } catch (e) { customSettings = {}; }
     function saveCustomSettings() {
       localStorage.setItem(CUSTOM_KEY, JSON.stringify(customSettings));
-      console.debug('[sccustom] saveCustomSettings:', customSettings);
     }
 
     
@@ -903,7 +785,6 @@
     nextHotkeyWrap.appendChild(nextHotkeyBtn);
     headerRow.appendChild(nextHotkeyWrap);
   menu.appendChild(headerRow);
-  console.debug('[sccustom] Header row with Next Unrated hotkey added');
 
     
     
@@ -956,7 +837,6 @@
           customSettings[i].skin = s;
           saveCustomSettings();
           applyCustomShortcutsHijack();
-          console.debug(`[sccustom] Skin changed for row ${i} to ${s}`);
         });
         skinBtns.push(btn);
         row.appendChild(btn);
@@ -996,7 +876,6 @@
           customSettings[i].pc = p;
           saveCustomSettings();
           applyCustomShortcutsHijack();
-          console.debug(`[sccustom] PC changed for row ${i} to ${p}`);
         });
         pcBtns.push(btn);
         row.appendChild(btn);
@@ -1032,7 +911,6 @@
   customSettings[i].cat = select.value;
   saveCustomSettings();
   applyCustomShortcutsHijack();
-  console.debug(`[sccustom] Category changed for row ${i} to ${select.value}`);
       });
       row.appendChild(select);
 
@@ -1050,7 +928,6 @@
   customSettings[i].noIndex = cb.checked;
   saveCustomSettings();
   applyCustomShortcutsHijack();
-  console.debug(`[sccustom] NoIndex changed for row ${i} to ${cb.checked}`);
       });
       noIndexLabel.appendChild(cb);
       const cbText = document.createElement('span');
@@ -1194,7 +1071,6 @@
   if (customSettings[i]) delete customSettings[i];
   saveCustomSettings();
   applyCustomShortcutsHijack();
-  console.debug(`[sccustom] Reset row ${i}`);
   
   host.remove();
   createCustomShortcutsMenu();
@@ -1212,14 +1088,18 @@
     
     setTimeout(() => {
       host.style.display = 'block';
-      console.debug('[sccustom] Menu display=block');
-      setTimeout(() => { menu.style.opacity = '1'; console.debug('[sccustom] Menu opacity=1'); }, 10);
+      setTimeout(() => { menu.style.opacity = '1'; }, 10);
     }, 10);
 
     
     function closeMenu() {
       menu.style.opacity = '0';
-      setTimeout(() => { host.remove(); }, 220);
+      setTimeout(() => {
+        try {
+          host.remove();
+        } catch (err) {
+        }
+      }, 220);
     }
 
     
@@ -1239,19 +1119,29 @@
   
   function addCustomizeButton() {
     
-    const other12Btn = Array.from(document.querySelectorAll('.ctButton4.desktopRate'))
-      .find(btn => {
-        const oc = btn.getAttribute('onclick');
-        if (oc && oc === "quickM('other12', this)") return true;
-        if (btn.id && originalButtonState[btn.id] && originalButtonState[btn.id].onclick) {
-          return /quickM\(['"]other12['"],\s*this\)/.test(originalButtonState[btn.id].onclick);
-        }
-        return false;
-      });
-    if (!other12Btn) return;
+    const desktopRateButtons = Array.from(document.querySelectorAll('.ctButton4.desktopRate'));
+    let anchorBtn = desktopRateButtons.find(btn => {
+      const oc = btn.getAttribute('onclick');
+      if (oc && oc === "quickM('other12', this)") return true;
+      if (btn.dataset && btn.dataset.sccustomQuickm) {
+        return btn.dataset.sccustomQuickm === 'other12' || btn.dataset.sccustomQuickm === 'other12/n';
+      }
+      if (btn.id && originalButtonState[btn.id] && originalButtonState[btn.id].onclick) {
+        return /quickM\(['"]other12['"],\s*this\)/.test(originalButtonState[btn.id].onclick);
+      }
+      return false;
+    });
+    if (!anchorBtn) {
+      anchorBtn = desktopRateButtons[desktopRateButtons.length - 1] || null;
+    }
+    if (!anchorBtn) {
+      return;
+    }
 
     
-    if (other12Btn.nextSibling && other12Btn.nextSibling.classList && other12Btn.nextSibling.classList.contains('fj-customize-btn')) return;
+    if (anchorBtn.nextSibling && anchorBtn.nextSibling.classList && anchorBtn.nextSibling.classList.contains('fj-customize-btn')) {
+      return;
+    }
 
     
     const customizeBtn = document.createElement('div');
@@ -1265,7 +1155,7 @@
       createCustomShortcutsMenu();
     });
     
-    other12Btn.parentNode.insertBefore(customizeBtn, other12Btn.nextSibling);
+    anchorBtn.parentNode.insertBefore(customizeBtn, anchorBtn.nextSibling);
   }
 
   
@@ -1357,14 +1247,12 @@
   if (!window.fjCustomShortcutsNumpadBound) {
     try {
       const onNumpadKeyDown = (e) => {
-        console.debug('[sccustom-hotkey] Handler called with event:', e);
         try {
           // Ignore typing contexts
           const t = e.target;
           const tag = t && t.tagName ? t.tagName.toLowerCase() : '';
           const isEditable = (t && (t.isContentEditable || tag === 'input' || tag === 'textarea'));
           if (isEditable) {
-            console.debug('[sccustom-hotkey] Skipping - in editable element');
             return;
           }
 
@@ -1376,8 +1264,6 @@
           const pressedCode = e.code || '';
           const pressedKey = e.key || '';
 
-          console.debug('[sccustom-hotkey] Key pressed:', { code: pressedCode, key: pressedKey, customSettings: cs });
-
           // Settings gate for row shortcuts
           const settings = window.fjTweakerSettings || {};
           const customEnabled = (settings.hideShortcuts !== true) && (settings.hideRateShortcuts !== false);
@@ -1387,11 +1273,9 @@
             const buttons = getCustomShortcutButtons();
             for (let i = 1; i <= 8; i++) {
               const eff = getEffectiveHotkeyLabelForRow(cs, i);
-              console.debug(`[sccustom-hotkey] Row ${i} effective hotkey:`, eff);
               if (eff && (eff === pressedCode || eff === pressedKey)) {
                 const btn = buttons[i-1];
                 if (!btn) break;
-                console.log(`[sccustom-hotkey] MATCHED row ${i}, clicking button:`, btn);
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -1406,9 +1290,7 @@
 
           // 2) Next Unrated direct match (works even if custom shortcuts disabled)
           const nextLabel = (cs && cs.nextUnratedHotkeyLabel) || 'Numpad9';
-          console.debug('[sccustom-hotkey] Next Unrated effective hotkey:', nextLabel);
           if (nextLabel && (nextLabel === pressedCode || nextLabel === pressedKey)) {
-            console.log('[sccustom-hotkey] MATCHED Next Unrated, clicking button');
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -1438,7 +1320,6 @@
                 const buttons = getCustomShortcutButtons();
                 const btn = buttons[n-1];
                 if (btn) {
-                  console.log(`[sccustom-hotkey] Default Numpad${n} active for row ${n}, clicking button`);
                   e.preventDefault();
                   e.stopPropagation();
                   e.stopImmediatePropagation();
@@ -1450,7 +1331,6 @@
                 }
               } else {
                 // Reassigned: block the stale NumpadN mapping from site handlers
-                console.log(`[sccustom-hotkey] Blocking stale Numpad${n} because row ${n} reassigned to`, effN);
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -1459,7 +1339,6 @@
             } else if (n === 9) {
               // Next Unrated fallback: if not using Numpad9 anymore, block it; else trigger
               if (nextLabel === 'Numpad9') {
-                console.log('[sccustom-hotkey] Fallback Next Unrated Numpad9 active, clicking');
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -1473,7 +1352,6 @@
                 } catch (_) {}
                 return;
               } else {
-                console.log('[sccustom-hotkey] Blocking stale Numpad9 because Next Unrated reassigned to', nextLabel);
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -1482,23 +1360,21 @@
             }
           }
 
-          console.debug('[sccustom-hotkey] No match found for key');
-        } catch (_) {}
+        } catch (err) {
+        }
       };
       
       // Try to add our handler as early as possible and with highest priority
-      console.debug('[sccustom-hotkey] Adding keydown handler');
       document.addEventListener('keydown', onNumpadKeyDown, true);
       window.fjCustomShortcutsNumpadBound = true;
-    } catch (_) {}
+    } catch (err) {
+    }
   }
 
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', updateCustomMods);
-    } else {
-      updateCustomMods();
-    }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateCustomMods);
+  } else {
+    updateCustomMods();
   }
 })();

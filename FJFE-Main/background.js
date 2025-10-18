@@ -11,9 +11,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'fjfe-info') {
     if (tab && tab.id) {
       chrome.tabs.sendMessage(tab.id, { type: 'fjfe-context-info' }, (response) => {
-        if (!response || !response.handled) {
+        
+        if (response && response.handled) {
+          return;
+        }
+        if (response && response.authorized === true) {
           chrome.tabs.create({ url: 'https://edu.fjme.me/' });
         }
+        
       });
     } else {
       chrome.tabs.create({ url: 'https://edu.fjme.me/' });

@@ -1,5 +1,4 @@
 (function() {
-  
   const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
   function clampSafe(n) {
@@ -14,8 +13,8 @@
     if (tools && typeof tools.format === 'function') {
       return tools.format(n);
     }
-  if (!Number.isFinite(n)) return 'Infinite';
-  n = Math.floor(Math.max(0, n));
+    if (!Number.isFinite(n)) return 'Infinity';
+    n = Math.floor(Math.max(0, n));
     if (n >= 1_000_000_000) {
       const v = Math.floor((n / 1_000_000_000) * 100) / 100;
       return v.toFixed(2) + 'B';
@@ -32,7 +31,7 @@
   function canAffordConsideringFormat(money, price) {
     const tools = window.fjfeClickerNumbers;
     if (tools && typeof tools.quantize === 'function') {
-      if (tools.isInfinite && tools.isInfinite(price)) return true;
+      if (tools.isInfinite && tools.isInfinite(price)) return tools.isInfinite(money);
       const normalizedMoney = tools.quantize(Math.max(0, money));
       const normalizedPrice = tools.quantize(Math.max(0, price));
       return normalizedMoney >= normalizedPrice;
@@ -60,24 +59,63 @@
 
   function getMoney() {
     try {
+      const storage = window.fjfeNumbersStorage;
+      if (storage) {
+        const st = storage.readRaw();
+        return storage.toDisplayNumber(st);
+      }
       const raw = localStorage.getItem('fjTweakerClickerCount');
       const p = parseFloat(raw);
       return Number.isFinite(p) ? p : 0;
-    } catch (_) {
-      return 0;
-    }
+    } catch (_) { return 0; }
+  }
+
+  
+  function getMoneyScaledState() {
+    try {
+      const storage = window.fjfeNumbersStorage;
+      if (storage) return storage.readRaw();
+    } catch (_) {}
+    return { infinite: false, scaled: 0n };
+  }
+  function priceToScaled(price) {
+    try {
+      if (typeof price === 'bigint') {
+        if (price < 0n) return 0n;
+        return price * 10n;
+      }
+      const num = Number(price);
+      if (!Number.isFinite(num) || num <= 0) return 0n;
+      return BigInt(Math.floor(num * 10));
+    } catch(_) { return 0n; }
+  }
+  function canAffordPrice(price) {
+    try {
+      const m = getMoneyScaledState();
+      if (m.infinite) return true;
+      const priceScaled = priceToScaled(price);
+      if (priceScaled <= 0n) return true;
+      return m.scaled >= priceScaled;
+    } catch(_) { return false; }
   }
 
   function setMoney(v) {
     try {
-      const num = Number(v);
       const tools = window.fjfeClickerNumbers;
+      const storage = window.fjfeNumbersStorage;
+      const num = Number(v);
       if (!Number.isFinite(num) || (tools && tools.isInfinite && tools.isInfinite(num))) {
-        localStorage.setItem('fjTweakerClickerCount', 'Infinity');
+        if (storage) storage.writeRaw({ infinite:true, scaled:0n });
+        else localStorage.setItem('fjTweakerClickerCount', 'Infinity');
         return;
       }
-      const bounded = Math.min(MAX_SAFE, Math.max(0, num || 0));
-      localStorage.setItem('fjTweakerClickerCount', String(bounded));
+      const bounded = Math.max(0, num || 0);
+      if (storage) {
+        const scaled = BigInt(Math.floor(bounded * 10));
+        storage.writeRaw({ infinite:false, scaled });
+      } else {
+        localStorage.setItem('fjTweakerClickerCount', String(Math.min(MAX_SAFE, Math.floor(bounded))));
+      }
     } catch (_) {}
   }
 
@@ -98,36 +136,37 @@
   
   const MULTIPLIER = 1.15;
   const UPGRADE_LIST = [
-    { id: 'contentManager', basePrice: 15,                         rpsAdd: 0.1,             name: 'Content Manager', tt: 'An in-house reposting menu, now automated.' },
-    { id: 'groupChat',      basePrice: 100,                        rpsAdd: 1,               name: 'Group Chat',      tt: 'A group chat from which to ' },
-    { id: 'memeFolder',     basePrice: 1100,                       rpsAdd: 8,               name: 'Meme Folder',     tt: 'Placeholder tooltip for Meme Folder.' },
-    { id: 'scheduledPost',  basePrice: 12000,                      rpsAdd: 47,              name: 'Scheduled Post',  tt: 'Placeholder tooltip for Scheduled Post.' },
-    { id: 'extraMonitor',   basePrice: 130000,                     rpsAdd: 260,             name: 'Extra Monitor',   tt: 'Placeholder tooltip for Extra Monitor.' },
-    { id: 'sponsoredMemes', basePrice: 1400000,                    rpsAdd: 1400,            name: 'Sponsored Memes', tt: 'Placeholder tooltip for Sponsored Memes.' },
-    { id: 'intern',         basePrice: 20000000,                   rpsAdd: 7800,            name: 'Intern',          tt: 'Placeholder tooltip for Intern.' },
-    { id: 'serverFarm',     basePrice: 300000000,                  rpsAdd: 44000,           name: 'Server Farm',     tt: 'Placeholder tooltip for Server Farm.' },
-    { id: 'botnet',         basePrice: 5100000000,                 rpsAdd: 260000,          name: 'Botnet',          tt: '' },
-    { id: 'funnyjunk2',     basePrice: 75000000000,                rpsAdd: 1600000,         name: 'FunnyJunk 2',     tt: 'A perfect duplicate of FunnyJunk to collect memes from.' },
-    { id: 'temp1',          basePrice: 1000000000000,              rpsAdd: 10000000,        name: 'Temp 1',          tt: 'Placeholder tooltip for Temp 1.' },
-    { id: 'temp2',          basePrice: 14000000000000,             rpsAdd: 65000000,        name: 'Temp 2',          tt: 'Placeholder tooltip for Temp 2.' },
-    { id: 'temp3',          basePrice: 170000000000000,            rpsAdd: 430000000,       name: 'Temp 3',          tt: 'Placeholder tooltip for Temp 3.' },
-    { id: 'temp4',          basePrice: 2100000000000000,           rpsAdd: 2900000000,      name: 'Temp 4',          tt: 'Placeholder tooltip for Temp 4.' },
-    { id: 'temp5',          basePrice: 26000000000000000,          rpsAdd: 21000000000,     name: 'Temp 5',          tt: 'Placeholder tooltip for Temp 5.' },
-    { id: 'temp6',          basePrice: 310000000000000000,         rpsAdd: 150000000000,    name: 'Temp 6',          tt: 'Placeholder tooltip for Temp 6.' },
-    { id: 'agiShitposter',  basePrice: 71000000000000000000,       rpsAdd: 1100000000000,   name: 'AGI Shitposter',  tt: 'True artificial intelligence, purpose-built for stealing memes.' },
-    { id: 'temp8',          basePrice: 1200000000000000000000,     rpsAdd: 8300000000000,   name: 'Temp 8',          tt: 'Placeholder tooltip for Temp 8.' },
-    { id: 'temp9',          basePrice: 190000000000000000000000,   rpsAdd: 64000000000000,  name: 'Temp 9',          tt: 'Placeholder tooltip for Temp 9.' },
-    { id: 'temp10',         basePrice: 54000000000000000000000000, rpsAdd: 510000000000000, name: 'Temp 10',         tt: 'Placeholder tooltip for Temp 10.' }
+    { id: 'script',            basePrice: 15,                         rpsAdd: 0.1,             name: 'Script',             tt: 'A simple script to repost your reposts.' },
+    { id: 'groupChat',         basePrice: 100,                        rpsAdd: 1,               name: 'Group Chat',         tt: 'Produces fresh content to steal.' },
+    { id: 'workshop',          basePrice: 1100,                       rpsAdd: 8,               name: 'Workshop',           tt: 'Carefully assembles memes from provided parts.' },
+    { id: 'studio',            basePrice: 12000,                      rpsAdd: 47,              name: 'Studio',             tt: 'Films high-effort content for you to effortlessly steal.' },
+    { id: 'recyclingCenter',   basePrice: 130000,                     rpsAdd: 260,             name: 'Recycling Center',   tt: 'Recycles old content into new content.' },
+    { id: 'digsite',           basePrice: 1400000,                    rpsAdd: 1400,            name: 'Digsite',            tt: 'Digs up ancient memes from a better time.' },
+    { id: 'officeBuilding',    basePrice: 20000000,                   rpsAdd: 7800,            name: 'Office Building',    tt: 'Analyzes market trends to produce relatable memes.' },
+    { id: 'contentFarm',       basePrice: 300000000,                  rpsAdd: 44000,           name: 'Content Farm',       tt: 'Grows content using industrial farming techniques.' },
+    { id: 'botnet',            basePrice: 5100000000,                 rpsAdd: 260000,          name: 'Botnet',             tt: 'Reposts at blinding speeds, changing IP every time.' },
+    { id: 'spaceport',         basePrice: 75000000000,                rpsAdd: 1600000,         name: 'Spaceport',          tt: 'Imports content from alien worlds.' },
+    { id: 'ritualCircle',      basePrice: 1000000000000,              rpsAdd: 10000000,        name: 'Ritual Circle',      tt: 'Uses unholy rituals to summon extradimensional content.' },
+    { id: 'memecatcher',       basePrice: 14000000000000,             rpsAdd: 65000000,        name: 'Memecatcher',        tt: 'Harvests memes from dreams.' },
+    { id: 'quantumHarmonizer', basePrice: 170000000000000,            rpsAdd: 430000000,       name: 'Quantum Harmonizer', tt: 'Finds content that may not exist and forces it to.' },
+    { id: 'timeForge',         basePrice: 2100000000000000,           rpsAdd: 2900000000,      name: 'Time Forge',         tt: 'Forges memes from the fabric of time itself.' },
+    { id: 'wormhole',          basePrice: 26000000000000000n,          rpsAdd: 21000000000,     name: 'Wormhole',           tt: 'Pulls content from who knows where, or when.' },
+    { id: 'pocketDimension',   basePrice: 310000000000000000n,         rpsAdd: 150000000000,    name: 'Pocket Dimension',   tt: 'An entire dimension, dedicated to created memes. After all, their survival depends on it.' },
+    { id: 'agiShitposter',     basePrice: 71000000000000000000n,       rpsAdd: 1100000000000,   name: 'AGI Shitposter',     tt: 'True artificial intelligence, purpose-built for stealing memes.' },
+    { id: 'realityShaper',     basePrice: 1200000000000000000000n,     rpsAdd: 8300000000000,   name: 'Reality Shaper',     tt: 'Infinitely folds reality into content.' },
+    { id: 'dysonSphere',       basePrice: 190000000000000000000000n,   rpsAdd: 64000000000000,  name: 'Dyson Sphere',       tt: 'Repurposes the energy of a star to generate endless memes.' },
+    { id: 'multiverse',        basePrice: 54000000000000000000000000n, rpsAdd: 510000000000000, name: 'Multiverse',         tt: "Other versions of you have some pretty hefty meme folders...surely they won't notice if you partake?" }
   ];
   const DEF_BY_ID = Object.fromEntries(UPGRADE_LIST.map(u => [u.id, u]));
   function getUnlockedCount() {
     const total = UPGRADE_LIST.length;
-    let unlocked = 2;
-    for (let i = 0; i < UPGRADE_LIST.length; i++) {
+    
+    let unlocked = 1;
+    for (let i = 0; i < UPGRADE_LIST.length - 1; i++) {
       if (i >= unlocked) break;
       const id = UPGRADE_LIST[i].id;
       const lvl = loadUpgradeLevelByIdGlobal(id);
-      if (lvl >= 10) unlocked = Math.min(total, unlocked + 1);
+      if (lvl >= 3) unlocked = Math.min(total, unlocked + 1);
     }
     return Math.min(total, unlocked);
   }
@@ -141,6 +180,7 @@
 
   function closeMenu(){
     const { allMenus } = state;
+    const hadAny = allMenus && allMenus.length > 0;
     allMenus.forEach(menu => {
       if(!menu._closing){
         menu._closing=true; menu.style.transition='none'; void menu.offsetWidth;
@@ -155,6 +195,11 @@
 
     });
     state.openMenu=null; state.openMenuColor=null;
+    try {
+      const now = Date.now();
+      const until = window.__fjfe_suppressCloseUntil || 0;
+      if (hadAny && !(now < until) && window.fjfeAudio) window.fjfeAudio.play('menu_close');
+    } catch(_) {}
   }
 
   function updatePosition() {
@@ -172,16 +217,21 @@
   }
 
   function calcPriceFor(def, curNum) {
-    const baseRaw = def.basePrice * Math.pow(MULTIPLIER, curNum);
+    
+    let base;
+    try {
+      base = Number(def.basePrice);
+    } catch(_) {
+      base = NaN;
+    }
+    if (!Number.isFinite(base)) return Number.POSITIVE_INFINITY;
+    const growth = Math.pow(MULTIPLIER, curNum);
+    const baseRaw = base * growth;
     const groupFactor = getPriceDiscountFactorGlobal('red');
     const rawProduct = baseRaw * groupFactor;
     const rawPrice = Number.isFinite(rawProduct) ? Math.floor(rawProduct) : Number.POSITIVE_INFINITY;
-    const tools = window.fjfeClickerNumbers;
-    if (tools && typeof tools.quantize === 'function') {
-      if (tools.isInfinite && tools.isInfinite(rawPrice)) return Number.POSITIVE_INFINITY;
-      const quantized = tools.quantize(rawPrice);
-      return Math.max(0, quantized);
-    }
+    
+    if (!Number.isFinite(rawPrice)) return Number.POSITIVE_INFINITY;
     return clampSafe(rawPrice);
   }
 
@@ -191,7 +241,27 @@
     for (const u of UPGRADE_LIST) {
       const lvl = loadUpgradeLevelByIdGlobal(u.id);
       if (lvl > 0) {
-        const contribution = lvl * (u.rpsAdd || 0);
+        let contribution = lvl * (u.rpsAdd || 0);
+        
+        
+        try {
+          const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${u.id}`);
+          const stored = parseFloat(raw);
+          if (Number.isFinite(stored)) {
+            
+            
+            let factor;
+            if (stored <= 0) {
+              factor = 1;
+            } else if (stored > 10) {
+              factor = 1 + (stored / 100);
+            } else {
+              factor = stored;
+            }
+            if (Number.isFinite(factor) && factor > 0) contribution = contribution * factor;
+          }
+        } catch (_) {}
+        
         if (tools && typeof tools.quantize === 'function') {
           sum += tools.quantize(contribution);
         } else {
@@ -199,6 +269,13 @@
         }
       }
     }
+    
+    try {
+      const bonusPct = parseInt(localStorage.getItem('fjfeStats_prestigeBonusPct')||'0',10) || 0;
+      if (Number.isFinite(bonusPct) && bonusPct > 0) {
+        sum = sum * (1 + (bonusPct / 100));
+      }
+    } catch(_) {}
     if (tools && typeof tools.quantize === 'function') {
       return tools.quantize(sum);
     }
@@ -221,7 +298,10 @@
       border: '1px solid #333',
       borderRadius: '0',
       padding: '0',
+      userSelect: 'none',
     });
+    try { row.setAttribute('unselectable','on'); } catch(_) {}
+    try { row.onselectstart = () => false; } catch(_) {}
 
     const upgrade = document.createElement('div');
     Object.assign(upgrade.style, {
@@ -258,11 +338,12 @@
 
     const img = document.createElement('img');
     img.className = 'fjfe-up-img';
+    try { img.draggable = false; } catch(_) {}
   const defaultImgName = (def.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const imgPath = def && def.img ? def.img : `icons/${defaultImgName}.png`;
+  const imgPath = def && def.img ? def.img : `icons/clicker/production/${defaultImgName}.png`;
     img.src = chrome.runtime.getURL ? chrome.runtime.getURL(imgPath) : imgPath;
     img.onerror = () => {
-      const fallback = 'icons/click.png';
+      const fallback = 'icons/error.png';
       img.src = chrome.runtime.getURL ? chrome.runtime.getURL(fallback) : fallback;
     };
     Object.assign(img.style, {
@@ -357,7 +438,7 @@
     let curNum = loadNum();
   const calcPrice = () => calcPriceFor(def, curNum);
 
-  priceNum.textContent = computeUnlocked() ? formatCompact(calcPrice()) : '???';
+  priceNum.textContent = computeUnlocked() ? ((window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice())) : '???';
     Object.assign(priceNum.style, {
       color: '#e33',
       fontWeight: '700',
@@ -370,7 +451,11 @@
     });
 
     const priceIcon = document.createElement('img');
-    priceIcon.src = chrome.runtime.getURL ? chrome.runtime.getURL('icons/thumb_down.png') : 'icons/thumb_down.png';
+    priceIcon.src = chrome.runtime.getURL ? chrome.runtime.getURL('icons/clicker/thumb_down.png') : 'icons/clicker/thumb_down.png';
+    priceIcon.onerror = () => {
+      const fb = chrome.runtime.getURL ? chrome.runtime.getURL('icons/error.png') : 'icons/error.png';
+      priceIcon.src = fb;
+    };
     Object.assign(priceIcon.style, {
       width: '12px',
       height: '12px',
@@ -389,14 +474,14 @@
 
     upgrade._isClickableNow = function() {
       if (!computeUnlocked()) return false;
-      return canAffordConsideringFormat(getMoney(), calcPrice());
+      return canAffordPrice(calcPrice());
     };
 
     const levelDiv = document.createElement('div');
     Object.assign(levelDiv.style, {
       marginLeft: 'auto',
       fontWeight: '800',
-  color: '#D2B48C',
+  color: '#61afff',
       fontSize: '30px',
       lineHeight: '1',
       textAlign: 'right',
@@ -414,56 +499,106 @@
       const unlockedNow = computeUnlocked();
       if (unlockedNow) {
         name.textContent = def.name || id;
-        const defaultImgName2 = (def.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
-        const imgPath2 = def.img ? def.img : `icons/${defaultImgName2}.png`;
-        img.src = chrome.runtime.getURL ? chrome.runtime.getURL(imgPath2) : imgPath2;
-  priceNum.textContent = formatCompact(calcPrice());
+    const defaultImgName2 = (def.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const imgPath2 = def.img ? def.img : `icons/clicker/production/${defaultImgName2}.png`;
+    img.src = chrome.runtime.getURL ? chrome.runtime.getURL(imgPath2) : imgPath2;
+    priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
         const clickable = upgrade._isClickableNow();
         row.style.cursor = clickable ? 'pointer' : 'not-allowed';
-        row.style.opacity = '1';
+        row.style.opacity = clickable ? '1' : '0.6';
       } else {
         name.textContent = '???';
-        img.src = chrome.runtime.getURL ? chrome.runtime.getURL('icons/hidden.png') : 'icons/hidden.png';
+        const unk = 'icons/clicker/production/unknown.png';
+        img.src = chrome.runtime.getURL ? chrome.runtime.getURL(unk) : unk;
         priceNum.textContent = '???';
         row.style.cursor = 'not-allowed';
-        row.style.opacity = '0.7';
+        row.style.opacity = '0.6';
       }
     }
 
     row._updateUnlockState = updateUnlockVisual;
+    row._syncFromStorage = function() {
+      try {
+        
+        curNum = loadNum();
+        updateNum();
+        updateUnlockVisual();
+      } catch (_) {}
+    };
 
     row.onclick = function(e) {
       e.preventDefault();
-      if (!computeUnlocked()) return;
+      if (!computeUnlocked()) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return; }
   const unlockedBefore = getUnlockedCount();
-      const price = calcPrice();
+  const price = calcPrice();
       const tools = window.fjfeClickerNumbers;
       const isInfiniteCost = !Number.isFinite(price) || (tools && tools.isInfinite && tools.isInfinite(price));
       const effectivePrice = isInfiniteCost ? 0 : price;
-      const moneyRaw = getMoney();
-      if (!canAffordConsideringFormat(moneyRaw, price)) return;
-      const normalizedMoney = tools && typeof tools.normalizeFunds === 'function' ? tools.normalizeFunds(moneyRaw) : moneyRaw;
-      const isInfiniteWallet = tools && tools.isInfinite && tools.isInfinite(normalizedMoney);
-      let newMoney;
-      if (isInfiniteWallet) {
-        newMoney = normalizedMoney;
-        if (isInfiniteCost) {
-          newMoney = 0;
+      if (!canAffordPrice(price)) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return; }
+      
+      try {
+        const storage = window.fjfeNumbersStorage;
+        const money = getMoneyScaledState();
+        const priceScaled = priceToScaled(effectivePrice);
+        if (!money.infinite && storage && typeof storage.writeRaw === 'function') {
+          let next = money.scaled - (priceScaled > 0n ? priceScaled : 0n);
+          if (next < 0n) next = 0n;
+          storage.writeRaw({ infinite:false, scaled: next });
         }
-      } else {
-        newMoney = normalizedMoney >= effectivePrice ? (normalizedMoney - effectivePrice) : 0;
-      }
-      setMoney(newMoney);
+      } catch(_) {}
       try {
         const disp = document.getElementById('fjfe-clicker-count-v2');
-        if (disp) disp.textContent = formatCompact(newMoney);
+        if (disp) {
+          const tools = window.fjfeClickerNumbers;
+          const storage = window.fjfeNumbersStorage;
+          const st = storage ? storage.readRaw() : { infinite:false, scaled:0n };
+          const newMoneyDisplay = storage ? storage.toDisplayNumber(st) : getMoney();
+          const txt = (tools && tools.formatCounter) ? tools.formatCounter(newMoneyDisplay) : formatCompact(newMoneyDisplay);
+          disp.textContent = txt;
+        }
+        
+        priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
+        if (window.fjfeRcInfo && typeof window.fjfeRcInfo.show === 'function' && row.matches(':hover')) {
+          const imgEl = img;
+          const currentCost = priceNum.textContent || '???';
+          const currentName = name.textContent || '???';
+            const tools2 = window.fjfeClickerNumbers;
+            
+            let per2 = def && def.rpsAdd ? def.rpsAdd : 0;
+            try {
+              const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${id}`);
+              const stored = parseFloat(raw);
+              if (Number.isFinite(stored)) {
+                let factor;
+                if (stored <= 0) factor = 1;
+                else if (stored > 10) factor = 1 + (stored / 100);
+                else factor = stored; 
+                if (Number.isFinite(factor) && factor > 0) per2 = per2 * factor;
+              }
+            } catch(_) {}
+            const lvl2 = loadUpgradeLevelByIdGlobal(id);
+            const total2 = (lvl2 || 0) * (per2 || 0);
+          const fmtSmall2 = tools2 && tools2.formatWordsSmallDecimals ? tools2.formatWordsSmallDecimals : (tools2 && tools2.formatWords ? tools2.formatWords : (x=>String(x)));
+          const perText2 = fmtSmall2(per2);
+          const totalText2 = fmtSmall2(total2);
+          const topLine2 = `Each ${def && def.name ? def.name : id} generates ${perText2} thumbs.`;
+          const midLine2 = `Generating ${totalText2} thumbs.`;
+          const ttLine2 = def && def.tt ? def.tt : '';
+          window.fjfeRcInfo.show({ imageSrc: imgEl && imgEl.src ? imgEl.src : '', name: currentName, cost: currentCost, bodyTop: topLine2, bodyMid: midLine2, bodyTT: ttLine2 });
+        }
       } catch (_) {}
-      curNum++;
+    curNum++;
       persistNum(curNum);
   priceNum.textContent = formatCompact(calcPrice());
       updateNum();
+      try { if (window.fjfeAudio) window.fjfeAudio.play('production'); } catch(_) {}
       try {
         if (typeof window.fjfeClickerV2Recompute === 'function') window.fjfeClickerV2Recompute();
+      } catch (_) {}
+      try {
+        if (window.fjfeRcStore && typeof window.fjfeRcStore.refresh === 'function') {
+          window.fjfeRcStore.refresh();
+        }
       } catch (_) {}
       const unlockedAfter = getUnlockedCount();
       if (unlockedAfter > unlockedBefore) {
@@ -494,19 +629,47 @@
           return;
         }
         const imgEl = img; 
+        
+        priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
         const currentCost = priceNum.textContent || '???';
         const currentName = name.textContent || '???';
-  const descText = def && def.tt ? def.tt : '???';
+        const tools = window.fjfeClickerNumbers;
+        
+        let per = def && def.rpsAdd ? def.rpsAdd : 0;
+        try {
+          const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${id}`);
+          const stored = parseFloat(raw);
+          if (Number.isFinite(stored)) {
+            let factor;
+            if (stored <= 0) factor = 1;
+            else if (stored > 10) factor = 1 + (stored / 100);
+            else factor = stored;
+            if (Number.isFinite(factor) && factor > 0) per = per * factor;
+          }
+        } catch(_) {}
+        const lvl = loadUpgradeLevelByIdGlobal(id);
+        const total = (lvl || 0) * (per || 0);
+        const fmtSmall = tools && tools.formatWordsSmallDecimals ? tools.formatWordsSmallDecimals : (tools && tools.formatWords ? tools.formatWords : (x=>String(x)));
+        const perText = fmtSmall(per);
+        const totalText = fmtSmall(total);
+        const topLine = `Each ${def && def.name ? def.name : id} generates ${perText} thumbs.`;
+        const midLine = `Generating ${totalText} thumbs.`;
+        const ttLine = def && def.tt ? def.tt : '';
         window.fjfeRcInfo.show({
           imageSrc: imgEl && imgEl.src ? imgEl.src : '',
           name: currentName,
           cost: currentCost,
-          description: descText,
+          bodyTop: topLine,
+          bodyMid: midLine,
+          bodyTT: ttLine,
         });
       } catch (_) {}
     });
     row.addEventListener('mouseleave', () => {
-      try { if (window.fjfeRcInfo) window.fjfeRcInfo.hide(); } catch (_) {}
+      try {
+        if (window.fjfeRcInfo) window.fjfeRcInfo.hide();
+      }
+ catch (_) {}
     });
     return row;
   }
@@ -571,6 +734,7 @@
         menu.style.transition = 'transform 0.22s cubic-bezier(.5,1.7,.5,1), opacity 0.18s cubic-bezier(.5,1.7,.5,1)';
       }, 220);
     }, 10);
+    try { if (window.fjfeAudio) window.fjfeAudio.play('menu_open'); } catch(_) {}
 
   state.openMenu = menu;
   state.openMenuColor = 'red';
@@ -584,7 +748,10 @@
       try {
         if (!state.openMenu) return;
         const nodes = state.openMenu.querySelectorAll('*');
-        nodes.forEach(n => { if (typeof n._updateUnlockState === 'function') n._updateUnlockState(); });
+        nodes.forEach(n => {
+          if (typeof n._syncFromStorage === 'function') n._syncFromStorage();
+          else if (typeof n._updateUnlockState === 'function') n._updateUnlockState();
+        });
       } catch (_) {}
     };
     window.updateOpenMenuUnlockStatesByIds = function(ids) {
@@ -604,6 +771,12 @@
           if (typeof n._isClickableNow === 'function') {
             const clickable = n._isClickableNow();
             n.style.cursor = clickable ? 'pointer' : 'not-allowed';
+            try {
+              
+              if (n.matches && n.matches('[data-upgrade-id]')) {
+                n.style.opacity = clickable ? '1' : '0.6';
+              }
+            } catch(_) {}
           }
         });
       } catch (_) {}
@@ -616,10 +789,16 @@
       return;
     }
     if (state.openMenu) {
+      try { if (window.fjfeAudio && window.fjfeAudio.suppressClose) window.fjfeAudio.suppressClose(300); } catch(_) {}
       closeMenu();
+      try { if (window.fjfeRcStats) window.fjfeRcStats.closeMenu(); } catch(_) {}
+      try { if (window.fjfeRcSettings) window.fjfeRcSettings.closeMenu(); } catch(_) {}
       setTimeout(() => actuallyOpenMenu(), 0);
       return;
     }
+    try { if (window.fjfeAudio && window.fjfeAudio.suppressClose) window.fjfeAudio.suppressClose(300); } catch(_) {}
+    try { if (window.fjfeRcStats) window.fjfeRcStats.closeMenu(); } catch(_) {}
+    try { if (window.fjfeRcSettings) window.fjfeRcSettings.closeMenu(); } catch(_) {}
     actuallyOpenMenu();
   }
 
@@ -627,7 +806,17 @@
     state.anchorEl = opts && opts.anchorEl ? opts.anchorEl : null;
   }
 
-  window.fjfeRcProd = { init, toggleMenu, closeMenu, updatePosition, getTotalRps };
+  function refresh() {
+    try {
+      
+      if (state.openMenu) {
+        if (typeof window.updateOpenMenuUnlockStates === 'function') window.updateOpenMenuUnlockStates();
+        if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors();
+      }
+    } catch (_) {}
+  }
+
+  window.fjfeRcProd = { init, toggleMenu, closeMenu, updatePosition, getTotalRps, refresh, isOpen: function(){ return !!state.openMenu; } };
 
   
   window.addEventListener('scroll', updatePosition, { passive: true });

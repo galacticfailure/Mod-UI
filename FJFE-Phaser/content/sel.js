@@ -5,10 +5,17 @@
   const DEFAULT_SETTINGS = {
     avoidNext: false,
     removeTwilight: true,
+    customMessages: false,
     hideRateShortcuts: true,
+    hideShortcuts: false,
     stopUsernamePopups: true,
     trackRates: false,
-    modJSExtras: true
+    modJSExtras: true,
+    walcorn: false,
+    checkText: false,
+    clicker2: false,
+    misrateWarning: false,
+    warnOnAll: false
   };
   const MANAGE_ENTRY_SELECTOR = '#topME .sideEditButt[onclick*="manageAll()"]';
   let manageEntryObserver = null;
@@ -116,7 +123,7 @@
     const toggleButton = document.createElement('button');
     toggleButton.id = 'fj-sel-toggle';
     toggleButton.type = 'button';
-  toggleButton.textContent = 'MOD UI';
+  toggleButton.textContent = 'Mod UI';
     Object.assign(toggleButton.style, {
       padding: '5px 9px',
       font: "500 12px 'Segoe UI', sans-serif",
@@ -148,7 +155,7 @@
    position: 'absolute',
    top: '0px',
    left: '0px',
-   zIndex: '999999',
+   zIndex: '2147483645',
       width: 'min(320px, 92vw)',
       maxHeight: 'min(70vh, 420px)',
       padding: '12px 14px',
@@ -191,19 +198,55 @@
     menu.appendChild(style);
     host.append(menu);
 
-    const header = document.createElement('div');
-  header.textContent = 'MOD UI Options';
-    Object.assign(header.style, {
-      fontSize: '14px',
-      fontWeight: '600'
-    });
-    menu.append(header);
+    
+    
+    const tabRow = document.createElement('div');
+    tabRow.style.display = 'flex';
+    tabRow.style.gap = '8px';
+    tabRow.style.width = '100%';
+    tabRow.style.marginBottom = '8px';
 
-    const checkboxContainer = document.createElement('div');
-    checkboxContainer.style.display = 'flex';
-    checkboxContainer.style.flexDirection = 'column';
-    checkboxContainer.style.gap = '8px';
-    checkboxContainer.style.width = '100%';
+    
+    const tabNames = [
+      { key: 'interface', label: 'Interface' },
+      { key: 'tools', label: 'Tools' },
+      { key: 'extras', label: 'Extras' }
+    ];
+    const tabButtons = {};
+    let activeTab = localStorage.getItem('fjTweakerLastTab') || 'interface';
+
+    tabNames.forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.type = 'button';
+      Object.assign(btn.style, {
+        flex: '1 1 0',
+        padding: '8px 0',
+        font: "600 14px 'Segoe UI', sans-serif",
+        color: '#f8f8f8',
+        background: '#222',
+        border: '1px solid #444',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        transition: 'background 0.18s',
+        outline: 'none',
+        letterSpacing: '0.5px',
+      });
+      btn.setAttribute('data-tab', key);
+      tabButtons[key] = btn;
+      tabRow.appendChild(btn);
+    });
+    menu.append(tabRow);
+
+    
+    const tabContent = document.createElement('div');
+    tabContent.style.transition = 'opacity 0.22s cubic-bezier(.2,.9,.2,1)';
+    tabContent.style.opacity = '1';
+    tabContent.style.display = 'flex';
+    tabContent.style.flexDirection = 'column';
+    tabContent.style.gap = '8px';
+    tabContent.style.width = '100%';
+    menu.append(tabContent);
 
 const createInfoButtonElement = (labelText) => {
   const resolvedLabel = (labelText || '').trim();
@@ -238,6 +281,7 @@ const createInfoButtonElement = (labelText) => {
 };
 
 const createCheckboxRow = (id, label, checked, onChange) => {
+  
   const row = document.createElement('div');
   row.style.display = 'flex';
   row.style.alignItems = 'center';
@@ -283,14 +327,22 @@ const createCheckboxRow = (id, label, checked, onChange) => {
   return { wrapper: row, input, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, hideRateRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow) => {
+const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow) => {
+  
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
     removeTwilight: removeTwilightRow.input.checked,
+    customMessages: customMessagesRow.input.checked,
     hideRateShortcuts: hideRateRow.input.checked,
+    hideShortcuts: hideShortcutsRow.input.checked,
     stopUsernamePopups: stopUserPopupRow.input.checked,
     trackRates: trackRatesRow.input.checked,
-    modJSExtras: modJSExtrasRow.input.checked
+    modJSExtras: modJSExtrasRow.input.checked,
+    walcorn: walcornRow ? Boolean(walcornRow.input.checked) : false,
+    checkText: checkTextRow.input.checked,
+    clicker2: clicker2Row.input.checked,
+    misrateWarning: misrateWarningRow.input.checked,
+    warnOnAll: warnOnAllRow.input.checked
   };
 
   persistSettings(nextSettings);
@@ -298,26 +350,85 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, hideRateRow, stopUser
   dispatchSettings(window.fjTweakerSettings);
 };
 
-const avoidNextRow = createCheckboxRow('fj-sel-avoid-next', 'Avoid Next', settings.avoidNext);
-const removeTwilightRow = createCheckboxRow('fj-sel-remove-twilight', 'Remove Twilight Zone', settings.removeTwilight);
-const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Hide Rate Shortcuts', settings.hideRateShortcuts);
-const stopUserPopupRow = createCheckboxRow('fj-sel-stop-userpop', 'Stop Username Popups', settings.stopUsernamePopups);
-const trackRatesRow = createCheckboxRow('fj-sel-track-rates', 'Track Rates', settings.trackRates);
-const modJSExtrasRow = createCheckboxRow('fj-sel-modjs', 'ModJS Extras', settings.modJSExtras);
-
-
-const addLiveChangeHandlers = () => {
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, hideRateRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow);
+  const avoidNextRow = createCheckboxRow('fj-sel-avoid-next', 'Avoid Next', settings.avoidNext);
+  const removeTwilightRow = createCheckboxRow('fj-sel-remove-twilight', 'Remove Twilight Zone', settings.removeTwilight);
+  const customMessagesRow = createCheckboxRow('fj-sel-custom-messages', 'Custom Messages', settings.customMessages);
   
-  avoidNextRow.input.addEventListener('change', saveHandler);
-  removeTwilightRow.input.addEventListener('change', saveHandler);
-  hideRateRow.input.addEventListener('change', saveHandler);
-  stopUserPopupRow.input.addEventListener('change', saveHandler);
-  trackRatesRow.input.addEventListener('change', saveHandler);
-  modJSExtrasRow.input.addEventListener('change', saveHandler);
-};
+  try {
+    const labelEl = customMessagesRow.wrapper.querySelector('label');
+    if (labelEl) labelEl.style.marginLeft = '22px';
+  } catch (_) {}
+  customMessagesRow.input.title = 'Enables custom hard-coded messages on mod profiles.';
+  const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Custom Shortcuts', settings.hideRateShortcuts);
+  
+  const hideShortcutsRow = createCheckboxRow('fj-sel-hide-shortcuts', 'Hide Shortcuts', settings.hideShortcuts);
+  
+  try {
+    const labelEl = hideShortcutsRow.wrapper.querySelector('label');
+    if (labelEl) labelEl.style.marginLeft = '22px';
+  } catch (_) {}
+  hideShortcutsRow.input.title = 'Completely hides and disabled shortcuts.';
+  const stopUserPopupRow = createCheckboxRow('fj-sel-stop-userpop', 'Stop Username Popups', settings.stopUsernamePopups);
+  const trackRatesRow = createCheckboxRow('fj-sel-track-rates', 'Track Rates', settings.trackRates);
+  const modJSExtrasRow = createCheckboxRow('fj-sel-modjs', 'ModJS Extras', settings.modJSExtras);
+  const walcornRow = createCheckboxRow('fj-sel-walcorn', 'Walcorn Mode', settings.walcorn);
+  const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
+  const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
+  const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
 
-addLiveChangeHandlers();
+  try {
+    const labelEl = warnOnAllRow.wrapper.querySelector('label');
+    if (labelEl) labelEl.style.marginLeft = '22px';
+  } catch (_) {}
+
+  const clicker2Row = createCheckboxRow('fj-sel-clicker2', 'Clicker', settings.clicker2, (e) => {
+    const checked = e.target.checked;
+    if (checked) {
+      if (window.fjfeClickerV2Open) window.fjfeClickerV2Open();
+      else {
+        const s2 = document.createElement('script');
+        s2.src = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL)
+          ? chrome.runtime.getURL('content/repost_clicker/rcmain.js')
+          : 'content/repost_clicker/rcmain.js';
+        s2.onload = () => { if (window.fjfeClickerV2Open) window.fjfeClickerV2Open(); };
+        document.head.appendChild(s2);
+      }
+    } else {
+  if (window.fjfeClickerV2Close) window.fjfeClickerV2Close();
+    }
+  });
+
+
+
+    const addLiveChangeHandlers = () => {
+  
+  const onToggleMutual = (source) => {
+    if (source === 'custom' && hideRateRow.input.checked) {
+      if (hideShortcutsRow.input.checked) hideShortcutsRow.input.checked = false;
+    }
+    if (source === 'hide' && hideShortcutsRow.input.checked) {
+      if (hideRateRow.input.checked) hideRateRow.input.checked = false;
+    }
+  };
+
+  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow);
+      avoidNextRow.input.addEventListener('change', saveHandler);
+      removeTwilightRow.input.addEventListener('change', saveHandler);
+      customMessagesRow.input.addEventListener('change', saveHandler);
+      hideRateRow.input.addEventListener('change', (e) => { onToggleMutual('custom'); saveHandler(); });
+      hideShortcutsRow.input.addEventListener('change', (e) => { onToggleMutual('hide'); saveHandler(); });
+      stopUserPopupRow.input.addEventListener('change', saveHandler);
+      trackRatesRow.input.addEventListener('change', saveHandler);
+      modJSExtrasRow.input.addEventListener('change', saveHandler);
+      walcornRow.input.addEventListener('change', saveHandler);
+      checkTextRow.input.addEventListener('change', saveHandler);
+      clicker2Row.input.addEventListener('change', () => {
+        saveHandler();
+      });
+      misrateWarningRow.input.addEventListener('change', saveHandler);
+      warnOnAllRow.input.addEventListener('change', saveHandler);
+    };
+    addLiveChangeHandlers();
 
 const resolveAssetUrl = (relativePath) => {
   if (!relativePath) {
@@ -353,28 +464,77 @@ const setInfoContent = (button, message, imagePath) => {
   button.title = '';
 };
 
-setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
-setInfoContent(removeTwilightRow.infoButton, 'Removes the Twilight Zone lyrics from user profiles.');
-setInfoContent(hideRateRow.infoButton, 'Hides the rating shortcuts in the toggle menu.');
-setInfoContent(stopUserPopupRow.infoButton, 'Stops the profile menu from popping up when mousing over a user. User must now be clicked to bring up menu.');
-setInfoContent(trackRatesRow.infoButton, 'Keeps count of rated content.');
-setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
+
+    setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
+    setInfoContent(removeTwilightRow.infoButton, 'Removes the Twilight Zone lyrics from user profiles.');
+  setInfoContent(customMessagesRow.infoButton, 'Enables custom hard-coded messages on mod profiles.');
+  setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
+  setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
+    setInfoContent(stopUserPopupRow.infoButton, 'Stops the profile menu from popping up when mousing over a user. User must now be clicked to bring up menu.');
+    setInfoContent(trackRatesRow.infoButton, 'Keeps count of rated content.');
+    setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
+    setInfoContent(walcornRow.infoButton, 'why');
+    setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
+  setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
+  setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
+  setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
+
+    
+    const tabGroups = {
+      interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper],
+      
+      tools: [
+        misrateWarningRow.wrapper,
+        warnOnAllRow.wrapper,
+        modJSExtrasRow.wrapper,
+        checkTextRow.wrapper,
+        hideRateRow.wrapper,
+        hideShortcutsRow.wrapper,
+        trackRatesRow.wrapper,
+      ],
+  extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper],
+    };
+
+    
+    function renderTab(tabKey, animate = true) {
+      if (!tabGroups[tabKey]) tabKey = 'interface';
+      
+      if (animate) {
+        tabContent.style.opacity = '0';
+        setTimeout(() => {
+          tabContent.innerHTML = '';
+          tabGroups[tabKey].forEach(el => tabContent.appendChild(el));
+          tabContent.style.opacity = '1';
+        }, 180);
+      } else {
+        tabContent.innerHTML = '';
+        tabGroups[tabKey].forEach(el => tabContent.appendChild(el));
+        tabContent.style.opacity = '1';
+      }
+      Object.entries(tabButtons).forEach(([k, btn]) => {
+        btn.style.background = (k === tabKey) ? '#822ef6' : '#222';
+        btn.style.color = (k === tabKey) ? '#fff' : '#f8f8f8';
+      });
+      localStorage.setItem('fjTweakerLastTab', tabKey);
+      activeTab = tabKey;
+    }
+
+    
+    Object.entries(tabButtons).forEach(([key, btn]) => {
+      btn.addEventListener('click', () => {
+        if (activeTab !== key) renderTab(key);
+      });
+    });
+
+    
+    renderTab(activeTab, false);
 
 
-    checkboxContainer.append(
-      modJSExtrasRow.wrapper,
-      hideRateRow.wrapper,
-      trackRatesRow.wrapper,
-      stopUserPopupRow.wrapper,
-      removeTwilightRow.wrapper,
-      avoidNextRow.wrapper
-    );
-
-    menu.append(checkboxContainer);
-
+    
     const versionLabel = document.createElement('div');
     versionLabel.style.fontSize = '12px';
     versionLabel.style.color = '#cccccc';
+    versionLabel.style.marginTop = '10px';
     versionLabel.textContent = 'Local version: v' + getLocalVersion();
     menu.append(versionLabel);
 

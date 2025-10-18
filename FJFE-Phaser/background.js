@@ -11,11 +11,11 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'fjfe-info') {
     if (tab && tab.id) {
       browser.tabs.sendMessage(tab.id, { type: 'fjfe-context-info' }).then(response => {
-        if (!response || !response.handled) {
-          browser.tabs.create({ url: 'https://edu.fjme.me/' });
-        }
+        
+        if (response && response.handled) return;
+        if (response && response.authorized === true) browser.tabs.create({ url: 'https://edu.fjme.me/' });
       }, () => {
-        browser.tabs.create({ url: 'https://edu.fjme.me/' });
+        
       });
     } else {
       browser.tabs.create({ url: 'https://edu.fjme.me/' });

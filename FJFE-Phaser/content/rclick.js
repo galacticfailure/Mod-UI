@@ -48,6 +48,10 @@
 
 	if (!hasRequiredModSoLink()) return;
 
+	const isAuthorizedNow = () => {
+		try { return !(window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') || window.fjApichk.isAuthorized(); } catch (_) { return true; }
+	};
+
 	const RATING_GUIDE_URL = 'https://edu.fjme.me/books/rating-guide-30/page/skin-rating';
 	const PC_GUIDE_URL = 'https://edu.fjme.me/books/rating-guide-30/page/pc-rating-%28political-correctness%29';
 	const CATEGORY_GUIDE_URL = 'https://edu.fjme.me/books/rating-guide-30/page/category-and-no-index';
@@ -79,7 +83,12 @@
 		{ id: 'noIndexEasy', tag: 'DIV', url: NOINDEX_IMAGE_URL },
 		{ id: 'flagContent', classList: ['nBtns', 'flagCn'], url: FLAG_GUIDE_URL },
 		{ classList: ['flagModifier'], url: FLAGMOD_IMAGE_URL },
+		
 		{ classList: ['ctBox', 'ctBox2', 'mbt', 'boxed'], tag: 'DIV', text: 'Mods', url: MODS_DIRECTORY_URL },
+		
+		{ classList: ['ctBox', 'ctBox2', 'mbt'], tag: 'DIV', text: 'Mods', url: MODS_DIRECTORY_URL },
+		
+		{ classList: ['adminButtonMenu', 'mbm', 'peaceOut'], tag: 'DIV', url: MODS_DIRECTORY_URL },
 		{ id: 'skinGuide', classList: ['ctButton4'], tag: 'SPAN', url: RATING_GUIDE_MAIN_URL },
 	];
 
@@ -139,6 +148,7 @@
 	}
 
 	document.addEventListener('contextmenu', (e) => {
+		if (!isAuthorizedNow()) { lastRightClicked = null; return; }
 		lastRightClicked = null;
 		let el = e.target;
 		while (el && el !== document.body) {
@@ -161,11 +171,13 @@
 
 	(typeof browser !== 'undefined' ? browser : chrome).runtime.onMessage.addListener((msg, sender, sendResponse) => {
 		if (msg && msg.type === 'fjfe-context-info') {
+			if (!isAuthorizedNow()) { sendResponse({ handled: false, authorized: false }); return true; }
 			if (lastRightClicked && lastRightClicked.url) {
 				window.open(lastRightClicked.url, '_blank');
-				sendResponse({ handled: true });
+				sendResponse({ handled: true, authorized: true });
 				return true;
 			}
+			sendResponse({ handled: false, authorized: true });
 		}
 	});
 })();

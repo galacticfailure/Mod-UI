@@ -13,8 +13,9 @@
   modJSExtras: true,
   walcorn: false,
   checkText: false,
-  clicker: false,
-  clicker2: false
+  clicker2: false,
+  misrateWarning: false,
+  warnOnAll: false
   };
   const MANAGE_ENTRY_SELECTOR = '#topME .sideEditButt[onclick*="manageAll()"]';
   let manageEntryObserver = null;
@@ -63,7 +64,7 @@
 
   const createUI = (settings) => {
     try {
-      console.debug('fjTweaker(sel): createUI called');
+      
     } catch (e) {}
     if (document.querySelector('#fj-sel-menu')) {
       return;
@@ -235,7 +236,7 @@
       tabButtons[key] = btn;
       tabRow.appendChild(btn);
     });
-    menu.append(tabRow);
+  menu.append(tabRow);
 
     
     const tabContent = document.createElement('div');
@@ -246,6 +247,31 @@
     tabContent.style.gap = '8px';
     tabContent.style.width = '100%';
     menu.append(tabContent);
+
+    
+    const unauthorizedWrap = document.createElement('div');
+    unauthorizedWrap.style.display = 'none';
+    unauthorizedWrap.style.flexDirection = 'column';
+    unauthorizedWrap.style.gap = '8px';
+    const unauthorizedMsg = document.createElement('div');
+    unauthorizedMsg.style.color = '#ffbaba';
+    unauthorizedMsg.style.font = "600 13px 'Segoe UI', sans-serif";
+    unauthorizedMsg.textContent = 'Credentials missing. Please update to enable Mod UI.';
+    const unauthorizedBtn = document.createElement('button');
+    unauthorizedBtn.type = 'button';
+    unauthorizedBtn.textContent = 'Update Credentials';
+    Object.assign(unauthorizedBtn.style, {
+      padding: '6px 10px',
+      font: "600 12px 'Segoe UI', sans-serif",
+      color: '#111',
+      background: '#ff8c00',
+      border: '1px solid #b86900',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      alignSelf: 'flex-start'
+    });
+    unauthorizedWrap.append(unauthorizedMsg, unauthorizedBtn);
+    menu.append(unauthorizedWrap);
 
 const createInfoButtonElement = (labelText) => {
   const resolvedLabel = (labelText || '').trim();
@@ -326,7 +352,7 @@ const createCheckboxRow = (id, label, checked, onChange) => {
   return { wrapper: row, input, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clickerRow, clicker2Row) => {
+const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
@@ -339,8 +365,9 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     modJSExtras: modJSExtrasRow.input.checked,
     walcorn: walcornRow ? Boolean(walcornRow.input.checked) : false,
     checkText: checkTextRow.input.checked,
-    clicker: clickerRow.input.checked,
-    clicker2: clicker2Row.input.checked
+  clicker2: clicker2Row.input.checked,
+    misrateWarning: misrateWarningRow.input.checked,
+    warnOnAll: warnOnAllRow.input.checked
   };
 
   persistSettings(nextSettings);
@@ -371,24 +398,15 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
   const modJSExtrasRow = createCheckboxRow('fj-sel-modjs', 'ModJS Extras', settings.modJSExtras);
   const walcornRow = createCheckboxRow('fj-sel-walcorn', 'Walcorn Mode', settings.walcorn);
   const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
+  const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
+  const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
 
-  const clickerRow = createCheckboxRow('fj-sel-clicker', 'Clicker', settings.clicker, (e) => {
-  const checked = e.target.checked;
-  if (checked) {
-    if (window.fjfeClickerOpen) window.fjfeClickerOpen();
-    else {
-      const s = document.createElement('script');
-      s.src = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) ? chrome.runtime.getURL('content/clicker.js') : 'content/clicker.js';
-      s.onload = () => { if (window.fjfeClickerOpen) window.fjfeClickerOpen(); };
-      document.head.appendChild(s);
-    }
-  } else {
-    if (window.fjfeClickerClose) window.fjfeClickerClose();
-  }
-});
+  try {
+    const labelEl = warnOnAllRow.wrapper.querySelector('label');
+    if (labelEl) labelEl.style.marginLeft = '22px';
+  } catch (_) {}
 
-  
-  const clicker2Row = createCheckboxRow('fj-sel-clicker2', 'Clicker v2', settings.clicker2, (e) => {
+  const clicker2Row = createCheckboxRow('fj-sel-clicker2', 'Clicker', settings.clicker2, (e) => {
     const checked = e.target.checked;
     if (checked) {
       if (window.fjfeClickerV2Open) window.fjfeClickerV2Open();
@@ -401,8 +419,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
         document.head.appendChild(s2);
       }
     } else {
-      if (window.fjfeClickerV2Close) window.fjfeClickerV2Close();
-      if (window.fjfeClickerClose) window.fjfeClickerClose();
+  if (window.fjfeClickerV2Close) window.fjfeClickerV2Close();
     }
   });
 
@@ -419,7 +436,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clickerRow, clicker2Row);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow);
       avoidNextRow.input.addEventListener('change', saveHandler);
       removeTwilightRow.input.addEventListener('change', saveHandler);
       customMessagesRow.input.addEventListener('change', saveHandler);
@@ -430,20 +447,11 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
       modJSExtrasRow.input.addEventListener('change', saveHandler);
       walcornRow.input.addEventListener('change', saveHandler);
       checkTextRow.input.addEventListener('change', saveHandler);
-      clickerRow.input.addEventListener('change', () => {
-        if (clickerRow.input.checked && clicker2Row.input.checked) {
-          clicker2Row.input.checked = false;
-          if (window.fjfeClickerV2Close) window.fjfeClickerV2Close();
-        }
-        saveHandler();
-      });
       clicker2Row.input.addEventListener('change', () => {
-        if (clicker2Row.input.checked && clickerRow.input.checked) {
-          clickerRow.input.checked = false;
-          if (window.fjfeClickerClose) window.fjfeClickerClose();
-        }
         saveHandler();
       });
+      misrateWarningRow.input.addEventListener('change', saveHandler);
+      warnOnAllRow.input.addEventListener('change', saveHandler);
     };
     addLiveChangeHandlers();
 
@@ -492,21 +500,24 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
     setInfoContent(walcornRow.infoButton, 'why');
     setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
-  setInfoContent(clickerRow.infoButton, 'Original clicker UI.');
-  setInfoContent(clicker2Row.infoButton, 'Repost Clicker v2 UI.');
+  setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
+  setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
+  setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
 
     
     const tabGroups = {
       interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper],
       
       tools: [
+        misrateWarningRow.wrapper,
+        warnOnAllRow.wrapper,
         modJSExtrasRow.wrapper,
         checkTextRow.wrapper,
         hideRateRow.wrapper,
         hideShortcutsRow.wrapper,
         trackRatesRow.wrapper,
       ],
-  extras: [avoidNextRow.wrapper, clickerRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper],
+  extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper],
     };
 
     
@@ -552,7 +563,69 @@ const setInfoContent = (button, message, imagePath) => {
     versionLabel.textContent = 'Local version: v' + getLocalVersion();
     menu.append(versionLabel);
 
-    let menuVisible = false;
+  let menuVisible = false;
+  let unauthorizedCooldownTimer = null;
+  let __fjSelStatusBound = false;
+
+    const setupUnauthorizedButtonState = () => {
+      try {
+        if (!window.fjApichk || !window.fjApichk.canUseManualRefresh) return;
+        const st = window.fjApichk.canUseManualRefresh();
+        if (unauthorizedCooldownTimer) { try { clearInterval(unauthorizedCooldownTimer); } catch(_) {} unauthorizedCooldownTimer = null; }
+        
+        unauthorizedBtn.disabled = false;
+        unauthorizedBtn.textContent = 'Update Credentials';
+      } catch (_) {}
+    };
+
+    const updateAuthorizationUI = () => {
+      try {
+        const authorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function'
+          ? window.fjApichk.isAuthorized()
+          : true;
+        if (!authorized) {
+          tabRow.style.display = 'none';
+          tabContent.style.display = 'none';
+          versionLabel.style.display = 'none';
+          unauthorizedWrap.style.display = 'flex';
+          setupUnauthorizedButtonState();
+        } else {
+          tabRow.style.display = 'flex';
+          tabContent.style.display = 'flex';
+          versionLabel.style.display = '';
+          unauthorizedWrap.style.display = 'none';
+        }
+      } catch (_) {}
+    };
+
+    unauthorizedBtn.addEventListener('click', async () => {
+      try {
+        if (!window.fjApichk || !window.fjApichk.canUseManualRefresh) return;
+        const st = window.fjApichk.canUseManualRefresh();
+        if (!st.allowed) {
+          const now = Date.now();
+          const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
+          alert(`Please wait ${minutesLeft} minutes before trying again.`);
+          return;
+        }
+        
+        const prevText = unauthorizedBtn.textContent;
+        unauthorizedBtn.disabled = true;
+        unauthorizedBtn.textContent = 'Updating…';
+        const doRefresh = (window.fjApichk.requestManualRefresh
+          ? window.fjApichk.requestManualRefresh
+          : async () => {
+              try { await window.fjApichk.ensureFetched?.(true); } catch (_) {}
+              return { ok: true, authorized: window.fjApichk.isAuthorized?.() };
+            }
+        );
+        await doRefresh();
+        unauthorizedBtn.textContent = prevText;
+        unauthorizedBtn.disabled = false;
+        
+      } catch (_) {}
+      setupUnauthorizedButtonState();
+    });
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -566,15 +639,20 @@ const setInfoContent = (button, message, imagePath) => {
       }
     };
 
-    const showMenu = () => {
-      try {
-        console.debug('fjTweaker(sel): showMenu called, menuVisible=', menuVisible);
-      } catch (e) {}
+  const showMenu = () => {
+      
       if (menuVisible) {
         return;
       }
 
-      let transitionFallbackTimer = null;
+  let transitionFallbackTimer = null;
+
+      
+      updateAuthorizationUI();
+      if (!__fjSelStatusBound) {
+        document.addEventListener('fjApichkStatus', updateAuthorizationUI, { passive: true });
+        __fjSelStatusBound = true;
+      }
 
       try {
         const rect = toggleButton.getBoundingClientRect();
@@ -668,14 +746,13 @@ const setInfoContent = (button, message, imagePath) => {
       }
     };
 
-    const hideMenu = () => {
-      try {
-        console.debug('fjTweaker(sel): hideMenu called, menuVisible=', menuVisible);
-      }
- catch(e) {}
+  const hideMenu = () => {
+      
       if (!menuVisible) {
         return;
       }
+
+  try { if (unauthorizedCooldownTimer) { clearInterval(unauthorizedCooldownTimer); unauthorizedCooldownTimer = null; } } catch(_) {}
 
       host.setAttribute('aria-expanded', 'false');
       const slickModule = window.fjTweakerModules && window.fjTweakerModules.slick;
@@ -707,10 +784,7 @@ const setInfoContent = (button, message, imagePath) => {
           document.removeEventListener('keydown', handleKeyDown, true);
         }
       } else {
-        try {
-          console.debug('fjTweaker(sel): running inline close animation fallback');
-        }
- catch(e) {}
+        
         try {
           if (host.style.display === 'none') host.style.display = 'block';
           host.style.visibility = '';

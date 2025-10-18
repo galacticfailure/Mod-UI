@@ -5,18 +5,6 @@
     return;
   }
 
-  
-  function hasRequiredModSoLink() {
-    try {
-      const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-      if (!link) return false;
-      const text = (link.textContent || '').trim();
-      return text === 'ModSo';
-    } catch (_) {
-      return false;
-    }
-  }
-
   const HEHE_KEY = 'fjfe_hehe_overlay_shown';
   const heheImg = 'icons/hehe.png';
   const hiddenImg = 'icons/hidden.png';
@@ -127,12 +115,22 @@
     window.addEventListener('keydown', onFirstInteraction, true);
   }
 
+  let __fjfe_baselineInit = false;
+  let __fjfe_proModulesInit = false;
   const initModules = () => {
     if (!window.fjTweakerModules) {
       return;
     }
-  const { sel, modjs, ratetrack, sccustom, userpop, nextMove, remtz, walcorn, apichk } = window.fjTweakerModules;
-    if (sel && typeof sel.init === 'function') sel.init();
+    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, remtz, walcorn, apichk, warn } = window.fjTweakerModules;
+    
+    if (!__fjfe_baselineInit) {
+      if (sel && typeof sel.init === 'function') sel.init();
+      if (apichk && typeof apichk.init === 'function') apichk.init();
+      __fjfe_baselineInit = true;
+    }
+    
+    const authorized = (window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') ? window.fjApichk.isAuthorized() : true;
+    if (!authorized || __fjfe_proModulesInit) return;
     if (modjs && typeof modjs.init === 'function') modjs.init();
     if (ratetrack && typeof ratetrack.init === 'function') ratetrack.init();
     if (sccustom && typeof sccustom.init === 'function') sccustom.init();
@@ -140,17 +138,19 @@
     if (nextMove && typeof nextMove.init === 'function') nextMove.init();
     if (remtz && typeof remtz.init === 'function') remtz.init();
     if (walcorn && typeof walcorn.init === 'function') walcorn.init();
-    if (apichk && typeof apichk.init === 'function') apichk.init();
+    if (warn && typeof warn.init === 'function') warn.init();
+    __fjfe_proModulesInit = true;
   };
 
   const run = () => {
     
-    if (!hasRequiredModSoLink()) {
-      return; 
-    }
-
     checkAndShowHehe();
     initModules();
+
+    
+    document.addEventListener('fjApichkStatus', () => {
+      try { initModules(); } catch (_) {}
+    }, { passive: true });
   };
 
   if (document.readyState === 'loading') {

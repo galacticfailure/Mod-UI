@@ -7,13 +7,6 @@
   }
 
   
-  try {
-    const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-    const ok = !!link && (link.textContent || '').trim() === 'ModSo';
-    if (!ok) return;
-  } catch (_) {
-    return;
-  }
 
 
   const PC_LIST = [

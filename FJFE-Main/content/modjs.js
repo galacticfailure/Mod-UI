@@ -168,7 +168,12 @@
       const infoTarget = key ? Object.keys(INFO_COPY).find(k => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')) : undefined;
 
       if (infoTarget && brokenJS.includes(infoTarget)) {
-        label.remove();
+        
+        if (row && row.parentElement) {
+          row.remove();
+        } else {
+          label.remove();
+        }
         return;
       }
 
@@ -198,6 +203,53 @@
     if (newlyAttached.length > 0) {
       root._fjModJsInfoRows.push(...newlyAttached);
     }
+  };
+
+  
+  
+  const removeBrokenRows = (root) => {
+    if (!root) return;
+
+    
+    
+    const btns = root.querySelectorAll('[data-fj-info-target]');
+    btns.forEach((btn) => {
+      const target = btn?.dataset?.fjInfoTarget;
+      if (!target) return;
+      if (brokenJS.includes(target)) {
+        const row = btn.closest('.fj-modjs-info-row');
+        if (row) {
+          row.remove();
+        } else {
+          
+          const label = btn.previousElementSibling && btn.previousElementSibling.matches?.('label.listJS')
+            ? btn.previousElementSibling
+            : null;
+          if (label) {
+            label.remove();
+          }
+        }
+      }
+    });
+
+    
+    const labels = root.querySelectorAll('label.listJS');
+    labels.forEach((label) => {
+      const txt = (label.textContent || '').trim();
+      const key = txt.includes(':') ? txt.split(':')[1].trim() : '';
+      if (!key) return;
+      const infoTarget = Object.keys(INFO_COPY).find(
+        (k) => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')
+      );
+      if (infoTarget && brokenJS.includes(infoTarget)) {
+        const wrapRow = label.closest('.fj-modjs-info-row');
+        if (wrapRow) {
+          wrapRow.remove();
+        } else {
+          label.remove();
+        }
+      }
+    });
   };
 
   const detachInfoButtonsFromPanel = (root) => {
@@ -518,11 +570,16 @@
     if (!featureEnabled || !root) {
       return;
     }
+    
+    removeBrokenRows(root);
 
     attachInfoButtonsToPanel(root);
     if (root && root.style) {
       root.style.overflowX = 'visible';
     }
+
+    
+    removeBrokenRows(root);
 
     const submitSpan = root.querySelector('#submitJ');
     if (!submitSpan || submitSpan.dataset.fjModJsEnhanced === '1') {

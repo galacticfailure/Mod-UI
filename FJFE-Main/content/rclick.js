@@ -1,51 +1,45 @@
 (function() {
     if (!/^(?:www\.)?funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
 
-    function hasRequiredModSoLink() {
+    let authorized = true;
+    const computeAuthorized = () => {
         try {
-            const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-            if (!link) return false;
-            const text = (link.textContent || '').trim();
-            return text === 'ModSo';
+            return !(window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') || window.fjApichk.isAuthorized();
         } catch (_) {
-          return false;
+            return true;
         }
-
-    }
-
-    if (!hasRequiredModSoLink()) return;
+    };
 
     function isEnabled() {
+        if (!authorized) return false;
         return Boolean(window.fjTweakerSettings && window.fjTweakerSettings.rclick);
     }
 
     function updateState() {
+        authorized = computeAuthorized();
         if (isEnabled()) {
+            
         } else {
+            
         }
     }
 
     updateState();
     document.addEventListener('fjTweakerSettingsChanged', updateState);
+    document.addEventListener('fjApichkStatus', updateState, { passive: true });
 })();
 
 
 (function() {
     if (!/funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
 
-    function hasRequiredModSoLink() {
+    const isAuthorizedNow = () => {
         try {
-            const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-            if (!link) return false;
-            const text = (link.textContent || '').trim();
-            return text === 'ModSo';
+            return !(window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') || window.fjApichk.isAuthorized();
         } catch (_) {
-          return false;
+            return true;
         }
-
-    }
-
-    if (!hasRequiredModSoLink()) return;
+    };
 
     const RATING_GUIDE_URL = 'https://edu.fjme.me/books/rating-guide-30/page/skin-rating';
     const PC_GUIDE_URL = 'https://edu.fjme.me/books/rating-guide-30/page/pc-rating-%28political-correctness%29';
@@ -78,7 +72,12 @@
         { id: 'noIndexEasy', tag: 'DIV', url: NOINDEX_IMAGE_URL },
         { id: 'flagContent', classList: ['nBtns', 'flagCn'], url: FLAG_GUIDE_URL },
         { classList: ['flagModifier'], url: FLAGMOD_IMAGE_URL },
-        { classList: ['ctBox', 'ctBox2', 'mbt', 'boxed'], tag: 'DIV', text: 'Mods', url: MODS_DIRECTORY_URL },
+    
+    { classList: ['ctBox', 'ctBox2', 'mbt', 'boxed'], tag: 'DIV', text: 'Mods', url: MODS_DIRECTORY_URL },
+    
+    { classList: ['ctBox', 'ctBox2', 'mbt'], tag: 'DIV', text: 'Mods', url: MODS_DIRECTORY_URL },
+    
+    { classList: ['adminButtonMenu', 'mbm', 'peaceOut'], tag: 'DIV', url: MODS_DIRECTORY_URL },
         { id: 'skinGuide', classList: ['ctButton4'], tag: 'SPAN', url: RATING_GUIDE_MAIN_URL },
     ];
 
@@ -137,6 +136,7 @@
     }
 
     document.addEventListener('contextmenu', (e) => {
+        if (!isAuthorizedNow()) { lastRightClicked = null; return; }
         lastRightClicked = null;
         let el = e.target;
         while (el && el !== document.body) {
@@ -159,11 +159,16 @@
 
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg && msg.type === 'fjfe-context-info') {
-            if (lastRightClicked && lastRightClicked.url) {
-                window.open(lastRightClicked.url, '_blank');
-                sendResponse({ handled: true });
+            if (!isAuthorizedNow()) {
+                sendResponse({ handled: false, authorized: false });
                 return true;
             }
+            if (lastRightClicked && lastRightClicked.url) {
+                window.open(lastRightClicked.url, '_blank');
+                sendResponse({ handled: true, authorized: true });
+                return true;
+            }
+            sendResponse({ handled: false, authorized: true });
         }
     });
 })();

@@ -14,7 +14,9 @@
     stopUsernamePopups: true,
     trackRates: false,
     modJSExtras: true,
-    checkText: false,
+  checkText: false,
+  misrateWarning: false,
+  warnOnAll: false,
     
   walcorn: false,
     
@@ -503,7 +505,9 @@
       modJSExtrasRow,
       walcornRow,
       checkTextRow,
-      autoplayRow
+      autoplayRow,
+      misrateWarningRow,
+      warnOnAllRow
     ) => {
       const nextSettings = {
         avoidNext: avoidNextRow.input.checked,
@@ -516,7 +520,9 @@
         modJSExtras: modJSExtrasRow.input.checked,
         walcorn: walcornRow.input.checked,
         checkText: checkTextRow.input.checked,
-        autoplay: autoplayRow ? autoplayRow.input.checked : Boolean(DEFAULT_SETTINGS.autoplay)
+        autoplay: autoplayRow ? autoplayRow.input.checked : Boolean(DEFAULT_SETTINGS.autoplay),
+        misrateWarning: misrateWarningRow.input.checked,
+        warnOnAll: warnOnAllRow.input.checked
       };
 
       persistSettings(nextSettings);
@@ -543,7 +549,10 @@
     const trackRatesRow = createCheckboxRow('fj-sel-track-rates', 'Track Rates', settings.trackRates);
     const modJSExtrasRow = createCheckboxRow('fj-sel-modjs', 'ModJS Extras', settings.modJSExtras);
     const walcornRow = createCheckboxRow('fj-sel-walcorn', 'Walcorn Mode', settings.walcorn);
-    const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
+  const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
+  const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
+  const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
+  try { const labelEl = warnOnAllRow.wrapper.querySelector('label'); if (labelEl) labelEl.style.marginLeft = '22px'; } catch(_) {}
 
     
     const autoplayRow = createCheckboxRow('fj-sel-autoplay', 'Re-enable Autoplay?', Boolean(settings.autoplay));
@@ -570,7 +579,9 @@
         modJSExtrasRow,
         walcornRow,
         checkTextRow,
-        autoplayRow
+        autoplayRow,
+        misrateWarningRow,
+        warnOnAllRow
       );
 
       avoidNextRow.input.addEventListener('change', saveHandler);
@@ -583,7 +594,9 @@
       modJSExtrasRow.input.addEventListener('change', saveHandler);
       walcornRow.input.addEventListener('change', saveHandler);
       checkTextRow.input.addEventListener('change', saveHandler);
-      autoplayRow.input.addEventListener('change', saveHandler);
+  autoplayRow.input.addEventListener('change', saveHandler);
+  misrateWarningRow.input.addEventListener('change', saveHandler);
+  warnOnAllRow.input.addEventListener('change', saveHandler);
     };
     addLiveChangeHandlers();
 
@@ -597,13 +610,15 @@
     setInfoContent(trackRatesRow.infoButton, 'Keeps count of rated content.');
     setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
     setInfoContent(walcornRow.infoButton, 'why');
-    setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
+  setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
+  setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
+  setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
   setInfoContent(autoplayRow.infoButton, 'The autplay toggle. Just moved.');
 
     
     const tabGroups = {
       interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper, autoplayRow.wrapper],
-      tools: [modJSExtrasRow.wrapper, checkTextRow.wrapper, hideRateRow.wrapper, hideShortcutsRow.wrapper, trackRatesRow.wrapper],
+  tools: [misrateWarningRow.wrapper, warnOnAllRow.wrapper, modJSExtrasRow.wrapper, checkTextRow.wrapper, hideRateRow.wrapper, hideShortcutsRow.wrapper, trackRatesRow.wrapper],
       extras: [avoidNextRow.wrapper, walcornRow.wrapper]
     };
 

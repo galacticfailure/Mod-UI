@@ -44,6 +44,26 @@
     showTextSpoilers: 'Auto-shows text spoilers.'
   };
 
+  const brokenJS = [
+    'admincsstest',
+    'djTools',
+    'stringFlagDANGER',
+    'banRequestForm',
+    'banRequestTicker',
+    'ComplaintBETA',
+    'disableBoardCSSNOHELPER',
+    'fadeContributorsOnSFWMOD',
+    'forceUnratedNext',
+    'mentionModsNOHELPER',
+    'ocHelper',
+    'permaBan',
+    'SYNCTEST2',
+    'TESTENTRY',
+    'makeToolsPretty',
+    'New7902',
+    'userFlagPatrolTicker'
+  ];
+
   let observer = null;
   let featureEnabled = true;
   let lastSavedState;
@@ -166,6 +186,13 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
       const key = labelText.includes(':') ? labelText.split(':')[1].trim() : '';
       const infoTarget = key ? Object.keys(INFO_COPY).find(k => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')) : undefined;
 
+      
+      if (infoTarget && brokenJS.includes(infoTarget)) {
+        const row = label.closest('.fj-modjs-info-row');
+        if (row) row.remove(); else label.remove();
+        return;
+      }
+
       const labelTitle = (label.textContent || '').replace(/\s+/g, ' ').trim() || key || 'Details';
       const infoCopy = infoTarget ? INFO_COPY[infoTarget] : undefined;
       const infoText = infoCopy || `TESTING: ${labelTitle}`;
@@ -192,6 +219,36 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
     if (newlyAttached.length > 0) {
       root._fjModJsInfoRows.push(...newlyAttached);
     }
+  };
+
+  
+  const removeBrokenRows = (root) => {
+    if (!root) return;
+
+    
+    const btns = root.querySelectorAll('[data-fj-info-target]');
+    btns.forEach((btn) => {
+      const target = btn?.dataset?.fjInfoTarget;
+      if (target && brokenJS.includes(target)) {
+        const row = btn.closest('.fj-modjs-info-row');
+        if (row) row.remove();
+      }
+    });
+
+    
+    const labels = root.querySelectorAll('label.listJS');
+    labels.forEach((label) => {
+      const txt = (label.textContent || '').trim();
+      const key = txt.includes(':') ? txt.split(':')[1].trim() : '';
+      if (!key) return;
+      const infoTarget = Object.keys(INFO_COPY).find(
+        (k) => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')
+      );
+      if (infoTarget && brokenJS.includes(infoTarget)) {
+        const row = label.closest('.fj-modjs-info-row');
+        if (row) row.remove(); else label.remove();
+      }
+    });
   };
 
   const detachInfoButtonsFromPanel = (root) => {
@@ -512,11 +569,16 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
     if (!featureEnabled || !root) {
       return;
     }
+    
+    removeBrokenRows(root);
 
     attachInfoButtonsToPanel(root);
     if (root && root.style) {
       root.style.overflowX = 'visible';
     }
+
+    
+    removeBrokenRows(root);
 
     const submitSpan = root.querySelector('#submitJ');
     if (!submitSpan || submitSpan.dataset.fjModJsEnhanced === '1') {
