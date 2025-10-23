@@ -449,6 +449,43 @@
     }
   }
 
+  
+  function getMoneyScaledState() {
+    try {
+      const storage = window.fjfeNumbersStorage;
+      if (storage) return storage.readRaw();
+    } catch (_) {}
+    return { infinite: false, scaled: 0n };
+  }
+
+  
+  function priceToScaled(price) {
+    try {
+      if (typeof price === 'bigint') {
+        if (price < 0n) return 0n;
+        return price * 10n;
+      }
+      const num = Number(price);
+      if (!Number.isFinite(num) || num <= 0) return 0n;
+      return BigInt(Math.floor(num * 10));
+    } catch (_) {
+      return 0n;
+    }
+  }
+
+  
+  function canAffordPrice(price) {
+    try {
+      const tools = window.fjfeClickerNumbers;
+      const money = getMoneyScaledState();
+      if (money.infinite) return true;
+      const priceScaled = priceToScaled(price);
+      
+      if (priceScaled <= 0n) return true;
+      return money.scaled >= priceScaled;
+    } catch (_) { return false; }
+  }
+
   function setMoney(v) {
     try {
       const tools = window.fjfeClickerNumbers;
@@ -494,41 +531,33 @@
   }
 
   function purchaseUpgrade(upgrade) {
-    const price = Number(upgrade.basePrice);
-    const tools = window.fjfeClickerNumbers;
+    const price = upgrade.basePrice;
+    
     const storage = window.fjfeNumbersStorage;
-    let currentMoney = getMoney();
-    if (!Number.isFinite(price)) {
-      
-      const isInfWallet = tools && tools.isInfinite && tools.isInfinite(currentMoney);
-      if (!isInfWallet) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return false; }
-    } else {
-      
-      const normalizedMoney = tools && typeof tools.normalizeFunds==='function' ? tools.normalizeFunds(currentMoney) : Math.max(0, Math.floor(currentMoney));
-      const normalizedPrice = tools && typeof tools.quantize==='function' ? tools.quantize(Math.max(0, price)) : Math.max(0, Math.floor(price));
-      if (normalizedMoney < normalizedPrice) {
-        try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {}
-        return false;
-      }
-      
-      if (storage) {
-        try {
-          const st = storage.readRaw();
-          if (st && st.infinite) {
-            
-          } else {
-            const curScaled = st ? st.scaled : 0n;
-            const priceScaled = BigInt(Math.floor(normalizedPrice * 10));
-            const nextScaled = curScaled - priceScaled;
-            storage.writeRaw({ infinite:false, scaled: nextScaled < 0n ? 0n : nextScaled });
-            currentMoney = storage.toDisplayNumber({ infinite:false, scaled: nextScaled < 0n ? 0n : nextScaled });
-          }
-        } catch(_) {}
-      } else {
-        setMoney(normalizedMoney - normalizedPrice);
-        currentMoney = normalizedMoney - normalizedPrice;
-      }
+    const money = getMoneyScaledState();
+    const priceScaled = priceToScaled(price);
+    const affordable = canAffordPrice(price);
+    if (!affordable) {
+      console.log('Not enough money to purchase upgrade:', upgrade.name);
+      try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {}
+      return false;
     }
+
+    
+    try {
+      if (money.infinite) {
+        
+      } else if (storage && typeof storage.writeRaw === 'function') {
+        let next = money.scaled - (priceScaled > 0n ? priceScaled : 0n);
+        if (next < 0n) next = 0n;
+        storage.writeRaw({ infinite: false, scaled: next });
+      } else {
+        
+        const currNum = getMoney();
+        const priceNum = (typeof price === 'bigint') ? Number(price) : Number(price);
+        setMoney(currNum - priceNum);
+      }
+    } catch(_) {}
   try { if (window.fjfeRcDebug && typeof window.fjfeRcDebug.refreshRaw === 'function') window.fjfeRcDebug.refreshRaw(); } catch(_) {}
 
     
@@ -596,21 +625,37 @@
 
   function formatPrice(value) {
     const tools = window.fjfeClickerNumbers;
-    if (tools && typeof tools.formatWords === 'function') {
-      return tools.formatWords(value);
-    }
-    if (!Number.isFinite(value)) return 'Infinity';
-    const n = Math.max(0, Math.floor(value));
-    if (n >= 1_000_000_000) {
-      return (Math.floor((n / 1_000_000_000) * 100) / 100).toFixed(2) + 'B';
-    }
-    if (n >= 1_000_000) {
-      return (Math.floor((n / 1_000_000) * 100) / 100).toFixed(2) + 'M';
-    }
-    if (n >= 1_000) {
-      return (Math.floor((n / 1_000) * 100) / 100).toFixed(2) + 'K';
-    }
-    return String(n);
+    const formatBig = (bi) => {
+      try {
+        if (typeof bi !== 'bigint') {
+          const num = Number(bi);
+          const fmt = (tools && tools.formatCounter) ? tools.formatCounter : (tools && tools.formatAbbrev) ? tools.formatAbbrev : (x=>String(x));
+          return fmt(num);
+        }
+        const neg = bi < 0n ? '-' : '';
+        let abs = bi < 0n ? -bi : bi;
+        if (abs < 1000n) return neg + abs.toString();
+        const units = [
+          { p:3n, a:'K' },{ p:6n, a:'M' },{ p:9n, a:'B' },{ p:12n, a:'T' },
+          { p:15n, a:'Qa' },{ p:18n, a:'Qi' },{ p:21n, a:'Sx' },{ p:24n, a:'Sp' },
+          { p:27n, a:'Oc' },{ p:30n, a:'No' },{ p:33n, a:'De' },{ p:36n, a:'Ud' }
+        ];
+        const s = abs.toString();
+        const digits = BigInt(s.length);
+        let unit = units[0];
+        for (let i = units.length - 1; i >= 0; i--) { if (digits > units[i].p) { unit = units[i]; break; } }
+        let div = 1n; for (let i=0n;i<unit.p;i++) div *= 10n;
+        const scaledTimesThousand = (abs * 1000n) / div;
+        const intPart = scaledTimesThousand / 1000n;
+        let frac = (scaledTimesThousand % 1000n).toString().padStart(3,'0');
+        frac = frac.replace(/0+$/,'');
+        const txt = frac.length ? `${intPart.toString()}.${frac}` : intPart.toString();
+        return neg + txt + unit.a;
+      } catch(_) {
+        try { return bi.toString(); } catch(__) { return '0'; }
+      }
+    };
+    return formatBig(value);
   }
 
   function formatPercentage(inc) {
@@ -765,17 +810,7 @@
     try {
       card._syncAffordability = function() {
         try {
-          const current = getMoney();
-          const price = Number(upgrade.basePrice);
-          const tools = window.fjfeClickerNumbers;
-          let canAfford = true;
-          if (!Number.isFinite(price)) {
-            canAfford = tools && tools.isInfinite && tools.isInfinite(current);
-          } else {
-            const normalizedMoney = tools && typeof tools.normalizeFunds==='function' ? tools.normalizeFunds(current) : Math.max(0, Math.floor(current));
-            const normalizedPrice = tools && typeof tools.quantize==='function' ? tools.quantize(Math.max(0, price)) : Math.max(0, Math.floor(price));
-            canAfford = normalizedMoney >= normalizedPrice;
-          }
+          const canAfford = canAffordPrice(upgrade.basePrice);
           card.style.opacity = canAfford ? '1' : '0.6';
           card.style.cursor = canAfford ? 'pointer' : 'not-allowed';
         } catch(_) {}

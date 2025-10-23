@@ -2,8 +2,70 @@
   const MODULE_KEY = 'apichk';
   const TARGET_HOST = 'funnyjunk.com';
   const CACHE_KEY = '__fj_apichk_cache__';
-  const CACHE_TTL_MS = 10 * 60 * 1000;
+  const CACHE_TTL_MS = 10 * 60 * 1000; 
+  const AUTO_REFRESH_KEY = '__fj_apichk_last_auto_refresh__';
+  const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
+  const AUTO_RETRY_MS = 60 * 60 * 1000; 
+
+  
+  const REFRESH_WINDOW_MS = 5 * 60 * 1000; 
+  const REFRESH_MAX_USES = 3;
+  const REFRESH_WINDOW_START_KEY = '__fj_apichk_refresh_window_start__';
+  const REFRESH_USES_LEFT_KEY = '__fj_apichk_refresh_uses_left__';
+
   let cached = { username: null, rankText: null, level: null, fetchedAt: 0, fetched: false };
+  let autoRefreshTimer = null;
+
+  const isAuthorized = () => {
+    
+    return Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined'));
+  };
+
+  const dispatchStatus = () => {
+    try {
+      const detail = { authorized: isAuthorized(), username: cached.username || null, rankText: cached.rankText || null, level: cached.level || null };
+      document.dispatchEvent(new CustomEvent('fjApichkStatus', { detail }));
+    } catch (_) {}
+  };
+
+  const readRefreshState = () => {
+    let windowStart = 0; let usesLeft = REFRESH_MAX_USES;
+    try { windowStart = parseInt(localStorage.getItem(REFRESH_WINDOW_START_KEY), 10); if (!Number.isFinite(windowStart)) windowStart = 0; } catch(_) { windowStart = 0; }
+    try { usesLeft = parseInt(localStorage.getItem(REFRESH_USES_LEFT_KEY), 10); if (!Number.isFinite(usesLeft)) usesLeft = REFRESH_MAX_USES; } catch(_) { usesLeft = REFRESH_MAX_USES; }
+    const now = Date.now();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      
+      windowStart = 0;
+      usesLeft = REFRESH_MAX_USES;
+    }
+    return { windowStart, usesLeft };
+  };
+
+  const writeRefreshState = (windowStart, usesLeft) => {
+    try { localStorage.setItem(REFRESH_WINDOW_START_KEY, String(windowStart || 0)); } catch(_) {}
+    try { localStorage.setItem(REFRESH_USES_LEFT_KEY, String(Math.max(0, usesLeft))); } catch(_) {}
+  };
+
+  const canUseManualRefresh = () => {
+    const { windowStart, usesLeft } = readRefreshState();
+    const now = Date.now();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      return { allowed: true, remaining: REFRESH_MAX_USES, resetAt: null };
+    }
+    return { allowed: usesLeft > 0, remaining: Math.max(0, usesLeft), resetAt: windowStart + REFRESH_WINDOW_MS };
+  };
+
+  const consumeManualRefresh = () => {
+    const now = Date.now();
+    let { windowStart, usesLeft } = readRefreshState();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      windowStart = now;
+      usesLeft = REFRESH_MAX_USES;
+    }
+    usesLeft = Math.max(0, usesLeft - 1);
+    writeRefreshState(windowStart, usesLeft);
+    return { windowStart, usesLeft };
+  };
 
   const sameOriginFetch = async (path) => {
     const url = path.startsWith('http') ? path : (location.origin + (path.startsWith('/') ? '' : '/') + path);
@@ -52,43 +114,312 @@
       const age = Date.now() - (obj.fetchedAt || 0);
       if (age >= CACHE_TTL_MS) return null;
       return obj;
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
+
   };
 
   const saveCache = (obj) => {
-    try { const toSave = { ...obj, fetchedAt: Date.now() }; localStorage.setItem(CACHE_KEY, JSON.stringify(toSave)); } catch (_) {}
+    try {
+      const toSave = { ...obj, fetchedAt: Date.now() };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(toSave));
+    } catch (_) {}
   };
 
   const ensureRankFetched = async (force = false) => {
     if (!force) {
       const fromStore = loadCache();
-      if (fromStore) { cached = { ...fromStore, fetched: true }; return cached; }
+      if (fromStore) {
+        cached = { ...fromStore, fetched: true };
+        dispatchStatus();
+        return cached;
+      }
       if (cached.fetched && (cached.username || cached.rankText)) return cached;
     }
     try {
       const username = await getUsername();
-      if (!username) { cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true }; saveCache(cached); return cached; }
+      if (!username) {
+        cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
+        saveCache(cached);
+        dispatchStatus();
+        return cached;
+      }
       const list = await getModRanksList();
       const entry = findRankForUser(list, username);
       const rankText = entry && entry.rank ? String(entry.rank) : null;
       const level = extractLevel(rankText);
       cached = { username, rankText, level, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
+      dispatchStatus();
       return cached;
     } catch (e) {
       cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
+      dispatchStatus();
       return cached;
     }
   };
 
+  const findVersionLabel = () => {
+    try {
+      const menu = document.getElementById('fj-sel-menu');
+      if (!menu) return null;
+      const divs = menu.querySelectorAll('div');
+      for (const d of divs) {
+        if (!d) continue;
+        const txt = (d.textContent || '').trim();
+        if (txt.startsWith('Local version: v')) return d;
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const ensureFooterUI = () => {
+    try {
+      const menu = document.getElementById('fj-sel-menu');
+      if (!menu) return null;
+      const label = findVersionLabel();
+      if (!label) return null;
+
+      
+      try {
+        const unauthorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function' ? !window.fjApichk.isAuthorized() : false;
+        if (unauthorized) {
+          const existing = label.closest('[data-fjFooterRow="1"]');
+          if (existing) {
+            const btn = existing.querySelector('#fj-apichk-refresh');
+            if (btn) btn.remove();
+          }
+          return { label, refreshBtn: null };
+        }
+      } catch (_) {}
+
+      
+      let row = label.closest('[data-fjFooterRow="1"]');
+      let right;
+      if (!row) {
+        
+        row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.gap = '8px';
+        row.style.marginTop = '6px';
+        row.dataset.fjFooterRow = '1';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.flex = '1 1 auto';
+
+        right = document.createElement('div');
+        right.style.flex = '0 0 auto';
+
+        const parent = label.parentElement;
+        if (!parent) return null;
+        parent.insertBefore(row, label);
+        left.appendChild(label);
+        row.appendChild(left);
+        row.appendChild(right);
+      } else {
+        right = row.querySelector(':scope > div:last-child') || row;
+      }
+
+      
+      let btn = row.querySelector('#fj-apichk-refresh');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'fj-apichk-refresh';
+        btn.type = 'button';
+        btn.textContent = 'Update Credentials';
+        Object.assign(btn.style, {
+          padding: '4px 8px',
+          font: "600 12px 'Segoe UI', sans-serif",
+          color: '#111',
+          background: '#ff8c00',
+          border: '1px solid #b86900',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        });
+        right.appendChild(btn);
+      } else {
+        
+        const clone = btn.cloneNode(true);
+        btn.replaceWith(clone);
+        btn = clone;
+      }
+
+      btn.addEventListener('click', async () => {
+        const st = canUseManualRefresh();
+        if (!st.allowed) {
+          
+          try {
+            const now = Date.now();
+            const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
+            alert(`Please wait ${minutesLeft} minutes before trying again.`);
+          } catch (_) {}
+          return;
+        }
+        consumeManualRefresh();
+        const prevAuthorized = (window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') ? window.fjApichk.isAuthorized() : null;
+        const prevText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Updating…';
+        try {
+          const res = await ensureRankFetched(true);
+          console.log('[FJFE:apichk] Credentials refreshed', {
+            username: res.username || null,
+            rank: res.rankText || null,
+            level: res.level || null
+          });
+          const nowAuthorized = (res && res.rankText && (res.level !== null && typeof res.level !== 'undefined')) ? true : false;
+          if (prevAuthorized !== null && nowAuthorized !== prevAuthorized) {
+            try { writeLastAutoRefresh(Date.now()); } catch(_) {}
+            setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
+          }
+        } catch (e) {
+          console.warn('[FJFE:apichk] Refresh failed', e);
+        }
+        btn.textContent = prevText;
+        btn.disabled = false;
+      });
+
+      return { label, refreshBtn: btn };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const applyRankToVersionLabel = () => {
+    
+    return Boolean(ensureFooterUI());
+  };
+
+  const observeMenuAndApply = async () => {
+    await ensureRankFetched();
+    
+    if (applyRankToVersionLabel()) return;
+    
+    const obs = new MutationObserver(() => {
+      if (applyRankToVersionLabel()) {
+        try {
+          obs.disconnect();
+        }
+ catch (_) {}
+      }
+    });
+    try {
+      obs.observe(document.documentElement || document.body, { childList: true, subtree: true });
+    } catch (_) {}
+  };
+
+  const init = () => {
+    try {
+      if (location.hostname !== TARGET_HOST) return;
+      if (window.__fjApichkInitDone) return;
+      window.__fjApichkInitDone = true;
+      observeMenuAndApply();
+      scheduleDailyAutoRefresh();
+      
+      ensureRankFetched(false).catch(() => {});
+    } catch (_) {}
+  };
+
+  const readLastAutoRefresh = () => {
+    try {
+      const v = parseInt(localStorage.getItem(AUTO_REFRESH_KEY), 10); return Number.isFinite(v) ? v : 0;
+    }
+ catch (_) {
+      return 0;
+    }
+
+  };
+
+  const writeLastAutoRefresh = (ts) => {
+    try {
+      localStorage.setItem(AUTO_REFRESH_KEY, String(ts));
+    }
+ catch (_) {}
+  };
+
+  const scheduleDailyAutoRefresh = () => {
+    try { if (autoRefreshTimer) { clearTimeout(autoRefreshTimer); autoRefreshTimer = null; } } catch (_) {}
+    const now = Date.now();
+    const last = readLastAutoRefresh();
+    
+    if (!last || last <= 0) {
+      try {
+        autoRefreshTimer = setTimeout(runDailyAutoRefresh, 5000);
+      }
+ catch (_) {}
+      return;
+    }
+    const next = last + AUTO_INTERVAL_MS;
+    if (now >= next) {
+      
+      try {
+        autoRefreshTimer = setTimeout(runDailyAutoRefresh, 0);
+      }
+ catch (_) {}
+      return;
+    }
+    const delay = Math.max(0, next - now);
+    try {
+      autoRefreshTimer = setTimeout(runDailyAutoRefresh, delay);
+    }
+ catch (_) {}
+  };
+
+  const runDailyAutoRefresh = async () => {
+    try {
+      const prevAuth = isAuthorized();
+      await ensureRankFetched(true);
+      const newAuth = isAuthorized();
+      if (prevAuth !== newAuth) {
+        try { writeLastAutoRefresh(Date.now()); } catch(_) {}
+        setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
+        return;
+      }
+      writeLastAutoRefresh(Date.now());
+      
+      try {
+        if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
+      }
+ catch (_) {}
+      autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_INTERVAL_MS);
+      try {
+        console.log('[FJFE:apichk] Daily credentials refresh completed.');
+      }
+ catch (_) {}
+    } catch (e) {
+      
+      try {
+        if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
+      }
+ catch (_) {}
+      autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_RETRY_MS);
+      try {
+        console.warn('[FJFE:apichk] Daily credentials refresh failed; will retry in 1h.', e);
+      }
+ catch (_) {}
+    }
+  };
+
+  if (!window.fjTweakerModules) window.fjTweakerModules = {};
+  window.fjTweakerModules[MODULE_KEY] = { init };
+
   
   window.fjApichk = {
     ensureFetched: ensureRankFetched,
-    isAuthorized: () => Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined')),
+    isAuthorized,
     getCached: () => ({ ...cached }),
+    canUseManualRefresh,
     requestManualRefresh: async () => {
-      const prev = window.fjApichk.isAuthorized();
+      const st = canUseManualRefresh();
+      if (!st.allowed) return { ok: false, reason: 'cooldown', resetAt: st.resetAt };
+      consumeManualRefresh();
+      const prevAuth = isAuthorized();
       const res = await ensureRankFetched(true);
       try {
         console.log('[FJFE:apichk] Credentials refreshed', {
@@ -97,12 +428,13 @@
           level: res.level || null
         });
       } catch (_) {}
-      const nowA = window.fjApichk.isAuthorized();
-      if (prev !== nowA) setTimeout(() => { try { location.reload(); } catch (_) {} }, 200);
-      return { ok: true, authorized: nowA };
+      const nowAuth = Boolean(res && res.rankText && (res.level !== null && typeof res.level !== 'undefined'));
+      
+      if (prevAuth !== nowAuth) {
+        try { writeLastAutoRefresh(Date.now()); } catch (_) {}
+        setTimeout(() => { try { location.reload(); } catch (_) {} }, 200);
+      }
+      return { ok: true, authorized: nowAuth };
     }
   };
-
-  if (!window.fjTweakerModules) window.fjTweakerModules = {};
-  window.fjTweakerModules[MODULE_KEY] = { init: () => { if (location.hostname !== TARGET_HOST) return; ensureRankFetched(false).catch(() => {}); } };
 })();

@@ -11,16 +11,16 @@
     fadeContributorsOnSFWMOD: 'Unknown.',
     forceUnratedNext: 'Unknown.',
     TESTENTRY: 'Unknown.',
-    execModFJMemeTools: 'Tools for Level 8+ moderators. Enable DiscordResolver it is required if you use this.',
-    flagNotice: 'Shows important information left by other mods when trying to flag content.',
-    adminIsABigNigger: 'Adds some custom styles to make things a bit prettier?',
+    execModFJMemeTools: 'Tools for Level 8+ moderators.',
+    flagNotice: 'Shows important information left by other mods when trying to flag content or comments.',
+    adminIsABigNigger: 'Adds some custom styles to make things a bit prettier',
     commentLinker: 'Debugging tool, adds a button to get the comment ID without having to inspect element. Worthless for most mods.',
     userHistory: 'Grants access to user history buttons on profiles.',
     permaBan: 'Adds a permaban button on user profiles, must have explicit access granted by Posttwo.',
     contentReview: 'Used by instructors to review content rated by students.',
     userFlagPatrolTicker: 'Adds a counter to the navbar that shows the number of user flags that need to be reviewed. Enable only if you take care of user flags on FJMeme.',
     HideShitpostNotes: 'Hides mod notes marked as shitposts.',
-    outboundCase: 'Allows you to make a modcase directly on FJ insteaf of on fjme.me.',
+    outboundCase: 'Allows you to send messages through fjmodbot directly on FJ instead of on fjme.me.',
     getUserFlagHistory: 'Enables you to see which user flags a user has made, useful for checking if a user is abusing the function.',
     SYNCTEST2: 'Defunct.',
     stringFlagDANGER: "Allows you to mass flag comments matching a string. Don't.",
@@ -35,34 +35,33 @@
     disableBoardCSSNOHELPER: 'Unknown.',
     discordResolver: 'Button to find FJMeme accounts connected to the user. Required if you use execModFJMemeTools.',
     ocHelper: 'Unknown.',
-    arrive2UNLESSASKED: 'Mod.js will not work without this. Allegedly.',
+    arrive2UNLESSASKED: 'Mod.js will not work without this.',
     djTools: "Don't.",
     massFlagUserComments: 'Enables you to use the mass flag comments tool on SFW comment pages, very useful for spam flags.',
     showImageSpoilers: "Automatically reveals image which have been 'spoilered'.",
     admincsstest: 'Unknown.',
-    makeToolsPretty: 'Unknown. Allegedly pretties up some tools? Maybe defunct.',
+    makeToolsPretty: 'Makes some modjs like ModHelp pretty.',
     showTextSpoilers: 'Auto-shows text spoilers.'
   };
 
   const brokenJS = [
-    'admincsstest',
-    'djTools',
-    'stringFlagDANGER',
-    'banRequestForm',
-    'banRequestTicker',
-    'ComplaintBETA',
+    'admincsstest', 
+    'djTools', 
+    'stringFlagDANGER', 
+    'banRequestForm', 
+    'banRequestTicker', 
+    'ComplaintBETA', 
     'disableBoardCSSNOHELPER',
     'fadeContributorsOnSFWMOD',
     'forceUnratedNext',
     'mentionModsNOHELPER',
-    'ocHelper',
+    'ocHelper', 
     'permaBan',
-    'SYNCTEST2',
-    'TESTENTRY',
-    'makeToolsPretty',
-    'New7902',
-    'userFlagPatrolTicker'
-  ];
+    'SYNCTEST2', 
+    'TESTENTRY', 
+    'makeToolsPretty', 
+    'New7902', 
+    'userFlagPatrolTicker'];
 
   let observer = null;
   let featureEnabled = true;
@@ -84,59 +83,41 @@
     return undefined;
   };
 
-  const createFallbackInfoButton = (text, size = 44, title = '') => {
+  const createFallbackInfoButton = (text, size = 20) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = 'i';
+    button.dataset.placement = 'right';
     button.style.backgroundImage = 'none';
-    const dimension = typeof size === 'number' ? size + 'px' : (size || '44px');
+    const dimension = typeof size === 'number' ? size + 'px' : (size || '20px');
     Object.assign(button.style, {
       width: dimension,
       height: dimension,
-      minWidth: '44px',
-      minHeight: '44px',
-      font: "600 14px 'Segoe UI', sans-serif",
+      font: "600 12px 'Segoe UI', sans-serif",
       color: '#f8f8f8',
       background: 'rgba(40, 40, 40, 0.85)',
       border: '1px solid #555',
       borderRadius: '50%',
       cursor: 'pointer',
-      flexShrink: '0',
-      touchAction: 'manipulation',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      flexShrink: '0'
     });
     button.addEventListener('click', (event) => {
       event.stopPropagation();
-      const heading = title || 'Details';
-      window.alert(`${heading}
-
-${text || 'PLACEHOLDER: ModJS entry'}`);
     });
     return button;
   };
 
-  const createInfoButton = ({ text = 'PLACEHOLDER: popup default', title = '', size = 44, placement = 'right' } = {}) => {
+
+
+  const createInfoButton = (text, size = 24, placement = 'right') => {
     if (window.fjTweakerInfo?.createInfoButton) {
       return window.fjTweakerInfo.createInfoButton({
-        text: text && text.length ? text : 'PLACEHOLDER: popup default',
-        title,
-        size: Math.max(size, 44),
+        text: text?.length ? text : 'PLACEHOLDER: ModJS entry',
+        size,
         placement
       });
     }
-    return createFallbackInfoButton(text, Math.max(size, 44), title);
-  };
-  const setModJsPopupContent = (button, title, message) => {
-    if (!button) {
-      return;
-    }
-    if (window.fjTweakerInfo?.updateInfoContent) {
-      window.fjTweakerInfo.updateInfoContent(button, { text: message, title });
-    }
-    button.dataset.fjInfoTitle = title;
-    button.dataset.fjInfoText = message;
+    return createFallbackInfoButton(text, size);
   };
 
   const attachInfoButtonsToPanel = (root) => {
@@ -174,47 +155,50 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
       row.append(label);
 
       const previousFlex = label.style.flex || '';
-      const previousMargin = label.style.margin || '';
+        const previousMargin = label.style.margin || '';
 
-      label.dataset.fjModJsInfoAttached = '1';
-      label.dataset.fjModJsInfoFlex = previousFlex;
-      label.dataset.fjModJsInfoMargin = previousMargin;
-      label.style.flex = '1 1 auto';
-      label.style.margin = '0';
+        label.dataset.fjModJsInfoAttached = '1';
+        label.dataset.fjModJsInfoFlex = previousFlex;
+        label.dataset.fjModJsInfoMargin = previousMargin;
+        label.style.flex = '1 1 auto';
+        label.style.margin = '0';
 
       const labelText = label.textContent.trim();
       const key = labelText.includes(':') ? labelText.split(':')[1].trim() : '';
       const infoTarget = key ? Object.keys(INFO_COPY).find(k => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')) : undefined;
 
-      
       if (infoTarget && brokenJS.includes(infoTarget)) {
-        const row = label.closest('.fj-modjs-info-row');
-        if (row) row.remove(); else label.remove();
+        
+        if (row && row.parentElement) {
+          row.remove();
+        } else {
+          label.remove();
+        }
         return;
       }
 
       const labelTitle = (label.textContent || '').replace(/\s+/g, ' ').trim() || key || 'Details';
       const infoCopy = infoTarget ? INFO_COPY[infoTarget] : undefined;
       const infoText = infoCopy || `TESTING: ${labelTitle}`;
-      const infoButton = createInfoButton({
-        text: infoText,
-        title: labelTitle,
-        size: 22,
-        placement: 'right'
-      });
-      setModJsPopupContent(infoButton, labelTitle, infoText);
-      infoButton.style.alignSelf = 'center';
-      infoButton.style.flexShrink = '0';
-      infoButton.style.marginLeft = '6px';
-      infoButton.dataset.fjInfoTarget = infoTarget;
-      infoButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-      });
+        const infoButton = createInfoButton(infoText, 22, 'right');
+        if (window.fjTweakerInfo?.updateTooltip) {
+          window.fjTweakerInfo.updateTooltip(infoButton, infoText);
+        } else {
+          infoButton.dataset.fjInfoText = infoText;
+        }
+        infoButton.style.alignSelf = 'center';
+        infoButton.style.flexShrink = '0';
+        infoButton.style.marginLeft = '6px';
+        infoButton.dataset.fjInfoTarget = infoTarget;
+        infoButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
 
-      row.append(infoButton);
+        row.append(infoButton);
 
       newlyAttached.push({ row, label });
     });
+
 
     if (newlyAttached.length > 0) {
       root._fjModJsInfoRows.push(...newlyAttached);
@@ -222,16 +206,29 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
   };
 
   
+  
   const removeBrokenRows = (root) => {
     if (!root) return;
 
     
+    
     const btns = root.querySelectorAll('[data-fj-info-target]');
     btns.forEach((btn) => {
       const target = btn?.dataset?.fjInfoTarget;
-      if (target && brokenJS.includes(target)) {
+      if (!target) return;
+      if (brokenJS.includes(target)) {
         const row = btn.closest('.fj-modjs-info-row');
-        if (row) row.remove();
+        if (row) {
+          row.remove();
+        } else {
+          
+          const label = btn.previousElementSibling && btn.previousElementSibling.matches?.('label.listJS')
+            ? btn.previousElementSibling
+            : null;
+          if (label) {
+            label.remove();
+          }
+        }
       }
     });
 
@@ -245,8 +242,12 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
         (k) => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')
       );
       if (infoTarget && brokenJS.includes(infoTarget)) {
-        const row = label.closest('.fj-modjs-info-row');
-        if (row) row.remove(); else label.remove();
+        const wrapRow = label.closest('.fj-modjs-info-row');
+        if (wrapRow) {
+          wrapRow.remove();
+        } else {
+          label.remove();
+        }
       }
     });
   };
@@ -792,4 +793,3 @@ ${text || 'PLACEHOLDER: ModJS entry'}`);
 
   window.fjTweakerModules[MODULE_KEY] = { init };
 })();
-

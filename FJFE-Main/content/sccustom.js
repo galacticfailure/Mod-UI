@@ -1216,7 +1216,11 @@
       if (!style) {
         style = document.createElement('style');
         style.id = id;
-        style.textContent = `#rateShort, #quickM { display: none !important; }`;
+        style.textContent = `
+          #rateShort, #quickM { display: none !important; }
+          .modF.modF1 ~ #cControlsCon { margin-top: -60px !important; }
+          .replaceModCC ~ #cControlsCon { margin-top: -60px !important; }
+        `;
         document.head.appendChild(style);
       }
     } else {
@@ -1226,6 +1230,10 @@
         const qm = document.getElementById('quickM');
         if (rs && rs.style.display === 'none') rs.style.display = '';
         if (qm && qm.style.display === 'none') qm.style.display = '';
+        
+        // Restore original margin-top for HTML 2 only
+        const html2 = document.getElementById('cControlsCon');
+        if (html2 && html2.style.marginTop === '-60px') html2.style.marginTop = '';
       } catch (_) {}
     }
   }

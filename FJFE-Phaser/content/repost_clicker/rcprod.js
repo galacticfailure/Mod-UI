@@ -70,6 +70,35 @@
     } catch (_) { return 0; }
   }
 
+  
+  function getMoneyScaledState() {
+    try {
+      const storage = window.fjfeNumbersStorage;
+      if (storage) return storage.readRaw();
+    } catch (_) {}
+    return { infinite: false, scaled: 0n };
+  }
+  function priceToScaled(price) {
+    try {
+      if (typeof price === 'bigint') {
+        if (price < 0n) return 0n;
+        return price * 10n;
+      }
+      const num = Number(price);
+      if (!Number.isFinite(num) || num <= 0) return 0n;
+      return BigInt(Math.floor(num * 10));
+    } catch(_) { return 0n; }
+  }
+  function canAffordPrice(price) {
+    try {
+      const m = getMoneyScaledState();
+      if (m.infinite) return true;
+      const priceScaled = priceToScaled(price);
+      if (priceScaled <= 0n) return true;
+      return m.scaled >= priceScaled;
+    } catch(_) { return false; }
+  }
+
   function setMoney(v) {
     try {
       const tools = window.fjfeClickerNumbers;
@@ -189,21 +218,34 @@
 
   function calcPriceFor(def, curNum) {
     
-    let base;
-    try {
-      base = Number(def.basePrice);
-    } catch(_) {
-      base = NaN;
-    }
-    if (!Number.isFinite(base)) return Number.POSITIVE_INFINITY;
-    const growth = Math.pow(MULTIPLIER, curNum);
-    const baseRaw = base * growth;
-    const groupFactor = getPriceDiscountFactorGlobal('red');
-    const rawProduct = baseRaw * groupFactor;
-    const rawPrice = Number.isFinite(rawProduct) ? Math.floor(rawProduct) : Number.POSITIVE_INFINITY;
     
-    if (!Number.isFinite(rawPrice)) return Number.POSITIVE_INFINITY;
-    return clampSafe(rawPrice);
+    
+    const toBigInt = (v) => {
+      try {
+        if (typeof v === 'bigint') return v < 0n ? 0n : v;
+        const num = Number(v);
+        if (!Number.isFinite(num) || num <= 0) return 0n;
+        return BigInt(Math.floor(num));
+      } catch(_) { return 0n; }
+    };
+    const baseBI = toBigInt(def && def.basePrice);
+    if (baseBI <= 0n) return 0n;
+    const S = 1000n; 
+    
+    let growthScaled = S;
+    for (let i = 0; i < Math.max(0, Math.floor(curNum||0)); i++) {
+      
+      growthScaled = (growthScaled * 115n) / 100n;
+      if (growthScaled <= 0n) { growthScaled = S; }
+    }
+    let gf = 1.0;
+    try { gf = Number(getPriceDiscountFactorGlobal('red')) || 1.0; } catch(_) {}
+    const gfScaled = BigInt(Math.floor(Math.max(0, gf) * Number(S)));
+    
+    let priceBI = (baseBI * growthScaled);
+    priceBI = (priceBI * gfScaled) / (S * S);
+    if (priceBI < 0n) priceBI = 0n;
+    return priceBI;
   }
 
   function getTotalRps() {
@@ -244,7 +286,7 @@
     try {
       const bonusPct = parseInt(localStorage.getItem('fjfeStats_prestigeBonusPct')||'0',10) || 0;
       if (Number.isFinite(bonusPct) && bonusPct > 0) {
-        sum = sum * (1 + (bonusPct/100));
+        sum = sum * (1 + (bonusPct / 100));
       }
     } catch(_) {}
     if (tools && typeof tools.quantize === 'function') {
@@ -407,9 +449,52 @@
     };
 
     let curNum = loadNum();
+  const formatBigAbbrev = (bi) => {
+    try {
+      if (typeof bi !== 'bigint') return (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev)
+        ? window.fjfeClickerNumbers.formatAbbrev(bi)
+        : formatCompact(Number(bi||0));
+      const neg = bi < 0n ? '-' : '';
+      let abs = bi < 0n ? -bi : bi;
+      if (abs < 1000n) return neg + abs.toString();
+      const units = [
+        { p:3n, a:'K' },{ p:6n, a:'M' },{ p:9n, a:'B' },{ p:12n, a:'T' },
+        { p:15n, a:'Qa' },{ p:18n, a:'Qi' },{ p:21n, a:'Sx' },{ p:24n, a:'Sp' },
+        { p:27n, a:'Oc' },{ p:30n, a:'No' },{ p:33n, a:'De' },{ p:36n, a:'Ud' },
+        { p:39n, a:'Dd' },{ p:42n, a:'Td' },{ p:45n, a:'Qd' },{ p:48n, a:'Qn' },
+        { p:51n, a:'Sxd' },{ p:54n, a:'Spd' },{ p:57n, a:'Ocd' },{ p:60n, a:'Nod' },
+        { p:63n, a:'Vg' },{ p:66n, a:'Uvg' },{ p:69n, a:'Dvg' },{ p:72n, a:'Trvg' },
+        { p:75n, a:'Qavg' },{ p:78n, a:'Qivg' },{ p:81n, a:'Sxvg' },{ p:84n, a:'Spvg' },
+        { p:87n, a:'Ocvg' },{ p:90n, a:'Novg' },{ p:93n, a:'Tg' },{ p:96n, a:'Utg' },
+        { p:99n, a:'Dtg' },{ p:102n, a:'Ttrg' },{ p:105n, a:'Qtrg' },{ p:108n, a:'Qitg' },
+        { p:111n, a:'Sxtg' },{ p:114n, a:'Sptg' },{ p:117n, a:'Octg' },{ p:120n, a:'Notg' },
+        { p:123n, a:'Qg' },{ p:126n, a:'Uqg' },{ p:129n, a:'Dqg' },{ p:132n, a:'Tqg' },
+        { p:135n, a:'Qaqg' },{ p:138n, a:'Qiqg' },{ p:141n, a:'Sxqg' },{ p:144n, a:'Spqg' },
+        { p:147n, a:'Ocqg' },{ p:150n, a:'Noqg' }
+      ];
+      const s = abs.toString();
+      const digits = BigInt(s.length);
+      let unit = units[0];
+      for (let i = units.length - 1; i >= 0; i--) { if (digits > units[i].p) { unit = units[i]; break; } }
+      let div = 1n; for (let i=0n;i<unit.p;i++) div *= 10n;
+      const scaledTimesThousand = (abs * 1000n) / div;
+      const intPart = scaledTimesThousand / 1000n;
+      let frac = (scaledTimesThousand % 1000n).toString().padStart(3,'0');
+      frac = frac.replace(/0+$/,'');
+      const txt = frac.length ? `${intPart.toString()}.${frac}` : intPart.toString();
+      return neg + txt + unit.a;
+    } catch(_) { try { return bi.toString(); } catch(__) { return '0'; } }
+  };
+  const formatPriceAny = (val) => {
+    if (typeof val === 'bigint') return formatBigAbbrev(val);
+    const num = Number(val);
+    if (!Number.isFinite(num)) return 'Infinity';
+    const fmt = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev : formatCompact;
+    return fmt(num);
+  };
   const calcPrice = () => calcPriceFor(def, curNum);
 
-  priceNum.textContent = computeUnlocked() ? ((window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice())) : '???';
+  priceNum.textContent = computeUnlocked() ? formatPriceAny(calcPrice()) : '???';
     Object.assign(priceNum.style, {
       color: '#e33',
       fontWeight: '700',
@@ -445,7 +530,7 @@
 
     upgrade._isClickableNow = function() {
       if (!computeUnlocked()) return false;
-      return canAffordConsideringFormat(getMoney(), calcPrice());
+      return canAffordPrice(calcPrice());
     };
 
     const levelDiv = document.createElement('div');
@@ -470,10 +555,10 @@
       const unlockedNow = computeUnlocked();
       if (unlockedNow) {
         name.textContent = def.name || id;
-    const defaultImgName2 = (def.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const defaultImgName2 = (def.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const imgPath2 = def.img ? def.img : `icons/clicker/production/${defaultImgName2}.png`;
     img.src = chrome.runtime.getURL ? chrome.runtime.getURL(imgPath2) : imgPath2;
-    priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
+  priceNum.textContent = formatPriceAny(calcPrice());
         const clickable = upgrade._isClickableNow();
         row.style.cursor = clickable ? 'pointer' : 'not-allowed';
         row.style.opacity = clickable ? '1' : '0.6';
@@ -503,31 +588,31 @@
   const unlockedBefore = getUnlockedCount();
   const price = calcPrice();
       const tools = window.fjfeClickerNumbers;
-      const isInfiniteCost = !Number.isFinite(price) || (tools && tools.isInfinite && tools.isInfinite(price));
-      const effectivePrice = isInfiniteCost ? 0 : price;
-      const moneyRaw = getMoney();
-  if (!canAffordConsideringFormat(moneyRaw, price)) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return; }
-      const normalizedMoney = tools && typeof tools.normalizeFunds === 'function' ? tools.normalizeFunds(moneyRaw) : moneyRaw;
-      const isInfiniteWallet = tools && tools.isInfinite && tools.isInfinite(normalizedMoney);
-      let newMoney;
-      if (isInfiniteWallet) {
-        
-        newMoney = isInfiniteCost ? 0 : normalizedMoney;
-      } else {
-        const canBuy = normalizedMoney >= effectivePrice;
-        if (!canBuy) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return; }
-        newMoney = normalizedMoney - effectivePrice;
-      }
-      setMoney(newMoney);
+    const isInfiniteCost = (typeof price !== 'bigint') && (!Number.isFinite(price) || (tools && tools.isInfinite && tools.isInfinite(price)));
+    const effectivePrice = price;
+      if (!canAffordPrice(price)) { try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {} return; }
+      
+      try {
+        const storage = window.fjfeNumbersStorage;
+        const money = getMoneyScaledState();
+        const priceScaled = priceToScaled(effectivePrice);
+        if (!money.infinite && storage && typeof storage.writeRaw === 'function') {
+          let next = money.scaled - (priceScaled > 0n ? priceScaled : 0n);
+          if (next < 0n) next = 0n;
+          storage.writeRaw({ infinite:false, scaled: next });
+        }
+      } catch(_) {}
       try {
         const disp = document.getElementById('fjfe-clicker-count-v2');
         if (disp) {
           const tools = window.fjfeClickerNumbers;
-          const txt = (tools && tools.formatCounter) ? tools.formatCounter(newMoney) : formatCompact(newMoney);
+          const storage = window.fjfeNumbersStorage;
+          const st = storage ? storage.readRaw() : { infinite:false, scaled:0n };
+          const newMoneyDisplay = storage ? storage.toDisplayNumber(st) : getMoney();
+          const txt = (tools && tools.formatCounter) ? tools.formatCounter(newMoneyDisplay) : formatCompact(newMoneyDisplay);
           disp.textContent = txt;
         }
-        
-        priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
+        priceNum.textContent = formatPriceAny(calcPrice());
         if (window.fjfeRcInfo && typeof window.fjfeRcInfo.show === 'function' && row.matches(':hover')) {
           const imgEl = img;
           const currentCost = priceNum.textContent || '???';
@@ -557,9 +642,9 @@
           window.fjfeRcInfo.show({ imageSrc: imgEl && imgEl.src ? imgEl.src : '', name: currentName, cost: currentCost, bodyTop: topLine2, bodyMid: midLine2, bodyTT: ttLine2 });
         }
       } catch (_) {}
-      curNum++;
+    curNum++;
       persistNum(curNum);
-  priceNum.textContent = formatCompact(calcPrice());
+  priceNum.textContent = formatPriceAny(calcPrice());
       updateNum();
       try { if (window.fjfeAudio) window.fjfeAudio.play('production'); } catch(_) {}
       try {
@@ -600,7 +685,7 @@
         }
         const imgEl = img; 
         
-        priceNum.textContent = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev(calcPrice()) : formatCompact(calcPrice());
+  priceNum.textContent = formatPriceAny(calcPrice());
         const currentCost = priceNum.textContent || '???';
         const currentName = name.textContent || '???';
         const tools = window.fjfeClickerNumbers;

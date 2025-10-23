@@ -73,21 +73,17 @@
   };
 
   const replayHoverEvents = (link) => {
+    const pointerEvent = new PointerEvent('pointerenter', {
+      bubbles: false,
+      cancelable: true
+    });
+    link.dispatchEvent(pointerEvent);
+
     const mouseEvent = new MouseEvent('mouseover', {
       bubbles: true,
       cancelable: true
     });
     link.dispatchEvent(mouseEvent);
-
-
-    if ('ontouchstart' in window) {
-      const touchEvent = new TouchEvent('touchstart', {
-        bubbles: true,
-        cancelable: true,
-        touches: []
-      });
-      link.dispatchEvent(touchEvent);
-    }
   };
 
   const handleClick = (event) => {
@@ -125,17 +121,14 @@
       handleClick(event);
     };
 
-
-    document.addEventListener('mouseenter', suppressPointerEnterHandler, true);
-    document.addEventListener('touchstart', suppressPointerEnterHandler, true);
+    document.addEventListener('pointerenter', suppressPointerEnterHandler, true);
     document.addEventListener('mouseover', suppressMouseOverHandler, true);
     document.addEventListener('click', clickHandler, true);
   };
 
   const detachListeners = () => {
     if (suppressPointerEnterHandler) {
-      document.removeEventListener('mouseenter', suppressPointerEnterHandler, true);
-      document.removeEventListener('touchstart', suppressPointerEnterHandler, true);
+      document.removeEventListener('pointerenter', suppressPointerEnterHandler, true);
       suppressPointerEnterHandler = null;
     }
 

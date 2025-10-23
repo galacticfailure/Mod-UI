@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Phaser FJ Feature Extender",
     "description": "Bunch of helper stuff.",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "browser_specific_settings": {
         "gecko": {
             "id": "phaser-fj-tweaker@nonsense.com",
@@ -20,11 +20,22 @@
                 "https://funnyjunk.com/*"
             ],
             "js": [
+                "content/farm/farmaudio.js",
                 "content/apichk.js",
                 "content/info.js",
                 "content/sel.js",
                 "content/slick.js",
                 "content/modjs.js",
+                "content/farm/farmmain.js",
+                "content/farm/farmtt.js",
+                "content/farm/farminteract.js",
+                "content/farm/farmtools.js",
+                "content/farm/farmseeds.js",
+                "content/farm/farmcook.js",
+                "content/farm/farmshop.js",
+                "content/farm/farmtile.js",
+                "content/farm/farminv.js",
+                "content/farm/farmset.js",
                 "content/ratetrack.js",
                 "content/sccustom.js",
                 "content/userpop.js",
@@ -61,6 +72,12 @@
         "icons/*",
         "icons/clicker/*",
         "icons/clicker/production/*",
-        "icons/clicker/upgrades/*"
+        "icons/clicker/upgrades/*",
+        "icons/farm/*",
+        "icons/farm/tiles/*",
+        "icons/farm/plants/*",
+        "icons/farm/tools/*",
+        "icons/farm/objects/*",
+        "icons/farm/sounds/*"
     ]
 }

@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Sushi FJ Feature Extender",
     "description": "Bunch of helper stuff.",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "browser_specific_settings": {
         "gecko": {
             "id": "sushi-fj-tweaker@nonsense.com",
@@ -10,8 +10,9 @@
         }
     },
     "permissions": [
-        "storage",
-        "https://funnyjunk.com/*"
+        "contextMenus",
+        "https://funnyjunk.com/*",
+        "storage"
     ],
     "content_scripts": [
         {
@@ -25,13 +26,13 @@
                 "content/slick.js",
                 "content/modjs.js",
                 "content/ratetrack.js",
-                "content/schide.js",
                 "content/sccustom.js",
                 "content/userpop.js",
                 "content/nextmove.js",
                 "content/remtz.js",
                 "content/textcheck.js",
                 "content/walcorn.js",
+                "content/warn.js",
                 "content/funnyjunkModifier.js"
             ],
             "run_at": "document_idle"

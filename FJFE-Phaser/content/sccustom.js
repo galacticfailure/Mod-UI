@@ -1,13 +1,5 @@
   
-  const FJFE_MODSO_OK = (() => {
-    try {
-      const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-      return !!link && (link.textContent || '').trim() === 'ModSo';
-    } catch (_) {
-      return false;
-    }
-
-  })();
+  
 
   const originalButtonState = window.fjCustomShortcutOriginals || {};
   window.fjCustomShortcutOriginals = originalButtonState;
@@ -523,23 +515,19 @@
   }
 
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', applyCustomShortcutsHijack);
-    } else {
-      applyCustomShortcutsHijack();
-    }
-    document.addEventListener('fjTweakerSettingsChanged', applyCustomShortcutsHijack);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyCustomShortcutsHijack);
+  } else {
+    applyCustomShortcutsHijack();
   }
+  document.addEventListener('fjTweakerSettingsChanged', applyCustomShortcutsHijack);
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', updateNextUnratedShortKeyUI);
-    } else {
-      updateNextUnratedShortKeyUI();
-    }
-    document.addEventListener('fjTweakerSettingsChanged', updateNextUnratedShortKeyUI);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateNextUnratedShortKeyUI);
+  } else {
+    updateNextUnratedShortKeyUI();
   }
+  document.addEventListener('fjTweakerSettingsChanged', updateNextUnratedShortKeyUI);
   
   function getCustomShortcutButtons() {
   let buttons = [];
@@ -1228,7 +1216,11 @@
       if (!style) {
         style = document.createElement('style');
         style.id = id;
-        style.textContent = `#rateShort, #quickM { display: none !important; }`;
+        style.textContent = `
+          #rateShort, #quickM { display: none !important; }
+          .modF.modF1 ~ #cControlsCon { margin-top: -60px !important; }
+          .replaceModCC ~ #cControlsCon { margin-top: -60px !important; }
+        `;
         document.head.appendChild(style);
       }
     } else {
@@ -1238,6 +1230,10 @@
         const qm = document.getElementById('quickM');
         if (rs && rs.style.display === 'none') rs.style.display = '';
         if (qm && qm.style.display === 'none') qm.style.display = '';
+        
+        // Restore original margin-top for HTML 2 only
+        const html2 = document.getElementById('cControlsCon');
+        if (html2 && html2.style.marginTop === '-60px') html2.style.marginTop = '';
       } catch (_) {}
     }
   }
@@ -1384,11 +1380,9 @@
   }
 
   
-  if (FJFE_MODSO_OK) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', updateCustomMods);
-    } else {
-      updateCustomMods();
-    }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateCustomMods);
+  } else {
+    updateCustomMods();
   }
 })();

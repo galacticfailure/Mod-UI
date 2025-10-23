@@ -4,13 +4,11 @@
 
   const resolveIconUrl = () => {
     try {
-      if (typeof browser !== 'undefined' && browser?.runtime?.getURL) {
-        return browser.runtime.getURL('icons/fjinfo.png');
-      }
       if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
         return chrome.runtime.getURL('icons/fjinfo.png');
       }
-    } catch (error) {}
+    } catch (error) {
+    }
     return '';
   };
 

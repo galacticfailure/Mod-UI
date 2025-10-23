@@ -146,18 +146,23 @@
             let potprest = 0;
             try {
               if (window.fjfeStats && typeof window.fjfeStats.computePrestigeProgress === 'function') {
-                const res = window.fjfeStats.computePrestigeProgress();
-                potprest = (res && typeof res.potprest === 'number') ? res.potprest : 0;
+                const pr = window.fjfeStats.computePrestigeProgress();
+                
+                potprest = Math.max(0, Math.floor(pr.potprest || 0));
               }
             } catch(_) {}
-            const timesPrestiged = parseInt(localStorage.getItem('fjfeStats_timesPrestiged')||'0',10) || 0;
-            const bonusPct = parseInt(localStorage.getItem('fjfeStats_prestigeBonusPct')||'0',10) || 0;
+
             
-            const newTimes = (Number.isFinite(timesPrestiged) ? timesPrestiged : 0) + 1;
-            localStorage.setItem('fjfeStats_timesPrestiged', String(newTimes));
+            const timesPrest = parseInt(localStorage.getItem('fjfeStats_timesPrestiged')||'0',10) || 0;
+            localStorage.setItem('fjfeStats_timesPrestiged', String(timesPrest + 1));
+
             
-            const newBonus = Math.max(0, (Number.isFinite(bonusPct)?bonusPct:0) + Math.max(0, Math.floor(potprest)));
-            try { if (window.fjfeStats && typeof window.fjfeStats.setPrestigeBonusPercent==='function') window.fjfeStats.setPrestigeBonusPercent(newBonus); } catch(_) {}
+            if (potprest > 0) {
+              const curBonus = parseInt(localStorage.getItem('fjfeStats_prestigeBonusPct')||'0',10) || 0;
+              const nextBonus = Math.max(0, Math.floor(curBonus + potprest));
+              try { if (window.fjfeStats && typeof window.fjfeStats.setPrestigeBonusPercent==='function') window.fjfeStats.setPrestigeBonusPercent(nextBonus); else localStorage.setItem('fjfeStats_prestigeBonusPct', String(nextBonus)); } catch(_) {}
+            }
+
             
             try { if (window.fjfeStats && typeof window.fjfeStats.prestigeReset==='function') window.fjfeStats.prestigeReset(); } catch(_) {}
           } catch(_) {}
@@ -175,18 +180,19 @@
         const tools = window.fjfeClickerNumbers;
         const fmt = (n)=> tools && tools.formatCounter ? tools.formatCounter(n) : String(n);
         let potprest = 0;
-        let prestremainStr = '0';
+        let prest = 0;
+        let remainStr = '';
         try {
           if (window.fjfeStats && typeof window.fjfeStats.computePrestigeProgress === 'function') {
-            const res = window.fjfeStats.computePrestigeProgress();
-            potprest = (res && typeof res.potprest === 'number') ? res.potprest : 0;
-            prestremainStr = (res && res.prestremainStr) ? String(res.prestremainStr) : String(res && res.prestremain ? res.prestremain : '0');
+            const pr = window.fjfeStats.computePrestigeProgress();
+            potprest = Math.max(0, Math.floor(pr.potprest || 0));
+            prest = Math.max(0, Math.floor((localStorage.getItem('fjfeStats_prestigeBonusPct')||'0')));
+            remainStr = pr.prestremainStr || fmt(pr.prestremain || 0);
           }
         } catch(_) {}
-        const bonusPct = parseInt(localStorage.getItem('fjfeStats_prestigeBonusPct')||'0',10) || 0;
-        const line1 = `Current prestige bonus: +${Math.max(0, bonusPct)}%`;
+        const line1 = `Current prestige bonus: +${prest}%`;
         const line2 = potprest>0 ? `Prestiging now would grant you a +${potprest}% bonus to your RPS.` : 'Prestiging now would grant you no bonus.';
-        const line3 = `${prestremainStr} thumbs until next prestige.`;
+        const line3 = `${remainStr} thumbs until next prestige.`;
         window.fjfeRcInfo.show({
           imageSrc,
           name: 'Ban Evade',

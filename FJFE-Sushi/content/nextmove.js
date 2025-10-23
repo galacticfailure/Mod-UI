@@ -76,8 +76,7 @@
 
   const detachButton = () => {
     if (currentButton && pointerHandler) {
-      currentButton.removeEventListener('mouseenter', pointerHandler);
-      currentButton.removeEventListener('touchstart', pointerHandler);
+      currentButton.removeEventListener('pointerenter', pointerHandler);
     }
     restoreStyle(currentButton);
     currentButton = null;
@@ -107,9 +106,7 @@
       relocateRandomly(currentButton);
     };
 
-
-    currentButton.addEventListener('mouseenter', pointerHandler, { passive: true });
-    currentButton.addEventListener('touchstart', pointerHandler, { passive: true });
+    currentButton.addEventListener('pointerenter', pointerHandler, { passive: true });
   };
 
   const startObserver = () => {

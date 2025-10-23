@@ -7,8 +7,65 @@
   const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
   const AUTO_RETRY_MS = 60 * 60 * 1000; 
 
+  
+  const REFRESH_WINDOW_MS = 5 * 60 * 1000; 
+  const REFRESH_MAX_USES = 3;
+  const REFRESH_WINDOW_START_KEY = '__fj_apichk_refresh_window_start__';
+  const REFRESH_USES_LEFT_KEY = '__fj_apichk_refresh_uses_left__';
+
   let cached = { username: null, rankText: null, level: null, fetchedAt: 0, fetched: false };
   let autoRefreshTimer = null;
+
+  const isAuthorized = () => {
+    
+    return Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined'));
+  };
+
+  const dispatchStatus = () => {
+    try {
+      const detail = { authorized: isAuthorized(), username: cached.username || null, rankText: cached.rankText || null, level: cached.level || null };
+      document.dispatchEvent(new CustomEvent('fjApichkStatus', { detail }));
+    } catch (_) {}
+  };
+
+  const readRefreshState = () => {
+    let windowStart = 0; let usesLeft = REFRESH_MAX_USES;
+    try { windowStart = parseInt(localStorage.getItem(REFRESH_WINDOW_START_KEY), 10); if (!Number.isFinite(windowStart)) windowStart = 0; } catch(_) { windowStart = 0; }
+    try { usesLeft = parseInt(localStorage.getItem(REFRESH_USES_LEFT_KEY), 10); if (!Number.isFinite(usesLeft)) usesLeft = REFRESH_MAX_USES; } catch(_) { usesLeft = REFRESH_MAX_USES; }
+    const now = Date.now();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      
+      windowStart = 0;
+      usesLeft = REFRESH_MAX_USES;
+    }
+    return { windowStart, usesLeft };
+  };
+
+  const writeRefreshState = (windowStart, usesLeft) => {
+    try { localStorage.setItem(REFRESH_WINDOW_START_KEY, String(windowStart || 0)); } catch(_) {}
+    try { localStorage.setItem(REFRESH_USES_LEFT_KEY, String(Math.max(0, usesLeft))); } catch(_) {}
+  };
+
+  const canUseManualRefresh = () => {
+    const { windowStart, usesLeft } = readRefreshState();
+    const now = Date.now();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      return { allowed: true, remaining: REFRESH_MAX_USES, resetAt: null };
+    }
+    return { allowed: usesLeft > 0, remaining: Math.max(0, usesLeft), resetAt: windowStart + REFRESH_WINDOW_MS };
+  };
+
+  const consumeManualRefresh = () => {
+    const now = Date.now();
+    let { windowStart, usesLeft } = readRefreshState();
+    if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
+      windowStart = now;
+      usesLeft = REFRESH_MAX_USES;
+    }
+    usesLeft = Math.max(0, usesLeft - 1);
+    writeRefreshState(windowStart, usesLeft);
+    return { windowStart, usesLeft };
+  };
 
   const sameOriginFetch = async (path) => {
     const url = path.startsWith('http') ? path : (location.origin + (path.startsWith('/') ? '' : '/') + path);
@@ -18,7 +75,6 @@
   };
 
   const getUsername = async () => {
-    
     try {
       const res = await sameOriginFetch('/userbar/getnewdata?extGet=1');
       const data = await res.json();
@@ -76,6 +132,7 @@
       const fromStore = loadCache();
       if (fromStore) {
         cached = { ...fromStore, fetched: true };
+        dispatchStatus();
         return cached;
       }
       if (cached.fetched && (cached.username || cached.rankText)) return cached;
@@ -85,6 +142,7 @@
       if (!username) {
         cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
         saveCache(cached);
+        dispatchStatus();
         return cached;
       }
       const list = await getModRanksList();
@@ -93,10 +151,12 @@
       const level = extractLevel(rankText);
       cached = { username, rankText, level, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
+      dispatchStatus();
       return cached;
     } catch (e) {
       cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
+      dispatchStatus();
       return cached;
     }
   };
@@ -117,53 +177,58 @@
 
   const ensureFooterUI = () => {
     try {
+      const menu = document.getElementById('fj-sel-menu');
+      if (!menu) return null;
       const label = findVersionLabel();
       if (!label) return null;
-      
-      try {
-        document.querySelectorAll('[data-fjFooterRow="1"]').forEach(n => n.remove());
-      }
- catch (_) {}
 
       
       try {
-        label.querySelectorAll('[data-fj-rank-extra="1"]').forEach(n => n.remove());
-      }
- catch (_) {}
-
-      
-      const parent = label.parentElement;
-      if (!parent) return null;
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.justifyContent = 'space-between';
-      row.style.alignItems = 'center';
-      row.style.gap = '8px';
-      row.style.marginTop = '6px';
-      row.dataset.fjFooterRow = '1';
-
-      const left = document.createElement('div');
-      left.style.display = 'flex';
-      left.style.alignItems = 'center';
-      left.style.flex = '1 1 auto';
-
-      const right = document.createElement('div');
-      right.style.flex = '0 0 auto';
-
-      
-      parent.insertBefore(row, label);
-      left.appendChild(label);
-      row.appendChild(left);
-      row.appendChild(right);
-
-      
-      let btn = document.getElementById('fj-apichk-refresh');
-      if (btn) {
-        try {
-          btn.remove();
+        const unauthorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function' ? !window.fjApichk.isAuthorized() : false;
+        if (unauthorized) {
+          const existing = label.closest('[data-fjFooterRow="1"]');
+          if (existing) {
+            const btn = existing.querySelector('#fj-apichk-refresh');
+            if (btn) btn.remove();
+          }
+          return { label, refreshBtn: null };
         }
- catch (_) {}
+      } catch (_) {}
+
+      
+      let row = label.closest('[data-fjFooterRow="1"]');
+      let right;
+      if (!row) {
+        
+        row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.gap = '8px';
+        row.style.marginTop = '6px';
+        row.dataset.fjFooterRow = '1';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.flex = '1 1 auto';
+
+        right = document.createElement('div');
+        right.style.flex = '0 0 auto';
+
+        const parent = label.parentElement;
+        if (!parent) return null;
+        parent.insertBefore(row, label);
+        left.appendChild(label);
+        row.appendChild(left);
+        row.appendChild(right);
       } else {
+        right = row.querySelector(':scope > div:last-child') || row;
+      }
+
+      
+      let btn = row.querySelector('#fj-apichk-refresh');
+      if (!btn) {
         btn = document.createElement('button');
         btn.id = 'fj-apichk-refresh';
         btn.type = 'button';
@@ -172,21 +237,35 @@
           padding: '4px 8px',
           font: "600 12px 'Segoe UI', sans-serif",
           color: '#111',
-          background: '#ff8c00', 
+          background: '#ff8c00',
           border: '1px solid #b86900',
           borderRadius: '4px',
           cursor: 'pointer'
         });
+        right.appendChild(btn);
+      } else {
+        
+        const clone = btn.cloneNode(true);
+        btn.replaceWith(clone);
+        btn = clone;
       }
-      right.appendChild(btn);
 
-      
-      const btnClone = btn.cloneNode(true);
-      btn.replaceWith(btnClone);
-      btnClone.addEventListener('click', async () => {
-        const prevText = btnClone.textContent;
-        btnClone.disabled = true;
-        btnClone.textContent = 'Updating…';
+      btn.addEventListener('click', async () => {
+        const st = canUseManualRefresh();
+        if (!st.allowed) {
+          
+          try {
+            const now = Date.now();
+            const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
+            alert(`Please wait ${minutesLeft} minutes before trying again.`);
+          } catch (_) {}
+          return;
+        }
+        consumeManualRefresh();
+        const prevAuthorized = (window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') ? window.fjApichk.isAuthorized() : null;
+        const prevText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Updating…';
         try {
           const res = await ensureRankFetched(true);
           console.log('[FJFE:apichk] Credentials refreshed', {
@@ -194,14 +273,19 @@
             rank: res.rankText || null,
             level: res.level || null
           });
+          const nowAuthorized = (res && res.rankText && (res.level !== null && typeof res.level !== 'undefined')) ? true : false;
+          if (prevAuthorized !== null && nowAuthorized !== prevAuthorized) {
+            try { writeLastAutoRefresh(Date.now()); } catch(_) {}
+            setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
+          }
         } catch (e) {
           console.warn('[FJFE:apichk] Refresh failed', e);
         }
-        btnClone.textContent = prevText;
-        btnClone.disabled = false;
+        btn.textContent = prevText;
+        btn.disabled = false;
       });
 
-      return { label, refreshBtn: btnClone };
+      return { label, refreshBtn: btn };
     } catch (_) {
       return null;
     }
@@ -233,8 +317,12 @@
   const init = () => {
     try {
       if (location.hostname !== TARGET_HOST) return;
+      if (window.__fjApichkInitDone) return;
+      window.__fjApichkInitDone = true;
       observeMenuAndApply();
       scheduleDailyAutoRefresh();
+      
+      ensureRankFetched(false).catch(() => {});
     } catch (_) {}
   };
 
@@ -285,7 +373,14 @@
 
   const runDailyAutoRefresh = async () => {
     try {
+      const prevAuth = isAuthorized();
       await ensureRankFetched(true);
+      const newAuth = isAuthorized();
+      if (prevAuth !== newAuth) {
+        try { writeLastAutoRefresh(Date.now()); } catch(_) {}
+        setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
+        return;
+      }
       writeLastAutoRefresh(Date.now());
       
       try {
@@ -317,10 +412,14 @@
   
   window.fjApichk = {
     ensureFetched: ensureRankFetched,
-    isAuthorized: () => Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined')),
+    isAuthorized,
     getCached: () => ({ ...cached }),
+    canUseManualRefresh,
     requestManualRefresh: async () => {
-      const prevAuth = window.fjApichk.isAuthorized();
+      const st = canUseManualRefresh();
+      if (!st.allowed) return { ok: false, reason: 'cooldown', resetAt: st.resetAt };
+      consumeManualRefresh();
+      const prevAuth = isAuthorized();
       const res = await ensureRankFetched(true);
       try {
         console.log('[FJFE:apichk] Credentials refreshed', {
@@ -329,8 +428,10 @@
           level: res.level || null
         });
       } catch (_) {}
-      const nowAuth = window.fjApichk.isAuthorized();
+      const nowAuth = Boolean(res && res.rankText && (res.level !== null && typeof res.level !== 'undefined'));
+      
       if (prevAuth !== nowAuth) {
+        try { writeLastAutoRefresh(Date.now()); } catch (_) {}
         setTimeout(() => { try { location.reload(); } catch (_) {} }, 200);
       }
       return { ok: true, authorized: nowAuth };

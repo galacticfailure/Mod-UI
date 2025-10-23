@@ -1,7 +1,6 @@
 (() => {
-  const STYLE_ID = 'fj-info-popup-style';
-  const DIALOG_ID = 'fj-info-popup';
-  const DEFAULT_TEXT = 'PLACEHOLDER: default popup';
+  const STYLE_ID = 'fj-info-button-style';
+  const DEFAULT_TOOLTIP = 'PLACEHOLDER: default tooltip';
 
   const resolveIconUrl = () => {
     try {
@@ -14,6 +13,8 @@
   };
 
   const ICON_URL = resolveIconUrl();
+  const GAP_PX = 12;
+  const VIEWPORT_MARGIN_PX = 6;
 
   const ensureStyles = () => {
     if (document.getElementById(STYLE_ID)) {
@@ -25,10 +26,9 @@
     style.textContent = `
       .fj-info-button {
         position: relative;
-        min-width: 44px;
-        min-height: 44px;
-        width: 44px;
-        height: 44px;
+        z-index: 2147483647;
+        width: 20px;
+        height: 20px;
         padding: 0;
         border: none;
         border-radius: 4px;
@@ -41,7 +41,9 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        touch-action: manipulation;
+        color: #f8f8f8;
+        box-shadow: none;
+        overflow: visible;
       }
 
       .fj-info-button:focus {
@@ -49,87 +51,109 @@
         outline-offset: 1px;
       }
 
-      #${DIALOG_ID} {
+      .fj-info-tooltip {
         position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.55);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2147483647;
-      }
-
-      #${DIALOG_ID} .fj-info-panel {
-        width: min(360px, 92vw);
-        max-height: min(80vh, 420px);
-        padding: 18px 20px 16px;
-        background: #151515;
+        display: none;
+        max-width: 50ch;
+        padding: 6px 8px;
+        background: rgba(12, 12, 12, 0.94);
         border: 1px solid #3a3a3a;
-        border-radius: 6px;
-        box-shadow: 0 18px 32px rgba(0, 0, 0, 0.55);
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        color: #f5f5f5;
-        font: 500 14px 'Segoe UI', sans-serif;
-      }
-
-      #${DIALOG_ID} .fj-info-title {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-      }
-
-      #${DIALOG_ID} .fj-info-body {
-        margin: 0;
-        font-size: 13px;
-        line-height: 1.45;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-      }
-
-      #${DIALOG_ID} .fj-info-actions {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      #${DIALOG_ID} .fj-info-close {
-        padding: 8px 16px;
-        min-height: 44px;
-        font: 500 13px 'Segoe UI', sans-serif;
-        color: #f8f8f8;
-        background: #2a2a2a;
-        border: 1px solid #3d3d3d;
         border-radius: 4px;
-        cursor: pointer;
-        touch-action: manipulation;
+        color: #f2f2f2;
+        font: 500 12px 'Segoe UI', sans-serif;
+        line-height: 1.35;
+        text-align: left;
+        white-space: normal;
+        z-index: 2147483647;
+        pointer-events: none;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+        visibility: hidden;
       }
 
-      #${DIALOG_ID} .fj-info-close:hover {
-        background: #353535;
+      .fj-info-tooltip::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 0;
+        height: 0;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+        transform: translateY(-50%);
+      }
+
+      .fj-info-tooltip[data-placement="right"]::before {
+        left: -6px;
+        border-right: 6px solid rgba(12, 12, 12, 0.94);
+      }
+
+      .fj-info-tooltip[data-placement="left"]::before {
+        right: -6px;
+        border-left: 6px solid rgba(12, 12, 12, 0.94);
+      }
+
+      .fj-info-tooltip.fj-info-visible {
+        display: block;
+        visibility: visible;
       }
     `;
 
     document.head?.append(style);
   };
 
-  const applyIcon = (button, size) => {
+  const createTooltipElement = () => {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'fj-info-tooltip';
+    document.body.append(tooltip);
+    return tooltip;
+  };
 
-    const minTouchSize = 44;
-    const requestedSize = Number.isFinite(size) ? size : 20;
-    const finalSize = Math.max(requestedSize, minTouchSize);
-    const dimension = `${finalSize}px`;
-    
-    button.style.width = dimension;
-    button.style.height = dimension;
-    button.style.minWidth = dimension;
-    button.style.minHeight = dimension;
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  const positionTooltip = (button, tooltip) => {
+    if (!button || !tooltip) {
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    const placement = button.dataset.placement === 'left' ? 'left' : 'right';
+    tooltip.dataset.placement = placement;
+
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+
+    const centerY = rect.top + rect.height / 2;
+    let left = placement === 'left'
+      ? rect.left - GAP_PX - tooltipWidth
+      : rect.right + GAP_PX;
+    let top = centerY - tooltipHeight / 2;
+
+    const maxLeft = window.innerWidth - tooltipWidth - VIEWPORT_MARGIN_PX;
+    const maxTop = window.innerHeight - tooltipHeight - VIEWPORT_MARGIN_PX;
+
+    left = clamp(left, VIEWPORT_MARGIN_PX, Math.max(VIEWPORT_MARGIN_PX, maxLeft));
+    top = clamp(top, VIEWPORT_MARGIN_PX, Math.max(VIEWPORT_MARGIN_PX, maxTop));
+
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+  };
+
+  const applyIcon = (button, size) => {
+    if (size) {
+      const pixelSize = Number.isFinite(size) ? `${size}px` : size;
+      button.style.width = pixelSize;
+      button.style.height = pixelSize;
+    } else {
+      button.style.width = '20px';
+      button.style.height = '20px';
+    }
 
     if (ICON_URL) {
+      button.textContent = '';
       button.style.backgroundImage = `url('${ICON_URL}')`;
-      const targetSize = Math.max(12, Math.min(finalSize - 4, finalSize));
+      const targetSize = typeof size === 'number' ? Math.max(12, Math.min(size - 4, size)) : 16;
       button.style.backgroundSize = `${targetSize}px ${targetSize}px`;
     } else {
+      button.style.backgroundImage = 'none';
       button.textContent = 'i';
       Object.assign(button.style, {
         font: "600 12px 'Segoe UI', sans-serif",
@@ -140,123 +164,153 @@
     }
   };
 
-  const closeDialog = () => {
-    const existing = document.getElementById(DIALOG_ID);
-    if (!existing) {
+  const showTooltip = (button) => {
+    if (!button) {
       return;
     }
-    existing.remove();
-  };
 
-  const openDialog = (title, message, imagePath) => {
-    closeDialog();
+    const text = button.dataset.fjInfoText || DEFAULT_TOOLTIP;
+    const imagePath = button.dataset.fjInfoImage;
+    const placement = button.dataset.placement === 'left' ? 'left' : 'right';
 
-    const overlay = document.createElement('div');
-    overlay.id = DIALOG_ID;
+    const tooltip = button._fjTooltip || (button._fjTooltip = createTooltipElement());
+    tooltip.dataset.placement = placement;
 
-    const panel = document.createElement('div');
-    panel.className = 'fj-info-panel';
-
-    const heading = document.createElement('h2');
-    heading.className = 'fj-info-title';
-    heading.textContent = title || 'Details';
-
-    const body = document.createElement('p');
-    body.className = 'fj-info-body';
-    body.textContent = message || DEFAULT_TEXT;
-
-    let imgEl = null;
-    if (imagePath) {
-      imgEl = document.createElement('img');
-      imgEl.src = imagePath;
-      imgEl.style.width = '75px';
-      imgEl.style.display = 'block';
-      imgEl.style.marginBottom = '8px';
+    tooltip.textContent = '';
+    const existingImg = tooltip.querySelector('img');
+    if (existingImg) {
+      existingImg.remove();
     }
 
-    const actions = document.createElement('div');
-    actions.className = 'fj-info-actions';
+    if (imagePath) {
+      const img = document.createElement('img');
+      img.src = imagePath;
+      img.style.width = '75px';
+      img.style.display = 'block';
+      tooltip.append(img);
+    } else {
+      tooltip.textContent = text;
+    }
 
-    const closeButton = document.createElement('button');
-    closeButton.type = 'button';
-    closeButton.className = 'fj-info-close';
-    closeButton.textContent = 'Close';
+    tooltip.classList.add('fj-info-visible');
+    tooltip.style.display = 'block';
+    tooltip.style.visibility = 'hidden';
 
-    const handleClose = (event) => {
-      event?.stopPropagation?.();
-      closeDialog();
+    const updatePosition = () => {
+      if (!tooltip.classList.contains('fj-info-visible')) {
+        return;
+      }
+      tooltip.style.visibility = 'hidden';
+      positionTooltip(button, tooltip);
+      tooltip.style.visibility = 'visible';
     };
 
-    closeButton.addEventListener('click', handleClose);
-    overlay.addEventListener('click', (event) => {
-      if (event.target === overlay) {
-        closeDialog();
-      }
-    });
+    if (button._fjTooltipUpdate) {
+      button._fjTooltipUpdate();
+      return;
+    }
 
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        closeDialog();
-      }
-    };
+    button._fjTooltipUpdate = updatePosition;
+    button.classList.add('fj-info-open');
 
-    document.addEventListener('keydown', handleKeyDown, { once: true });
+    updatePosition();
+    requestAnimationFrame(updatePosition);
 
-    actions.append(closeButton);
-    if (imgEl) panel.append(heading, imgEl, body, actions);
-    else panel.append(heading, body, actions);
-    overlay.append(panel);
-    document.body.append(overlay);
-    closeButton.focus({ preventScroll: true });
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
   };
 
-  const createInfoButton = ({ text = DEFAULT_TEXT, title = '', size = 20 } = {}) => {
+  const hideTooltip = (button) => {
+    if (!button) {
+      return;
+    }
+
+    const tooltip = button._fjTooltip;
+    if (tooltip) {
+      tooltip.classList.remove('fj-info-visible');
+      tooltip.style.display = 'none';
+      tooltip.style.visibility = 'hidden';
+    }
+
+    if (button._fjTooltipUpdate) {
+      window.removeEventListener('scroll', button._fjTooltipUpdate, true);
+      window.removeEventListener('resize', button._fjTooltipUpdate);
+      delete button._fjTooltipUpdate;
+    }
+
+    button.classList.remove('fj-info-open');
+  };
+
+  const createInfoButton = ({ text = DEFAULT_TOOLTIP, size = 20, placement = 'right' } = {}) => {
     ensureStyles();
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'fj-info-button';
-    button.dataset.fjInfoText = typeof text === 'string' && text.length ? text : DEFAULT_TEXT;
-    button.dataset.fjInfoTitle = title || '';
+    button.dataset.placement = placement === 'left' ? 'left' : 'right';
+    button.dataset.fjInfoText = typeof text === 'string' && text.length > 0 ? text : DEFAULT_TOOLTIP;
 
     applyIcon(button, size);
 
-    button.addEventListener('click', (event) => {
+    const handleEnter = () => showTooltip(button);
+    const handleLeave = () => hideTooltip(button);
+    const handleFocus = () => showTooltip(button);
+    const handleBlur = () => hideTooltip(button);
+    const handleClick = (event) => {
       event.stopPropagation();
-      openDialog(button.dataset.fjInfoTitle || '', button.dataset.fjInfoText || DEFAULT_TEXT, button.dataset.fjInfoImage);
-    });
+    };
+
+    button.addEventListener('mouseenter', handleEnter);
+    button.addEventListener('mouseleave', handleLeave);
+    button.addEventListener('focus', handleFocus);
+    button.addEventListener('blur', handleBlur);
+    button.addEventListener('click', handleClick);
 
     return button;
   };
 
-  const updateInfoContent = (button, { text, title }) => {
+  const updateTooltip = (button, text, imagePath) => {
     if (!button) {
       return;
     }
-    if (typeof text === 'string') {
-      button.dataset.fjInfoText = text.length ? text : DEFAULT_TEXT;
-    }
-    if (typeof title === 'string') {
-      button.dataset.fjInfoTitle = title;
-    }
-  };
 
-  const updateInfoContentWithImage = (button, { text, title, imagePath } = {}) => {
-    updateInfoContent(button, { text, title });
-    if (!button) return;
-    if (typeof imagePath === 'string' && imagePath.length) {
+    const nextText = ((typeof text === 'string' && text.length > 0) || imagePath) ? text : DEFAULT_TOOLTIP;
+    button.dataset.fjInfoText = nextText;
+
+    if (imagePath) {
       button.dataset.fjInfoImage = imagePath;
-    } else if (imagePath === null) {
+    } else {
       delete button.dataset.fjInfoImage;
+    }
+
+    const tooltip = button._fjTooltip;
+    if (tooltip && tooltip.classList.contains('fj-info-visible')) {
+      tooltip.textContent = '';
+      const existingImg = tooltip.querySelector('img');
+      if (existingImg) {
+        existingImg.remove();
+      }
+
+      if (imagePath) {
+        const img = document.createElement('img');
+        img.src = imagePath;
+        img.style.width = '75px';
+        img.style.display = 'block';
+        tooltip.append(img);
+      } else {
+        tooltip.textContent = nextText;
+      }
+
+      if (button._fjTooltipUpdate) {
+        button._fjTooltipUpdate();
+      }
     }
   };
 
   const api = window.fjTweakerInfo || {};
   api.createInfoButton = createInfoButton;
-  api.updateTooltip = (button, nextText, imagePath) => updateInfoContentWithImage(button, { text: nextText, imagePath });
-  api.updateInfoContent = updateInfoContentWithImage;
+  api.updateTooltip = updateTooltip;
   api.ensureInfoStyles = ensureStyles;
 
   window.fjTweakerInfo = api;
 })();
-

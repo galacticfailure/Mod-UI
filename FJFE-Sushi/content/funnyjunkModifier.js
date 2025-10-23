@@ -11,7 +11,7 @@
   const vanishAudio = 'icons/vanish.mp3';
 
   function getResourceUrl(relPath) {
-    return (typeof browser !== 'undefined' ? browser : chrome).runtime.getURL(relPath);
+    return chrome.runtime.getURL(relPath);
   }
 
   function showHeheOverlay() {
@@ -32,6 +32,7 @@
     img.style.pointerEvents = 'auto';
     img.id = 'fjfe-hehe-overlay';
 
+
     let audioUnlocked = false;
     function unlockAudio() {
       if (audioUnlocked) return;
@@ -50,9 +51,11 @@
         }
       } catch (e) {}
       audioUnlocked = true;
-      window.removeEventListener('touchstart', unlockAudio, true);
+      window.removeEventListener('pointerdown', unlockAudio, true);
+      window.removeEventListener('keydown', unlockAudio, true);
     }
-    window.addEventListener('touchstart', unlockAudio, true);
+    window.addEventListener('pointerdown', unlockAudio, true);
+    window.addEventListener('keydown', unlockAudio, true);
 
     function playVanishAudio() {
       try {
@@ -77,29 +80,27 @@
       });
     }
 
-    img.addEventListener('touchstart', function handleTouchStart(e) {
-      img.removeEventListener('touchstart', handleTouchStart);
+    img.addEventListener('mouseenter', function handleMouseEnter() {
+      img.removeEventListener('mouseenter', handleMouseEnter);
       img.src = getResourceUrl(hiddenImg);
       playVanishAudio();
       img.style.opacity = '0';
       setTimeout(() => {
         img.remove();
       }, 1000);
-      const storage = (typeof browser !== 'undefined' ? browser : chrome).storage.local;
-      if (storage) {
-        storage.set({ [HEHE_KEY]: true });
+      if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ [HEHE_KEY]: true });
       }
-      e.preventDefault();
     });
 
     document.body.appendChild(img);
   }
 
+
   function checkAndShowHehe() {
     function onFirstInteraction() {
-      const storage = (typeof browser !== 'undefined' ? browser : chrome).storage.local;
-      if (storage) {
-        storage.get([HEHE_KEY], (result) => {
+      if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get([HEHE_KEY], (result) => {
           if (!result[HEHE_KEY]) {
             showHeheOverlay();
           }
@@ -107,39 +108,49 @@
       } else {
         showHeheOverlay();
       }
-      window.removeEventListener('touchstart', onFirstInteraction, true);
+      window.removeEventListener('pointerdown', onFirstInteraction, true);
+      window.removeEventListener('keydown', onFirstInteraction, true);
     }
-    window.addEventListener('touchstart', onFirstInteraction, true);
+    window.addEventListener('pointerdown', onFirstInteraction, true);
+    window.addEventListener('keydown', onFirstInteraction, true);
   }
 
+  let __fjfe_baselineInit = false;
+  let __fjfe_proModulesInit = false;
   const initModules = () => {
     if (!window.fjTweakerModules) {
       return;
     }
-    const { sel, modjs, ratetrack, schide, userpop, nextMove, remtz, sccustom, walcorn } = window.fjTweakerModules;
-    if (sel && typeof sel.init === 'function') sel.init();
+    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, remtz, walcorn, apichk, warn } = window.fjTweakerModules;
+    
+    if (!__fjfe_baselineInit) {
+      if (sel && typeof sel.init === 'function') sel.init();
+      if (apichk && typeof apichk.init === 'function') apichk.init();
+      __fjfe_baselineInit = true;
+    }
+    
+    const authorized = (window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') ? window.fjApichk.isAuthorized() : true;
+    if (!authorized || __fjfe_proModulesInit) return;
     if (modjs && typeof modjs.init === 'function') modjs.init();
     if (ratetrack && typeof ratetrack.init === 'function') ratetrack.init();
-    if (schide && typeof schide.init === 'function') schide.init();
+    if (sccustom && typeof sccustom.init === 'function') sccustom.init();
     if (userpop && typeof userpop.init === 'function') userpop.init();
     if (nextMove && typeof nextMove.init === 'function') nextMove.init();
     if (remtz && typeof remtz.init === 'function') remtz.init();
-    if (sccustom && typeof sccustom.init === 'function') sccustom.init();
     if (walcorn && typeof walcorn.init === 'function') walcorn.init();
+    if (warn && typeof warn.init === 'function') warn.init();
+    __fjfe_proModulesInit = true;
   };
 
   const run = () => {
     
-    try {
-      const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-      const ok = !!link && (link.textContent || '').trim() === 'ModSo';
-      if (!ok) return;
-    } catch (_) {
-      return;
-    }
-
     checkAndShowHehe();
     initModules();
+
+    
+    document.addEventListener('fjApichkStatus', () => {
+      try { initModules(); } catch (_) {}
+    }, { passive: true });
   };
 
   if (document.readyState === 'loading') {

@@ -69,49 +69,6 @@
     document.addEventListener('keydown', onFirst, true);
   };
 
-  
-  const playSound = () => {
-    const a = ensureAudio();
-    if (a) {
-      try {
-        a.volume = 1;
-      }
- catch (_) {}
-      try {
-        a.currentTime = 0;
-      }
- catch (_) {}
-      try {
-        a.play().catch(() => {
-          try {
-            const url = resolveAssetUrl('icons/gnome.mp3');
-            const inst = new Audio(url);
-            try {
-              inst.volume = 1;
-            }
- catch (e) {}
-            inst.play().catch(() => {});
-          } catch (_) {}
-        });
-      } catch (_) {}
-      try {
-        setTimeout(() => {
-          try { if (a.paused) { a.currentTime = 0; a.play().catch(()=>{}); } } catch (_) {}
-        }, 0);
-      } catch (_) {}
-      return;
-    }
-    try {
-      const url = resolveAssetUrl('icons/gnome.mp3');
-      const inst = new Audio(url);
-      try {
-        inst.volume = 1;
-      }
- catch (e) {}
-      inst.play().catch(() => {});
-    } catch (_) {}
-  };
-
   const makeOverlay = (imgUrl, styles = {}, fallbackUrl) => {
     const el = document.createElement('img');
     el.src = imgUrl;
@@ -247,18 +204,62 @@
  }
   };
 
+  
+  const playSound = () => {
+    const a = ensureAudio();
+    if (a) {
+      try {
+        a.volume = 1;
+      }
+ catch (_) {}
+      try {
+        a.currentTime = 0;
+      }
+ catch (_) {}
+      try {
+        a.play().catch(() => {
+          try {
+            const url = resolveAssetUrl('icons/gnome.mp3');
+            const inst = new Audio(url);
+            try {
+              inst.volume = 1;
+            }
+ catch (e) {}
+            inst.play().catch(() => {});
+          } catch (_) {}
+        });
+      } catch (_) {}
+      try {
+        setTimeout(() => {
+          try { if (a.paused) { a.currentTime = 0; a.play().catch(()=>{}); } } catch (_) {}
+        }, 0);
+      } catch (_) {}
+      return;
+    }
+    try {
+      const url = resolveAssetUrl('icons/gnome.mp3');
+      const inst = new Audio(url);
+      try {
+        inst.volume = 1;
+      }
+ catch (e) {}
+      inst.play().catch(() => {});
+    } catch (_) {}
+  };
+
   const isSameTabNavigationClick = (e) => {
     try {
       if (!e || typeof e !== 'object') return false;
-      if (e.defaultPrevented) return false;
-      if (e.button !== 0) return false;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
+      if (e.defaultPrevented) return false; 
+      if (e.button !== 0) return false; 
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false; 
       const a = e.target && (e.target.closest?.('a[href]'));
       if (!a) return false;
       if (a.target && a.target.toLowerCase() === '_blank') return false;
       if (a.hasAttribute('download')) return false;
       const href = a.getAttribute('href') || '';
       if (!href || href.startsWith('javascript:')) return false;
+      
       return true;
     } catch (_) {
       return false;
@@ -274,6 +275,7 @@
     else if (r < 0.11) effect = 'gnome';
     if (!effect) return;
 
+    
     if (isSameTabNavigationClick(e)) {
       try {
         sessionStorage.setItem(DEFER_KEY, JSON.stringify({ effect, ts: Date.now() }));
@@ -298,12 +300,12 @@
       try {
         ensureAudio();
       }
- catch (e) {}
+ catch (ex) {}
     } else {
       try {
         document.removeEventListener('click', handleAction, true);
       }
- catch (e) {}
+ catch (ex) {}
     }
   };
 
@@ -318,6 +320,7 @@
           sessionStorage.removeItem(DEFER_KEY);
           const obj = JSON.parse(raw);
           if (obj && obj.effect && Math.abs(Date.now() - (obj.ts || 0)) < 15000) {
+            
             setTimeout(() => {
               try { if (enabled) { playSound(); obj.effect === 'runescape' ? showRunescape() : showGnome(); } } catch (_) {}
             }, 60);
@@ -366,6 +369,22 @@
       }
     } catch (e) {}
     document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged);
+    
+    try {
+      window.addEventListener('beforeunload', () => {
+        try { if (audio) { try {
+          audio.pause();
+        }
+ catch (e) {} try {
+          audio.currentTime = 0;
+        }
+ catch (e) {} } } catch (_) {}
+        try { activeOverlays.forEach(el => { try {
+          el.remove();
+        }
+ catch (e) {} }); } catch (_) {}
+      });
+    } catch (_) {}
   };
 
   if (!window.fjTweakerModules) window.fjTweakerModules = {};

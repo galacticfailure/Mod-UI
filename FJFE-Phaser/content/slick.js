@@ -2,6 +2,39 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'slick';
 
+  
+  window.fjfeSlickAnimateIn = function(host) {
+    if (!host) return;
+    try {
+      host.style.transition = 'transform 220ms cubic-bezier(.2,.9,.2,1), opacity 180ms ease';
+      host.style.willChange = 'transform, opacity';
+      host.style.transform = 'translateY(-12px)';
+      host.style.opacity = '0';
+      host.offsetHeight;
+      host.style.transform = 'translateY(0)';
+      host.style.opacity = '1';
+      let finished = false;
+      const cleanup = () => {
+        if (finished) return;
+        finished = true;
+        try {
+          host.removeEventListener('transitionend', onEnd);
+        }
+ catch (e) {}
+        try {
+          host.style.transition = ''; host.style.willChange = '';
+        }
+ catch (e) {}
+      };
+      const onEnd = (ev) => {
+        if (ev.target !== host) return;
+        cleanup();
+      };
+      host.addEventListener('transitionend', onEnd);
+      setTimeout(cleanup, 420);
+    } catch (e) {}
+  };
+
   const safe = (fn) => {
     try {
       return fn();

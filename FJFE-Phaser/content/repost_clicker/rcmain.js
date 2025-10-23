@@ -1,14 +1,6 @@
 
 
 (function() {
-    
-    try {
-        const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-        const ok = !!link && (link.textContent || '').trim() === 'ModSo';
-        if (!ok) return;
-    } catch (_) {
-      return;
-    }
 
     const CLICKER_POSITION_KEY = 'fjTweakerClickerPanelPosition';
 
@@ -97,8 +89,9 @@
         if (!Number.isFinite(val)) return true;
         const abs = Math.abs(val);
         if (abs === 0) return false;
+        
+        
         if (abs >= UNIT_THRESHOLD) return true;
-        if (abs >= MAX_SAFE) return true;
         return false;
     }
 
@@ -883,10 +876,22 @@
             letterSpacing: '0.04em',
             userSelect: 'none'
         });
-        rpsLabel.textContent = '+0 RPS';
+        rpsLabel.textContent = '+0.000 RPS';
+        rpsLabel.title = '+0.000';
         dragHandle.appendChild(rpsLabel);
 
         
+        
+        function _formatFullWords(val) {
+            try {
+                const tools = window.fjfeClickerNumbers;
+                if (tools && typeof tools.formatWordsSmallDecimals === 'function') {
+                    return tools.formatWordsSmallDecimals(val);
+                }
+            } catch(_) {}
+            return String(val);
+        }
+
         window.fjfeClickerV2SetClickBonus = function(v) {
             try {
                 const label = document.getElementById('fjfe-clicker-rps-label-v2');
@@ -897,12 +902,23 @@
                 const fmt = (numberTools && typeof numberTools.formatAbbrev === 'function') ? numberTools.formatAbbrev : (numberTools.format || formatCompact);
                 const txt = fmt(displayValue);
                 label.textContent = '+' + txt + ' RPS';
-                try {
-                    const wordsFmt = (numberTools && typeof numberTools.formatWordsSmallDecimals === 'function') ? numberTools.formatWordsSmallDecimals : (numberTools.formatWords || null);
-                    if (wordsFmt) label.title = wordsFmt(displayValue) + ' Reposts per Second';
-                } catch(_) {}
+                
+                const full = _formatFullWords(displayValue);
+                label.title = '+' + full + ' per second';
             } catch(_) {}
         };
+
+        
+        rpsLabel.addEventListener('mouseenter', function(){
+            try {
+                const rawRps = (window.fjfeRcProd && typeof window.fjfeRcProd.getTotalRps === 'function') ? window.fjfeRcProd.getTotalRps() : 0;
+                const normalized = numberTools.quantize(rawRps);
+                const isInf = numberTools.isInfinite && numberTools.isInfinite(rawRps);
+                const displayValue = isInf ? Number.POSITIVE_INFINITY : normalized;
+                const full = _formatFullWords(displayValue);
+                rpsLabel.title = '+' + full + ' per second';
+            } catch(_) {}
+        });
         
         win.append(dragHandle);
 

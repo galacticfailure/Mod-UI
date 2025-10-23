@@ -1,4 +1,3 @@
-
 (() => {
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'remtz';
@@ -14,10 +13,10 @@
   
   
   const CUSTOM_MESSAGES = {
+    'Shisui': "best mod dad",
     'gubbels': "The goose was right, C'est la vie",
     'phaseus': "This mod is a n/egg/er and a nikker.",
     'galacticfailure': "only a bullet can stop my sinful hand",
-    'Shisui': "best mod dad",
     'WMDxVeLoCiTy': "Eh, just leave it blank I guess. I dont really care for shit like that",
   };
 
@@ -32,7 +31,7 @@
   
   const CUSTOM_MESSAGES_STORAGE_KEY = 'fjTweakerCustomMessages';
 
-    const normalizeUsername = (s) => String(s || '')
+  const normalizeUsername = (s) => String(s || '')
       .replace(/[\u200B-\u200D\uFEFF]/g, '') 
       .replace(/\u00A0/g, ' ') 
       .trim()
@@ -176,13 +175,6 @@
     const candidates = document.querySelectorAll('div[style*="color: red"][style*="background: #232323"]');
     candidates.forEach((candidate) => {
       if (!matchesTarget(candidate)) return;
-
-      
-      
-      
-      
-      
-
       if (removeEnabled && !customEnabled) {
         candidate.remove();
         return;

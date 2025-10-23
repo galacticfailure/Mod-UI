@@ -52,6 +52,7 @@
     rememberInlineStyle(element, 'visibility', 'Visibility');
     rememberInlineStyle(element, 'pointer-events', 'PointerEvents');
     rememberInlineStyle(element, 'opacity', 'Opacity');
+    rememberInlineStyle(element, 'margin-top', 'MarginTop');
 
     element.dataset.fjQuickOriginalStylesSaved = '1';
   };
@@ -65,6 +66,7 @@
     restoreInlineStyle(element, 'visibility', 'Visibility');
     restoreInlineStyle(element, 'pointer-events', 'PointerEvents');
     restoreInlineStyle(element, 'opacity', 'Opacity');
+    restoreInlineStyle(element, 'margin-top', 'MarginTop');
 
     delete element.dataset.fjQuickOriginalStylesSaved;
   };
@@ -84,6 +86,16 @@
     quickMenu.style.setProperty('visibility', 'hidden', 'important');
     quickMenu.style.setProperty('pointer-events', 'none', 'important');
     quickMenu.style.setProperty('opacity', '0', 'important');
+
+    
+    const html1 = document.querySelector('.modCC.modF.modF1');
+    const replaceModCC = document.querySelector('.replaceModCC');
+    const html2 = document.getElementById('cControlsCon');
+
+    if ((html1 || replaceModCC) && html2) {
+      markOriginalStyles(html2);
+      html2.style.setProperty('margin-top', '-60px', 'important');
+    }
   };
 
   const showQuickMenu = () => {
@@ -93,6 +105,13 @@
     }
 
     restoreOriginalStyles(quickMenu);
+
+    
+    const html2 = document.getElementById('cControlsCon');
+
+    if (html2) {
+      restoreOriginalStyles(html2);
+    }
   };
 
   const startObserver = () => {

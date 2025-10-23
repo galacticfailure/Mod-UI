@@ -89,8 +89,9 @@
         if (!Number.isFinite(val)) return true;
         const abs = Math.abs(val);
         if (abs === 0) return false;
+        
+        
         if (abs >= UNIT_THRESHOLD) return true;
-        if (abs >= MAX_SAFE) return true;
         return false;
     }
 

@@ -5,6 +5,7 @@
 
   let observer = null;
   let featureEnabled = true;
+  let numpadHandler = null;
 
   const getSettings = () => {
     const settings = window.fjTweakerSettings || {};
@@ -51,6 +52,7 @@
     rememberInlineStyle(element, 'visibility', 'Visibility');
     rememberInlineStyle(element, 'pointer-events', 'PointerEvents');
     rememberInlineStyle(element, 'opacity', 'Opacity');
+    rememberInlineStyle(element, 'margin-top', 'MarginTop');
 
     element.dataset.fjQuickOriginalStylesSaved = '1';
   };
@@ -64,6 +66,7 @@
     restoreInlineStyle(element, 'visibility', 'Visibility');
     restoreInlineStyle(element, 'pointer-events', 'PointerEvents');
     restoreInlineStyle(element, 'opacity', 'Opacity');
+    restoreInlineStyle(element, 'margin-top', 'MarginTop');
 
     delete element.dataset.fjQuickOriginalStylesSaved;
   };
@@ -83,6 +86,16 @@
     quickMenu.style.setProperty('visibility', 'hidden', 'important');
     quickMenu.style.setProperty('pointer-events', 'none', 'important');
     quickMenu.style.setProperty('opacity', '0', 'important');
+
+    
+    const html1 = document.querySelector('.modCC.modF.modF1');
+    const replaceModCC = document.querySelector('.replaceModCC');
+    const html2 = document.getElementById('cControlsCon');
+
+    if ((html1 || replaceModCC) && html2) {
+      markOriginalStyles(html2);
+      html2.style.setProperty('margin-top', '-60px', 'important');
+    }
   };
 
   const showQuickMenu = () => {
@@ -92,6 +105,13 @@
     }
 
     restoreOriginalStyles(quickMenu);
+
+    
+    const html2 = document.getElementById('cControlsCon');
+
+    if (html2) {
+      restoreOriginalStyles(html2);
+    }
   };
 
   const startObserver = () => {
@@ -106,6 +126,50 @@
     observer.observe(document.body, { childList: true, subtree: true });
   };
 
+  const isTypingElement = (el) => {
+    if (!el) return false;
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA') return true;
+    if (tag === 'INPUT') {
+      const t = (el.type || '').toLowerCase();
+      return ['text', 'search', 'tel', 'url', 'email', 'password', 'number'].indexOf(t) !== -1;
+    }
+    if (el.isContentEditable) return true;
+    return false;
+  };
+
+  const handleNumpadKeyDown = (e) => {
+    if (!featureEnabled) return;
+
+    try {
+      if (isTypingElement(document.activeElement)) {
+        return;
+      }
+    } catch (err) {
+    }
+
+    const isNumpadCode = e.code && /^Numpad[1-9]$/.test(e.code);
+    const isNumpadLocation = (e.location === (KeyboardEvent && KeyboardEvent.DOM_KEY_LOCATION_NUMPAD ? KeyboardEvent.DOM_KEY_LOCATION_NUMPAD : 3)) && /^[1-9]$/.test(e.key);
+
+    if (isNumpadCode || isNumpadLocation) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+  };
+
+  const addNumpadListener = () => {
+    if (numpadHandler) return;
+    numpadHandler = handleNumpadKeyDown;
+    document.addEventListener('keydown', numpadHandler, true);
+  };
+
+  const removeNumpadListener = () => {
+    if (!numpadHandler) return;
+    document.removeEventListener('keydown', numpadHandler, true);
+    numpadHandler = null;
+  };
+
   const stopObserver = () => {
     if (observer) {
       observer.disconnect();
@@ -118,8 +182,10 @@
 
     if (featureEnabled) {
       hideQuickMenu();
+      addNumpadListener();
       startObserver();
     } else {
+      removeNumpadListener();
       stopObserver();
       showQuickMenu();
     }

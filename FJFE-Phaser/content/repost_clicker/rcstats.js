@@ -18,56 +18,63 @@
   function setInt(key, v) { try { localStorage.setItem(key, String(Math.max(0, Math.floor(v||0)))); } catch(_) {} }
 
   
-  function loadAllTimeBig() {
+  function loadBigInt(key){
     try {
-      const raw = localStorage.getItem(K.THUMBS_ALL_TIME);
-      if (!raw) return 0n;
-      if (raw.startsWith && raw.startsWith('bi:')) {
-        try { return BigInt(raw.slice(3)); } catch(_) { return 0n; }
-      }
-      if (raw === 'Infinity') return 0n; 
-      const p = parseFloat(raw);
-      if (!Number.isFinite(p) || p <= 0) return 0n;
-      return BigInt(Math.floor(p));
+      const s = localStorage.getItem(key);
+      if (!s) return 0n;
+      if (s === 'Infinity') return 0n; 
+      return BigInt(s);
     } catch(_) { return 0n; }
   }
-  function setAllTimeBig(v) {
-    try {
-      const bi = (typeof v === 'bigint') ? v : BigInt(Math.max(0, Math.floor(v||0)));
-      const clamped = bi < 0n ? 0n : bi;
-      localStorage.setItem(K.THUMBS_ALL_TIME, 'bi:' + clamped.toString());
-    } catch(_) {}
-  }
+  function setBigInt(key, bi){ try { localStorage.setItem(key, (bi < 0n ? 0n : bi).toString()); } catch(_) {} }
 
   
-  function formatBigIntAbbrev(bi) {
+  function formatBigAbbrev(bi){
     try {
-      const negative = bi < 0n ? '-' : '';
-      let v = bi < 0n ? -bi : bi;
-      if (v === 0n) return '0';
+      if (typeof bi !== 'bigint') return formatCounter(Number(bi||0));
+      const neg = bi < 0n ? '-' : '';
+      let abs = bi < 0n ? -bi : bi;
+      if (abs < 1000n) return neg + abs.toString();
       const units = [
-        [3n,'K'],[6n,'M'],[9n,'B'],[12n,'T'],[15n,'Qa'],[18n,'Qi'],[21n,'Sx'],[24n,'Sp'],[27n,'Oc'],[30n,'No'],
-        [33n,'De'],[36n,'Ud'],[39n,'Dd'],[42n,'Td'],[45n,'Qd'],[48n,'Qn'],[51n,'Sxd'],[54n,'Spd'],[57n,'Ocd'],[60n,'Nod'],
-        [63n,'Vg'],[66n,'Uvg'],[69n,'Dvg'],[72n,'Trvg'],[75n,'Qavg'],[78n,'Qivg'],[81n,'Sxvg'],[84n,'Spvg'],[87n,'Ocvg'],[90n,'Novg'],
-        [93n,'Tg'],[96n,'Utg'],[99n,'Dtg'],[102n,'Ttrg'],[105n,'Qtrg'],[108n,'Qitg'],[111n,'Sxtg'],[114n,'Sptg'],[117n,'Octg'],[120n,'Notg'],
-        [123n,'Qg'],[126n,'Uqg'],[129n,'Dqg'],[132n,'Tqg'],[135n,'Qaqg'],[138n,'Qiqg'],[141n,'Sxqg'],[144n,'Spqg'],[147n,'Ocqg'],[150n,'Noqg']
+        { power: 3, abb: 'K' },{ power: 6, abb: 'M' },{ power: 9, abb: 'B' },{ power: 12, abb: 'T' },
+        { power: 15, abb: 'Qa' },{ power: 18, abb: 'Qi' },{ power: 21, abb: 'Sx' },{ power: 24, abb: 'Sp' },
+        { power: 27, abb: 'Oc' },{ power: 30, abb: 'No' },{ power: 33, abb: 'De' },{ power: 36, abb: 'Ud' },
+        { power: 39, abb: 'Dd' },{ power: 42, abb: 'Td' },{ power: 45, abb: 'Qd' },{ power: 48, abb: 'Qn' },
+        { power: 51, abb: 'Sxd' },{ power: 54, abb: 'Spd' },{ power: 57, abb: 'Ocd' },{ power: 60, abb: 'Nod' },
+        { power: 63, abb: 'Vg' },{ power: 66, abb: 'Uvg' },{ power: 69, abb: 'Dvg' },{ power: 72, abb: 'Trvg' },
+        { power: 75, abb: 'Qavg' },{ power: 78, abb: 'Qivg' },{ power: 81, abb: 'Sxvg' },{ power: 84, abb: 'Spvg' },
+        { power: 87, abb: 'Ocvg' },{ power: 90, abb: 'Novg' },{ power: 93, abb: 'Tg' },{ power: 96, abb: 'Utg' },
+        { power: 99, abb: 'Dtg' },{ power: 102, abb: 'Ttrg' },{ power: 105, abb: 'Qtrg' },{ power: 108, abb: 'Qitg' },
+        { power: 111, abb: 'Sxtg' },{ power: 114, abb: 'Sptg' },{ power: 117, abb: 'Octg' },{ power: 120, abb: 'Notg' },
+        { power: 123, abb: 'Qg' },{ power: 126, abb: 'Uqg' },{ power: 129, abb: 'Dqg' },{ power: 132, abb: 'Tqg' },
+        { power: 135, abb: 'Qaqg' },{ power: 138, abb: 'Qiqg' },{ power: 141, abb: 'Sxqg' },{ power: 144, abb: 'Spqg' },
+        { power: 147, abb: 'Ocqg' },{ power: 150, abb: 'Noqg' },{ power: 153, abb: 'Qig' },{ power: 156, abb: 'Uqig' },
+        { power: 159, abb: 'Dqig' },{ power: 162, abb: 'Tqig' },{ power: 165, abb: 'Qaqig' },{ power: 168, abb: 'Qiqig' },
+        { power: 171, abb: 'Sxqig' },{ power: 174, abb: 'Spqig' },{ power: 177, abb: 'Ocqig' },{ power: 180, abb: 'Noqig' },
+        { power: 183, abb: 'Sxg' },{ power: 186, abb: 'Usxg' },{ power: 189, abb: 'Dsxg' },{ power: 192, abb: 'Tsxg' },
+        { power: 195, abb: 'Qsxg' },{ power: 198, abb: 'Qisxg' },{ power: 201, abb: 'Sxsxg' },{ power: 204, abb: 'Spsxg' },
+        { power: 207, abb: 'Ocsxg' },{ power: 210, abb: 'Nosxg' },{ power: 213, abb: 'Spg' },{ power: 243, abb: 'Ocg' },
+        { power: 273, abb: 'Nog' },{ power: 303, abb: 'C' }
       ];
-      const digits = BigInt(String(v).length - 1);
-      let chosen = null;
+      const s = abs.toString();
+      const digits = s.length;
+      let unit = units[0];
       for (let i = units.length - 1; i >= 0; i--) {
-        if (digits >= units[i][0]) { chosen = units[i]; break; }
+        if (digits > units[i].power) { unit = units[i]; break; }
       }
-      if (!chosen) return negative + v.toString();
-      const pow10 = (p)=>{
-        let r = 1n; for (let i=0n;i<p;i++) r *= 10n; return r;
-      };
-      const base = pow10(chosen[0]);
-      const scaledTimes1000 = (v * 1000n) / base; 
-      const intPart = scaledTimes1000 / 1000n;
-      const fracPart = scaledTimes1000 % 1000n;
-      const fracStr = fracPart.toString().padStart(3,'0');
-      return negative + intPart.toString() + '.' + fracStr + chosen[1];
-    } catch(_) { return bi.toString(); }
+      const pow = BigInt(unit.power);
+      
+      let div = 1n; for (let i=0n;i<pow;i++) div *= 10n;
+      const scaledTimesThousand = (abs * 1000n) / div;
+      const intPart = scaledTimesThousand / 1000n;
+      let frac = (scaledTimesThousand % 1000n).toString().padStart(3,'0');
+      
+      frac = frac.replace(/0+$/,'');
+      const txt = frac.length ? `${intPart.toString()}.${frac}` : intPart.toString();
+      return neg + txt + unit.abb;
+    } catch(_) {
+      try { return bi.toString(); } catch(__) { return '0'; }
+    }
   }
 
   function formatCounter(n){ try { const t = window.fjfeClickerNumbers; return (t && t.formatCounter) ? t.formatCounter(n) : String(n); } catch(_) { return String(n); } }
@@ -124,11 +131,11 @@
     Object.assign(list.style, { display:'flex', flexDirection:'column', overflowY:'auto', gap:'6px', width:'100%', height:'100%', padding:'8px' });
 
     
-  const timesClicked = loadInt(K.TIMES_CLICKED, 0);
-  const thumbsPerClickLast = loadInt(K.THUMBS_PER_CLICK_LAST, 0);
-  const thumbsFromClicking = loadInt(K.THUMBS_FROM_CLICKING, 0);
-  const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
-  const allTimeThumbsBI = loadAllTimeBig();
+    const timesClicked = loadInt(K.TIMES_CLICKED, 0);
+    const thumbsPerClickLast = loadInt(K.THUMBS_PER_CLICK_LAST, 0);
+    const thumbsFromClicking = loadInt(K.THUMBS_FROM_CLICKING, 0);
+    const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
+    const allTimeThumbs = loadInt(K.THUMBS_ALL_TIME, 0);
     const timesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
     const clickBonusPct = loadInt(K.CLICK_BONUS_PCT, 0);
     const prestigeBonusPct = loadInt(K.PRESTIGE_BONUS_PCT, 0);
@@ -137,7 +144,7 @@
     list.appendChild(statRow('Thumbs per Click:', formatCounter(thumbsPerClickLast), { thumb:true }));
     list.appendChild(statRow('Thumbs from Clicking:', formatCounter(thumbsFromClicking), { thumb:true }));
     list.appendChild(statRow('Thumbs Generated:', formatCounter(thumbsGenerated), { thumb:true }));
-  list.appendChild(statRow('All-Time Thumbs Generated:', formatBigIntAbbrev(allTimeThumbsBI), { thumb:true }));
+    list.appendChild(statRow('All-Time Thumbs Generated:', formatCounter(allTimeThumbs), { thumb:true }));
     list.appendChild(statRow('Times Prestiged:', String(timesPrestiged)));
 
     
@@ -175,11 +182,11 @@
         if (!list) return;
         const children = list.children;
         
-  const timesClicked = loadInt(K.TIMES_CLICKED, 0);
-  const thumbsPerClickLast = loadInt(K.THUMBS_PER_CLICK_LAST, 0);
-  const thumbsFromClicking = loadInt(K.THUMBS_FROM_CLICKING, 0);
-  const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
-  const allTimeThumbsBI = loadAllTimeBig();
+        const timesClicked = loadInt(K.TIMES_CLICKED, 0);
+        const thumbsPerClickLast = loadInt(K.THUMBS_PER_CLICK_LAST, 0);
+        const thumbsFromClicking = loadInt(K.THUMBS_FROM_CLICKING, 0);
+        const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
+        const allTimeThumbs = loadInt(K.THUMBS_ALL_TIME, 0);
         const timesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
         const clickBonusPct = loadInt(K.CLICK_BONUS_PCT, 0);
         const prestigeBonusPct = loadInt(K.PRESTIGE_BONUS_PCT, 0);
@@ -192,7 +199,7 @@
         updateRow(1, formatCounter(thumbsPerClickLast));
         updateRow(2, formatCounter(thumbsFromClicking));
         updateRow(3, formatCounter(thumbsGenerated));
-  updateRow(4, formatBigIntAbbrev(allTimeThumbsBI));
+        updateRow(4, formatCounter(allTimeThumbs));
         updateRow(5, String(timesPrestiged));
         
         updateRow(7, String(clickBonusPct)+'%');
@@ -309,100 +316,149 @@
 
   
   window.fjfeStats = {
-    addClick(deltaThumbs){ try {
-      const inc = Math.max(0, Math.floor(deltaThumbs||0));
-      setInt(K.TIMES_CLICKED, loadInt(K.TIMES_CLICKED,0)+1);
-      setInt(K.THUMBS_PER_CLICK_LAST, inc);
-      setInt(K.THUMBS_FROM_CLICKING, loadInt(K.THUMBS_FROM_CLICKING,0)+inc);
-      setInt(K.THUMBS_GENERATED_TOTAL, loadInt(K.THUMBS_GENERATED_TOTAL,0)+inc);
-      
-      const curBI = loadAllTimeBig();
-      setAllTimeBig(curBI + BigInt(inc));
-    } catch(_) {} },
-    addPassive(deltaThumbs){ try {
-      const inc = Math.max(0, Math.floor(deltaThumbs||0));
-      setInt(K.THUMBS_GENERATED_TOTAL, loadInt(K.THUMBS_GENERATED_TOTAL,0)+inc);
-      const curBI = loadAllTimeBig();
-      setAllTimeBig(curBI + BigInt(inc));
-    } catch(_) {} },
+    addClick(deltaThumbs){
+      try {
+        const inc = Math.max(0, Math.floor(deltaThumbs||0));
+        setInt(K.TIMES_CLICKED, loadInt(K.TIMES_CLICKED,0)+1);
+        setInt(K.THUMBS_PER_CLICK_LAST, inc);
+        setInt(K.THUMBS_FROM_CLICKING, loadInt(K.THUMBS_FROM_CLICKING,0)+inc);
+        setInt(K.THUMBS_GENERATED_TOTAL, loadInt(K.THUMBS_GENERATED_TOTAL,0)+inc);
+        
+        const allBi = loadBigInt(K.THUMBS_ALL_TIME) + BigInt(inc);
+        setBigInt(K.THUMBS_ALL_TIME, allBi);
+      } catch(_) {}
+    },
+    addPassive(deltaThumbs){
+      try {
+        const inc = Math.max(0, Math.floor(deltaThumbs||0));
+        setInt(K.THUMBS_GENERATED_TOTAL, loadInt(K.THUMBS_GENERATED_TOTAL,0)+inc);
+        const allBi = loadBigInt(K.THUMBS_ALL_TIME) + BigInt(inc);
+        setBigInt(K.THUMBS_ALL_TIME, allBi);
+      } catch(_) {}
+    },
     
-    addPassiveScaledBig(deltaScaled){ try {
-      const ds = (typeof deltaScaled === 'bigint') ? deltaScaled : BigInt(Math.max(0, Math.floor(deltaScaled||0)));
-      if (ds <= 0n) return;
-      const add = ds / 10n; 
-      if (add > 0n) setAllTimeBig(loadAllTimeBig() + add);
-    } catch(_) {} },
+    addPassiveScaledBig(deltaScaled){
+      try {
+        if (typeof deltaScaled !== 'bigint') return;
+        if (deltaScaled <= 0n) return;
+        const whole = deltaScaled / 10n;
+        if (whole <= 0n) return;
+        const allBi = loadBigInt(K.THUMBS_ALL_TIME) + whole;
+        setBigInt(K.THUMBS_ALL_TIME, allBi);
+      } catch(_) {}
+    },
     setClickBonusPercent(pct){ try { setInt(K.CLICK_BONUS_PCT, Math.max(0, Math.floor(pct||0))); } catch(_) {} },
     setPrestigeBonusPercent(pct){ try { setInt(K.PRESTIGE_BONUS_PCT, Math.max(0, Math.floor(pct||0))); } catch(_) {} },
     reset(){ try { Object.values(K).forEach(k => { localStorage.removeItem(k); }); } catch(_) {} },
     prestigeReset(){
       try {
         
-        const keepAllTimeBI = loadAllTimeBig();
+        const keepAllTime = loadInt(K.THUMBS_ALL_TIME, 0);
         const keepTimesClicked = loadInt(K.TIMES_CLICKED, 0);
         const keepTimesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
         const keepPrestigeBonus = loadInt(K.PRESTIGE_BONUS_PCT, 0);
 
         
-        try {
-          const prefixes = ['fjTweakerUpgradeNum_', 'fjTweakerStoreMultiplier_', 'fjTweakerStoreUpgrade_'];
-          const toRemove = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key) continue;
-            if (prefixes.some(p => key.startsWith(p))) toRemove.push(key);
-          }
-          toRemove.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
-        } catch(_) {}
-        try {
-          const storage = window.fjfeNumbersStorage;
-          if (storage) storage.writeRaw({ infinite:false, scaled:0n });
-          else localStorage.setItem('fjTweakerClickerCount', '0');
-        } catch(_) {}
+        Object.values(K).forEach(k => { localStorage.removeItem(k); });
 
         
-        Object.values(K).forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
-
-        
-        setAllTimeBig(keepAllTimeBI);
+        setInt(K.THUMBS_ALL_TIME, keepAllTime);
         setInt(K.TIMES_CLICKED, keepTimesClicked);
         setInt(K.TIMES_PRESTIGED, keepTimesPrestiged);
         setInt(K.PRESTIGE_BONUS_PCT, keepPrestigeBonus);
 
         
-        try { if (window.fjfeRcMain && typeof window.fjfeRcMain.refresh==='function') window.fjfeRcMain.refresh(); } catch(_) {}
-        try { if (window.fjfeRcProd && typeof window.fjfeRcProd.refresh==='function') window.fjfeRcProd.refresh(); } catch(_) {}
-        try { if (window.fjfeRcStore && typeof window.fjfeRcStore.refresh==='function') window.fjfeRcStore.refresh(); } catch(_) {}
+        try {
+          const storage = window.fjfeNumbersStorage;
+          if (storage && typeof storage.writeRaw === 'function') {
+            storage.writeRaw({ infinite:false, scaled: 0n });
+          } else {
+            localStorage.setItem('fjTweakerClickerCount', '0');
+          }
+        } catch(_) {}
+
+        
+        try {
+          const keys = Object.keys(localStorage);
+          keys.forEach(k => {
+            if (k.startsWith('fjTweakerStoreUpgrade_')) localStorage.removeItem(k);
+            if (k.startsWith('fjTweakerStoreMultiplier_')) localStorage.removeItem(k);
+          });
+        } catch(_) {}
+
+        
+        try {
+          const keys = Object.keys(localStorage);
+          keys.forEach(k => {
+            if (k.startsWith('fjTweakerUpgradeNum_')) localStorage.removeItem(k);
+          });
+        } catch(_) {}
+
+        
+        try {
+          const tools = window.fjfeClickerNumbers;
+          const disp = document.getElementById('fjfe-clicker-count-v2');
+          if (disp) {
+            const txt = (tools && tools.formatCounter) ? tools.formatCounter(0) : '0';
+            disp.textContent = txt;
+          }
+        } catch(_) {}
+        try { if (typeof window.fjfeClickerV2Recompute === 'function') window.fjfeClickerV2Recompute(); } catch(_) {}
+        try { if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors(); } catch(_) {}
+        try { if (typeof window.fjfeRefreshStoreAffordability === 'function') window.fjfeRefreshStoreAffordability(); } catch(_) {}
       } catch(_) {}
     },
     computePrestigeProgress(){
       try {
-        const allTimeBI = loadAllTimeBig();
-        const level = loadInt(K.PRESTIGE_BONUS_PCT, 0) || 0; 
-        const T = 1000000000000n; 
-        const safePow3BI = (n)=>{ n = BigInt(Math.max(0, Math.floor(Number(n)||0))); return n*n*n; };
         
-        const ratio = allTimeBI / T;
-        const cbrt = (x)=>{
+        const readBig = (key) => {
+          try {
+            const s = localStorage.getItem(key);
+            if (!s) return 0n;
+            return BigInt(s);
+          } catch(_) { return 0n; }
+        };
+        const allTime = readBig(K.THUMBS_ALL_TIME);
+        let level = readBig(K.PRESTIGE_BONUS_PCT);
+        if (level < 0n) level = 0n;
+
+        const T = 1000000000000n; 
+
+        
+        const floorCbrt = (x) => {
           if (x <= 0n) return 0n;
-          let hi = 1n;
-          while (hi*hi*hi <= x) hi *= 2n;
-          let lo = hi/2n;
-          while (lo < hi) {
-            const mid = (lo + hi + 1n) >> 1n;
+          
+          let lo = 0n, hi = 1n;
+          while (hi*hi*hi <= x) hi <<= 1n;
+          
+          while (hi - lo > 1n) {
+            const mid = (lo + hi) >> 1n;
             const m3 = mid*mid*mid;
-            if (m3 <= x) lo = mid; else hi = mid - 1n;
+            if (m3 <= x) lo = mid; else hi = mid;
           }
           return lo;
         };
-        const root = cbrt(ratio);
-        const lvlBI = BigInt(Math.max(0, Math.floor(level||0)));
-        let potprestBI = root - lvlBI;
-        if (potprestBI < 0n) potprestBI = 0n;
-        const nextThreshold = safePow3BI(lvlBI + potprestBI + 1n) * T;
-        const remainBI = nextThreshold > allTimeBI ? (nextThreshold - allTimeBI) : 0n;
-        return { prest: loadInt(K.TIMES_PRESTIGED,0)||0, potprest: Number(potprestBI), prestremain: Number(remainBI > 9007199254740991n ? 9007199254740991n : remainBI), prestremainStr: formatBigIntAbbrev(remainBI) };
-      } catch(_) { return { prest:0, potprest:0, prestremain:0, prestremainStr:'0' }; }
+
+  const s = floorCbrt(allTime / T);
+  
+  const pot = (s > level) ? (s - level) : 0n;
+
+  const nextLevel = level + pot + 1n; 
+        const threshold = nextLevel*nextLevel*nextLevel * T;
+        const remain = (allTime >= threshold) ? 0n : (threshold - allTime);
+
+        const toSafeNumber = (bi)=>{
+          const max = BigInt(Number.MAX_SAFE_INTEGER);
+          return bi <= max ? Number(bi) : null;
+        };
+        const formatBig = (bi)=>{ return formatBigAbbrev(bi); };
+
+        const prest = toSafeNumber(level) ?? Number.MAX_SAFE_INTEGER;
+        const potprest = toSafeNumber(pot) ?? Number.MAX_SAFE_INTEGER;
+        const prestremain = toSafeNumber(remain);
+        const prestremainStr = formatBig(remain);
+        return { prest, potprest, prestremain: (prestremain ?? Infinity), prestremainStr };
+      } catch(_) { return { prest:0, potprest:0, prestremain:0, prestremainStr: '0' }; }
     }
   };
 })();

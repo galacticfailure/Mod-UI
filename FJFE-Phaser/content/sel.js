@@ -3,19 +3,20 @@
   const MODULE_KEY = 'sel';
   const SETTINGS_KEY = 'fjTweakerSettings';
   const DEFAULT_SETTINGS = {
-    avoidNext: false,
-    removeTwilight: true,
-    customMessages: false,
-    hideRateShortcuts: true,
-    hideShortcuts: false,
-    stopUsernamePopups: true,
-    trackRates: false,
-    modJSExtras: true,
-    walcorn: false,
-    checkText: false,
-    clicker2: false,
-    misrateWarning: false,
-    warnOnAll: false
+  avoidNext: false,
+  removeTwilight: true,
+  customMessages: false,
+  hideRateShortcuts: true, 
+  hideShortcuts: false,
+  stopUsernamePopups: true,
+  trackRates: false,
+  modJSExtras: true,
+  walcorn: false,
+  checkText: false,
+  clicker2: false,
+  misrateWarning: false,
+  warnOnAll: false,
+  farm: false
   };
   const MANAGE_ENTRY_SELECTOR = '#topME .sideEditButt[onclick*="manageAll()"]';
   let manageEntryObserver = null;
@@ -64,7 +65,7 @@
 
   const createUI = (settings) => {
     try {
-      console.debug('fjTweaker(sel): createUI called');
+      
     } catch (e) {}
     if (document.querySelector('#fj-sel-menu')) {
       return;
@@ -236,7 +237,7 @@
       tabButtons[key] = btn;
       tabRow.appendChild(btn);
     });
-    menu.append(tabRow);
+  menu.append(tabRow);
 
     
     const tabContent = document.createElement('div');
@@ -247,6 +248,31 @@
     tabContent.style.gap = '8px';
     tabContent.style.width = '100%';
     menu.append(tabContent);
+
+    
+    const unauthorizedWrap = document.createElement('div');
+    unauthorizedWrap.style.display = 'none';
+    unauthorizedWrap.style.flexDirection = 'column';
+    unauthorizedWrap.style.gap = '8px';
+    const unauthorizedMsg = document.createElement('div');
+    unauthorizedMsg.style.color = '#ffbaba';
+    unauthorizedMsg.style.font = "600 13px 'Segoe UI', sans-serif";
+    unauthorizedMsg.textContent = 'Credentials missing. Please update to enable Mod UI.';
+    const unauthorizedBtn = document.createElement('button');
+    unauthorizedBtn.type = 'button';
+    unauthorizedBtn.textContent = 'Update Credentials';
+    Object.assign(unauthorizedBtn.style, {
+      padding: '6px 10px',
+      font: "600 12px 'Segoe UI', sans-serif",
+      color: '#111',
+      background: '#ff8c00',
+      border: '1px solid #b86900',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      alignSelf: 'flex-start'
+    });
+    unauthorizedWrap.append(unauthorizedMsg, unauthorizedBtn);
+    menu.append(unauthorizedWrap);
 
 const createInfoButtonElement = (labelText) => {
   const resolvedLabel = (labelText || '').trim();
@@ -327,7 +353,7 @@ const createCheckboxRow = (id, label, checked, onChange) => {
   return { wrapper: row, input, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow) => {
+const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
@@ -342,7 +368,8 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     checkText: checkTextRow.input.checked,
     clicker2: clicker2Row.input.checked,
     misrateWarning: misrateWarningRow.input.checked,
-    warnOnAll: warnOnAllRow.input.checked
+    warnOnAll: warnOnAllRow.input.checked,
+    farm: farmRow ? Boolean(farmRow.input.checked) : false
   };
 
   persistSettings(nextSettings);
@@ -375,6 +402,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
   const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
   const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
   const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
+  const farmRow = createCheckboxRow('fj-sel-farm', 'Farm', settings.farm);
 
   try {
     const labelEl = warnOnAllRow.wrapper.querySelector('label');
@@ -411,7 +439,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow);
       avoidNextRow.input.addEventListener('change', saveHandler);
       removeTwilightRow.input.addEventListener('change', saveHandler);
       customMessagesRow.input.addEventListener('change', saveHandler);
@@ -427,6 +455,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
       });
       misrateWarningRow.input.addEventListener('change', saveHandler);
       warnOnAllRow.input.addEventListener('change', saveHandler);
+      farmRow.input.addEventListener('change', saveHandler);
     };
     addLiveChangeHandlers();
 
@@ -467,17 +496,18 @@ const setInfoContent = (button, message, imagePath) => {
 
     setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
     setInfoContent(removeTwilightRow.infoButton, 'Removes the Twilight Zone lyrics from user profiles.');
-  setInfoContent(customMessagesRow.infoButton, 'Enables custom hard-coded messages on mod profiles.');
-  setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
-  setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
+    setInfoContent(customMessagesRow.infoButton, 'Enables custom hard-coded messages on mod profiles.');
+    setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
+    setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
     setInfoContent(stopUserPopupRow.infoButton, 'Stops the profile menu from popping up when mousing over a user. User must now be clicked to bring up menu.');
     setInfoContent(trackRatesRow.infoButton, 'Keeps count of rated content.');
     setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
     setInfoContent(walcornRow.infoButton, 'why');
     setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
-  setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
-  setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
-  setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
+    setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
+    setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
+    setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
+    setInfoContent(farmRow.infoButton, 'A farm.');
 
     
     const tabGroups = {
@@ -492,7 +522,7 @@ const setInfoContent = (button, message, imagePath) => {
         hideShortcutsRow.wrapper,
         trackRatesRow.wrapper,
       ],
-  extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper],
+  extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
     };
 
     
@@ -538,7 +568,69 @@ const setInfoContent = (button, message, imagePath) => {
     versionLabel.textContent = 'Local version: v' + getLocalVersion();
     menu.append(versionLabel);
 
-    let menuVisible = false;
+  let menuVisible = false;
+  let unauthorizedCooldownTimer = null;
+  let __fjSelStatusBound = false;
+
+    const setupUnauthorizedButtonState = () => {
+      try {
+        if (!window.fjApichk || !window.fjApichk.canUseManualRefresh) return;
+        const st = window.fjApichk.canUseManualRefresh();
+        if (unauthorizedCooldownTimer) { try { clearInterval(unauthorizedCooldownTimer); } catch(_) {} unauthorizedCooldownTimer = null; }
+        
+        unauthorizedBtn.disabled = false;
+        unauthorizedBtn.textContent = 'Update Credentials';
+      } catch (_) {}
+    };
+
+    const updateAuthorizationUI = () => {
+      try {
+        const authorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function'
+          ? window.fjApichk.isAuthorized()
+          : true;
+        if (!authorized) {
+          tabRow.style.display = 'none';
+          tabContent.style.display = 'none';
+          versionLabel.style.display = 'none';
+          unauthorizedWrap.style.display = 'flex';
+          setupUnauthorizedButtonState();
+        } else {
+          tabRow.style.display = 'flex';
+          tabContent.style.display = 'flex';
+          versionLabel.style.display = '';
+          unauthorizedWrap.style.display = 'none';
+        }
+      } catch (_) {}
+    };
+
+    unauthorizedBtn.addEventListener('click', async () => {
+      try {
+        if (!window.fjApichk || !window.fjApichk.canUseManualRefresh) return;
+        const st = window.fjApichk.canUseManualRefresh();
+        if (!st.allowed) {
+          const now = Date.now();
+          const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
+          alert(`Please wait ${minutesLeft} minutes before trying again.`);
+          return;
+        }
+        
+        const prevText = unauthorizedBtn.textContent;
+        unauthorizedBtn.disabled = true;
+        unauthorizedBtn.textContent = 'Updating…';
+        const doRefresh = (window.fjApichk.requestManualRefresh
+          ? window.fjApichk.requestManualRefresh
+          : async () => {
+              try { await window.fjApichk.ensureFetched?.(true); } catch (_) {}
+              return { ok: true, authorized: window.fjApichk.isAuthorized?.() };
+            }
+        );
+        await doRefresh();
+        unauthorizedBtn.textContent = prevText;
+        unauthorizedBtn.disabled = false;
+        
+      } catch (_) {}
+      setupUnauthorizedButtonState();
+    });
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -552,15 +644,20 @@ const setInfoContent = (button, message, imagePath) => {
       }
     };
 
-    const showMenu = () => {
-      try {
-        console.debug('fjTweaker(sel): showMenu called, menuVisible=', menuVisible);
-      } catch (e) {}
+  const showMenu = () => {
+      
       if (menuVisible) {
         return;
       }
 
-      let transitionFallbackTimer = null;
+  let transitionFallbackTimer = null;
+
+      
+      updateAuthorizationUI();
+      if (!__fjSelStatusBound) {
+        document.addEventListener('fjApichkStatus', updateAuthorizationUI, { passive: true });
+        __fjSelStatusBound = true;
+      }
 
       try {
         const rect = toggleButton.getBoundingClientRect();
@@ -654,14 +751,13 @@ const setInfoContent = (button, message, imagePath) => {
       }
     };
 
-    const hideMenu = () => {
-      try {
-        console.debug('fjTweaker(sel): hideMenu called, menuVisible=', menuVisible);
-      }
- catch(e) {}
+  const hideMenu = () => {
+      
       if (!menuVisible) {
         return;
       }
+
+  try { if (unauthorizedCooldownTimer) { clearInterval(unauthorizedCooldownTimer); unauthorizedCooldownTimer = null; } } catch(_) {}
 
       host.setAttribute('aria-expanded', 'false');
       const slickModule = window.fjTweakerModules && window.fjTweakerModules.slick;
@@ -693,10 +789,7 @@ const setInfoContent = (button, message, imagePath) => {
           document.removeEventListener('keydown', handleKeyDown, true);
         }
       } else {
-        try {
-          console.debug('fjTweaker(sel): running inline close animation fallback');
-        }
- catch(e) {}
+        
         try {
           if (host.style.display === 'none') host.style.display = 'block';
           host.style.visibility = '';

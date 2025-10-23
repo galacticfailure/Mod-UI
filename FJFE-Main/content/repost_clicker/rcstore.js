@@ -625,27 +625,37 @@
 
   function formatPrice(value) {
     const tools = window.fjfeClickerNumbers;
-    
-    const toNum = (val) => {
+    const formatBig = (bi) => {
       try {
-        return (typeof val === 'bigint') ? Number(val) : Number(val);
-      } catch(_) { return Number.NaN; }
-    };
-    const n = toNum(value);
-    if (tools && typeof tools.formatCounter === 'function') {
-      return tools.formatCounter(n);
-    }
-    if (!Number.isFinite(n)) return 'Infinity';
-    
-    const abs = Math.abs(n);
-    if (abs < 1_000) return String(Math.floor(abs));
-    const units = [ ['T',1e12], ['B',1e9], ['M',1e6], ['K',1e3] ];
-    for (const [abbr, base] of units) {
-      if (abs >= base) {
-        return (Math.floor((abs / base) * 1000) / 1000).toFixed(3) + abbr;
+        if (typeof bi !== 'bigint') {
+          const num = Number(bi);
+          const fmt = (tools && tools.formatCounter) ? tools.formatCounter : (tools && tools.formatAbbrev) ? tools.formatAbbrev : (x=>String(x));
+          return fmt(num);
+        }
+        const neg = bi < 0n ? '-' : '';
+        let abs = bi < 0n ? -bi : bi;
+        if (abs < 1000n) return neg + abs.toString();
+        const units = [
+          { p:3n, a:'K' },{ p:6n, a:'M' },{ p:9n, a:'B' },{ p:12n, a:'T' },
+          { p:15n, a:'Qa' },{ p:18n, a:'Qi' },{ p:21n, a:'Sx' },{ p:24n, a:'Sp' },
+          { p:27n, a:'Oc' },{ p:30n, a:'No' },{ p:33n, a:'De' },{ p:36n, a:'Ud' }
+        ];
+        const s = abs.toString();
+        const digits = BigInt(s.length);
+        let unit = units[0];
+        for (let i = units.length - 1; i >= 0; i--) { if (digits > units[i].p) { unit = units[i]; break; } }
+        let div = 1n; for (let i=0n;i<unit.p;i++) div *= 10n;
+        const scaledTimesThousand = (abs * 1000n) / div;
+        const intPart = scaledTimesThousand / 1000n;
+        let frac = (scaledTimesThousand % 1000n).toString().padStart(3,'0');
+        frac = frac.replace(/0+$/,'');
+        const txt = frac.length ? `${intPart.toString()}.${frac}` : intPart.toString();
+        return neg + txt + unit.a;
+      } catch(_) {
+        try { return bi.toString(); } catch(__) { return '0'; }
       }
-    }
-    return String(Math.floor(abs));
+    };
+    return formatBig(value);
   }
 
   function formatPercentage(inc) {

@@ -1,6 +1,7 @@
 (() => {
   const MODULE_KEY = 'walcorn';
   const SETTINGS_KEY = 'fjTweakerSettings';
+  const DEFER_KEY = '__fj_walcorn_defer__';
 
   const resolveAssetUrl = (relativePath) => {
     try {
@@ -16,6 +17,7 @@
   let audioPrimed = false;
   let gnomePrimaryUrl = null;
   let runescapePrimaryUrl = null;
+  const activeOverlays = [];
 
   const buildBustedUrl = (relativePath) => {
     const base = resolveAssetUrl(relativePath);
@@ -30,7 +32,7 @@
   };
 
   const getFallbackGnome = () => resolveAssetUrl('icons/hehe.png');
-  const getFallbackRunescape = () => resolveAssetUrl('icons/runescape.png');
+  const getFallbackRunescape = () => resolveAssetUrl('icons/funnyjunk_2.png');
 
   const ensureAudio = () => {
     if (audio) return audio;
@@ -46,49 +48,6 @@
     return audio;
   };
 
-  
-  const playSound = () => {
-    const a = ensureAudio();
-    if (a) {
-      try {
-        a.volume = 1;
-      }
- catch (_) {}
-      try {
-        a.currentTime = 0;
-      }
- catch (_) {}
-      try {
-        a.play().catch(() => {
-          try {
-            const url = resolveAssetUrl('icons/gnome.mp3');
-            const inst = new Audio(url);
-            try {
-              inst.volume = 1;
-            }
- catch (e) {}
-            inst.play().catch(() => {});
-          } catch (_) {}
-        });
-      } catch (_) {}
-      try {
-        setTimeout(() => {
-          try { if (a.paused) { a.currentTime = 0; a.play().catch(()=>{}); } } catch (_) {}
-        }, 0);
-      } catch (_) {}
-      return;
-    }
-    try {
-      const url = resolveAssetUrl('icons/gnome.mp3');
-      const inst = new Audio(url);
-      try {
-        inst.volume = 1;
-      }
- catch (e) {}
-      inst.play().catch(() => {});
-    } catch (_) {}
-  };
-
   const primeAudioOnGesture = () => {
     if (audioPrimed) return;
     const onFirst = () => {
@@ -102,22 +61,18 @@
       }
  catch (e) {}
       try {
-        document.removeEventListener('touchstart', onFirst, true);
-      }
- catch (e) {}
-      try {
         document.removeEventListener('keydown', onFirst, true);
       }
  catch (e) {}
     };
     document.addEventListener('pointerdown', onFirst, true);
-    document.addEventListener('touchstart', onFirst, true);
     document.addEventListener('keydown', onFirst, true);
   };
 
   const makeOverlay = (imgUrl, styles = {}, fallbackUrl) => {
     const el = document.createElement('img');
     el.src = imgUrl;
+    el.dataset.fjWalcornOverlay = '1';
     if (fallbackUrl) {
       el.onerror = () => { try {
         el.onerror = null; el.src = fallbackUrl;
@@ -130,16 +85,16 @@
       });
     }
     el.style.position = 'fixed';
-    el.style.zIndex = '2147483646';
+  el.style.zIndex = '2147483647';
     el.style.pointerEvents = 'none';
     el.style.opacity = '0';
     el.style.transition = 'opacity 120ms linear';
-    try {
-      el.dataset.fjfeOverlay = '1';
-    }
- catch (_) {}
     Object.assign(el.style, styles);
     document.body.appendChild(el);
+    try {
+      activeOverlays.push(el);
+    }
+ catch (e) {}
     if (fallbackUrl) {
       setTimeout(() => {
         try {
@@ -163,8 +118,7 @@
 
   const showRunescape = () => {
     const primary = runescapePrimaryUrl || buildBustedUrl('icons/runescape.png');
-    
-    const el = makeOverlay(primary, { left: '0', top: '0', height: '200px', transform: 'translate3d(0,0,0)', willChange: 'transform' }, getFallbackRunescape());
+    const el = makeOverlay(primary, { left: '0', top: '0', height: '400px', transform: 'translate3d(0,0,0)', willChange: 'transform' }, getFallbackRunescape());
 
     const startBounce = () => {
       try {
@@ -175,13 +129,13 @@
           const nh = el.naturalHeight || 0;
           const nw = el.naturalWidth || 0;
           if (nh > 0 && nw > 0) {
-            h = 200; w = Math.max(20, Math.round(nw * (h / nh)));
+            h = 400; w = Math.max(40, Math.round(nw * (h / nh)));
             el.style.width = w + 'px';
           }
         } catch (e) {}
         if (!w || !h) {
           const r = el.getBoundingClientRect();
-          w = r.width || 160; h = r.height || 200;
+          w = r.width || 320; h = r.height || 400;
         }
         let x = Math.max(0, Math.random() * (vw - w));
         let y = Math.max(0, Math.random() * (vh - h));
@@ -251,71 +205,88 @@
   };
 
   
-  
-  let attemptFired = false;
-  let removeEligiblePressListener = null;
-  const ELIGIBLE_PRESS_SELECTOR = [
-    '.tUpBig',
-    '.tDnBig',
-    '#bottomFavAdd',
-    '.conFave',
-    '#modRa',
-    '#flagContent',
-    '#alertLi',
-    '#alertLink',
-    '#voteInfo',
-    '.userPQ',
-    '#logoFJ a',
-    'a.modLinky',
-    '#newComTopLink',
-    '.addCommentLink',
-    '.commentReplyLink',
-  ].join(',');
-
-  const addEligiblePressListener = () => {
-    const isEligiblePress = (target) => {
+  const playSound = () => {
+    const a = ensureAudio();
+    if (a) {
       try {
-        return Boolean(target && target.closest && target.closest(ELIGIBLE_PRESS_SELECTOR));
+        a.volume = 1;
       }
- catch (_) {
-        return false;
+ catch (_) {}
+      try {
+        a.currentTime = 0;
       }
+ catch (_) {}
+      try {
+        a.play().catch(() => {
+          try {
+            const url = resolveAssetUrl('icons/gnome.mp3');
+            const inst = new Audio(url);
+            try {
+              inst.volume = 1;
+            }
+ catch (e) {}
+            inst.play().catch(() => {});
+          } catch (_) {}
+        });
+      } catch (_) {}
+      try {
+        setTimeout(() => {
+          try { if (a.paused) { a.currentTime = 0; a.play().catch(()=>{}); } } catch (_) {}
+        }, 0);
+      } catch (_) {}
+      return;
+    }
+    try {
+      const url = resolveAssetUrl('icons/gnome.mp3');
+      const inst = new Audio(url);
+      try {
+        inst.volume = 1;
+      }
+ catch (e) {}
+      inst.play().catch(() => {});
+    } catch (_) {}
+  };
 
-    };
-
-    const onClick = (e) => {
-      if (!enabled || attemptFired) return;
-      const t = e.target;
-      if (!t) return;
-      if (!isEligiblePress(t)) return;
+  const isSameTabNavigationClick = (e) => {
+    try {
+      if (!e || typeof e !== 'object') return false;
+      if (e.defaultPrevented) return false; 
+      if (e.button !== 0) return false; 
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false; 
+      const a = e.target && (e.target.closest?.('a[href]'));
+      if (!a) return false;
+      if (a.target && a.target.toLowerCase() === '_blank') return false;
+      if (a.hasAttribute('download')) return false;
+      const href = a.getAttribute('href') || '';
+      if (!href || href.startsWith('javascript:')) return false;
       
-      const r = Math.random();
-      let effect = null;
-      if (r < 0.01) effect = 'runescape';
-      else if (r < 0.11) effect = 'gnome';
-      if (!effect) return;
-      try {
-        ensureAudio();
-      }
- catch (_) {}
-      try {
-        playSound();
-      }
- catch (_) {}
-      try {
-        effect === 'runescape' ? showRunescape() : showGnome();
-      }
- catch (_) {}
-      attemptFired = true;
-    };
+      return true;
+    } catch (_) {
+      return false;
+    }
 
-    document.addEventListener('click', onClick, true);
-    return () => {
+  };
+
+  const handleAction = (e) => {
+    if (!enabled) return;
+    const r = Math.random();
+    let effect = null;
+    if (r < 0.01) effect = 'runescape';
+    else if (r < 0.11) effect = 'gnome';
+    if (!effect) return;
+
+    
+    if (isSameTabNavigationClick(e)) {
       try {
-        document.removeEventListener('click', onClick, true);
-      }
- catch (_) {}
-    };
+        sessionStorage.setItem(DEFER_KEY, JSON.stringify({ effect, ts: Date.now() }));
+      } catch (_) {}
+      return;
+    }
+
+    try {
+      playSound();
+      if (effect === 'runescape') showRunescape(); else showGnome();
+    } catch (_) {}
   };
 
   const handleSettingsChanged = (e) => {
@@ -324,23 +295,17 @@
     if (wants === enabled) return;
     enabled = wants;
     if (enabled) {
+      document.addEventListener('click', handleAction, true);
       primeAudioOnGesture();
       try {
         ensureAudio();
       }
- catch (e) {}
-      if (typeof removeEligiblePressListener === 'function') { try {
-        removeEligiblePressListener();
-      }
- catch (_) {} }
-      removeEligiblePressListener = addEligiblePressListener();
+ catch (ex) {}
     } else {
-      if (typeof removeEligiblePressListener === 'function') { try {
-        removeEligiblePressListener();
+      try {
+        document.removeEventListener('click', handleAction, true);
       }
- catch (_) {} }
-      removeEligiblePressListener = null;
-      attemptFired = false;
+ catch (ex) {}
     }
   };
 
@@ -348,6 +313,20 @@
     try {
       const s = window[SETTINGS_KEY] || {};
       enabled = Boolean(s.walcorn);
+      
+      try {
+        const raw = sessionStorage.getItem(DEFER_KEY);
+        if (raw) {
+          sessionStorage.removeItem(DEFER_KEY);
+          const obj = JSON.parse(raw);
+          if (obj && obj.effect && Math.abs(Date.now() - (obj.ts || 0)) < 15000) {
+            
+            setTimeout(() => {
+              try { if (enabled) { playSound(); obj.effect === 'runescape' ? showRunescape() : showGnome(); } } catch (_) {}
+            }, 60);
+          }
+        }
+      } catch (_) {}
       try {
         const testImg1 = new Image();
         const candidate1 = buildBustedUrl('icons/gnome.png');
@@ -381,15 +360,31 @@
       }
 
       if (enabled) {
+        document.addEventListener('click', handleAction, true);
         primeAudioOnGesture();
         try {
           ensureAudio();
         }
  catch (e) {}
-        removeEligiblePressListener = addEligiblePressListener();
       }
     } catch (e) {}
     document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged);
+    
+    try {
+      window.addEventListener('beforeunload', () => {
+        try { if (audio) { try {
+          audio.pause();
+        }
+ catch (e) {} try {
+          audio.currentTime = 0;
+        }
+ catch (e) {} } } catch (_) {}
+        try { activeOverlays.forEach(el => { try {
+          el.remove();
+        }
+ catch (e) {} }); } catch (_) {}
+      });
+    } catch (_) {}
   };
 
   if (!window.fjTweakerModules) window.fjTweakerModules = {};

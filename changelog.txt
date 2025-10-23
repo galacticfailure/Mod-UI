@@ -1,5 +1,10 @@
 0.5.1
 - Updated warn system to include videos over 60 seconds
+- Fixed image missing in clicker
+- Fixed infinity number issue in clicker
+- Compensated for FJ updates
+- Updated Sushi and Phaser
+- Added new feature to Extras menu
 
 0.5.0
 - Clicker overhaul

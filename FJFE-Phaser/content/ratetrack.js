@@ -8,6 +8,8 @@
   const PANEL_LOCK_KEY = 'fjTweakerRatePanelLocked';
   const SKIN_BUTTON_IDS = ['skinLevel1', 'skinLevel2', 'skinLevel3'];
   const PANEL_MARGIN = 12;
+  const QUICK_MENU_ID = 'quickM';
+  const QUICK_BUTTON_SELECTOR = '.ctButton4';
 
   const getScrollOffsets = () => ({
     left: window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0,
@@ -27,6 +29,7 @@
   let countEditsEnabled = false;
   let panel = null;
   let countDisplay = null;
+  let lockButton = null;
   let plusButton = null;
   let minusButton = null;
   let resetButton = null;
@@ -37,23 +40,43 @@
   let dragState = null;
 
   const skinButtonHandlers = new Map();
+  let quickMenuClickHandler = null;
+  let quickKeydownHandler = null;
+  const DEDUP_WINDOW_MS = 600;
+  let lastRateCountAt = 0;
 
-  const storageAvailable = () => !!(typeof chrome !== 'undefined' && chrome?.storage?.local);
+  const storageAvailable = () => !!(typeof chrome !== 'undefined' && chrome && chrome.storage && chrome.storage.local);
   const storageGet = (keys) => new Promise((resolve) => {
     try {
-      if (storageAvailable()) chrome.storage.local.get(keys, (items) => resolve(items || {}));
-      else resolve({});
-    } catch (_) { resolve({}); }
+      if (storageAvailable()) {
+        chrome.storage.local.get(keys, (items) => resolve(items || {}));
+      } else {
+        resolve({});
+      }
+    } catch (e) {
+      resolve({});
+    }
   });
   const storageSet = (items) => new Promise((resolve) => {
     try {
-      if (storageAvailable()) chrome.storage.local.set(items, () => resolve());
-      else resolve();
-    } catch (_) {
+      if (storageAvailable()) {
+        chrome.storage.local.set(items, () => resolve());
+      } else {
+        resolve();
+      }
+    } catch (e) {
       resolve();
     }
-
   });
+
+  const tryCountRate = () => {
+    const now = Date.now();
+    if (lastRateCountAt && now - lastRateCountAt < DEDUP_WINDOW_MS) {
+      return;
+    }
+    lastRateCountAt = now;
+    adjustCounter(1);
+  };
 
   const getSettingValue = () => {
     const settings = window.fjTweakerSettings || {};
@@ -67,29 +90,36 @@
     try {
       const items = await storageGet([COUNT_KEY]);
       const raw = items && items[COUNT_KEY];
-      if (raw !== undefined && raw !== null) {
+      if (typeof raw !== 'undefined' && raw !== null) {
         const parsed = parseInt(String(raw), 10);
         return Number.isFinite(parsed) ? parsed : 0;
       }
     } catch (_) {}
+
     try {
       const rawLs = localStorage.getItem(COUNT_KEY);
       if (rawLs) {
         const parsed = parseInt(rawLs, 10);
         const safe = Number.isFinite(parsed) ? parsed : 0;
-        await storageSet({ [COUNT_KEY]: safe });
         try {
-          localStorage.removeItem(COUNT_KEY);
-        }
+          await storageSet({ [COUNT_KEY]: safe });
+          try {
+            localStorage.removeItem(COUNT_KEY);
+          }
  catch (_) {}
+        } catch (_) {}
         return safe;
       }
     } catch (_) {}
+
     return 0;
   };
 
   const persistCounter = async () => {
-    try { await storageSet({ [COUNT_KEY]: String(counterValue) }); } catch (_) {}
+    try {
+      await storageSet({ [COUNT_KEY]: String(counterValue) });
+    } catch (error) {
+    }
   };
 
   const updateDisplay = () => {
@@ -102,7 +132,6 @@
     counterValue = value;
     updateDisplay();
     if (shouldPersist) {
-      
       persistCounter();
     }
   };
@@ -183,18 +212,17 @@
   const loadPanelLocked = () => {
     try {
       const raw = localStorage.getItem(PANEL_LOCK_KEY);
-      if (raw === null || raw === undefined) return true;
+      if (raw === null || raw === undefined) return true; 
       return raw === '1' || raw === 'true';
     } catch (_) {
       return true;
     }
-
   };
+
   const persistPanelLocked = () => {
     try {
       localStorage.setItem(PANEL_LOCK_KEY, panelLocked ? '1' : '0');
-    }
- catch (_) {}
+    } catch (_) {}
   };
 
   const clampPanelPosition = (left, top) => {
@@ -257,13 +285,15 @@
       panel.style.position = 'fixed';
       panel.style.left = clamped.left + 'px';
       panel.style.top = clamped.top + 'px';
+      panel.style.bottom = '';
+      panel.style.right = '';
     } else {
       panel.style.position = 'absolute';
       panel.style.left = clamped.left + 'px';
       panel.style.top = clamped.top + 'px';
+      panel.style.bottom = '';
+      panel.style.right = '';
     }
-    panel.style.bottom = '';
-    panel.style.right = '';
   };
 
   const removeGlobalDragListeners = () => {
@@ -354,6 +384,8 @@
       pointerId: event.pointerId,
       startPageX: startPosition.x,
       startPageY: startPosition.y,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
       originLeft: panelPosition.left,
       originTop: panelPosition.top
     };
@@ -411,7 +443,7 @@
       justifyContent: 'space-between',
       borderBottom: '1px solid #1f1f1f',
       padding: '2px 0',
-      gap: '6px'
+      gap: '8px'
     });
 
     const dragHandle = document.createElement('div');
@@ -427,19 +459,20 @@
     dragHandle.textContent = 'Drag';
     dragHandle.addEventListener('pointerdown', startDrag);
 
-    const lockButton = document.createElement('button');
+    lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '22px',
-      height: '22px',
-      lineHeight: '22px',
+      width: '24px',
+      height: '24px',
+      lineHeight: '24px',
       textAlign: 'center',
-      fontSize: '12px',
+      fontSize: '14px',
       border: '1px solid #2f2f2f',
       borderRadius: '4px',
       cursor: 'pointer',
       flex: '0 0 auto'
     });
     const applyLockButtonUI = () => {
+      if (!lockButton) return;
       if (panelLocked) {
         lockButton.textContent = '🔒︎';
         lockButton.style.background = '#142a14';
@@ -455,14 +488,20 @@
     lockButton.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
+      
       const { left: scrollLeft, top: scrollTop } = getScrollOffsets();
       if (!panelPosition) {
-        const rect2 = panel.getBoundingClientRect();
-        panelPosition = panelLocked ? { left: rect2.left, top: rect2.top } : { left: rect2.left + scrollLeft, top: rect2.top + scrollTop };
+        
+        const rect = panel.getBoundingClientRect();
+        panelPosition = panelLocked ? { left: rect.left, top: rect.top } : { left: rect.left + scrollLeft, top: rect.top + scrollTop };
       } else {
-        panelPosition = panelLocked
-          ? { left: panelPosition.left + scrollLeft, top: panelPosition.top + scrollTop }
-          : { left: panelPosition.left - scrollLeft, top: panelPosition.top - scrollTop };
+        if (panelLocked) {
+          
+          panelPosition = { left: panelPosition.left + scrollLeft, top: panelPosition.top + scrollTop };
+        } else {
+          
+          panelPosition = { left: panelPosition.left - scrollLeft, top: panelPosition.top - scrollTop };
+        }
       }
       panelLocked = !panelLocked;
       persistPanelLocked();
@@ -471,6 +510,7 @@
       persistPanelPosition();
     });
 
+    
     panelLocked = loadPanelLocked();
     applyLockButtonUI();
 
@@ -667,7 +707,7 @@
     if (!shouldCountForClick(button)) {
       return;
     }
-    adjustCounter(1);
+    tryCountRate();
   };
 
   const ensureSkinButtonsBound = () => {
@@ -692,6 +732,9 @@
       }
 
       const handler = (event) => {
+        if (!event || event.isTrusted === false) {
+          return;
+        }
         handleSkinButtonClick(event.currentTarget);
       };
 
@@ -705,6 +748,67 @@
       binding.element.removeEventListener('click', binding.handler, true);
     });
     skinButtonHandlers.clear();
+  };
+
+  const findQuickButtonForDigit = (digit) => {
+    try {
+      const quickMenu = document.getElementById(QUICK_MENU_ID);
+      if (!quickMenu) return null;
+      const buttons = quickMenu.querySelectorAll(QUICK_BUTTON_SELECTOR);
+      for (const b of buttons) {
+        const sk = b.querySelector('.shortKey');
+        if (sk && (sk.textContent || '').trim() === String(digit)) {
+          return b;
+        }
+      }
+    } catch (error) {
+    }
+    return null;
+  };
+
+  const handleQuickMenuClick = (event) => {
+    if (!featureEnabled) return;
+    if (!event || event.isTrusted === false) return;
+
+    const settings = window.fjTweakerSettings || {};
+    if (settings.hideRateShortcuts) return;
+
+    const target = event.target && event.target.closest ? event.target.closest(QUICK_BUTTON_SELECTOR) : null;
+    if (!target) return;
+
+    if (!shouldCountForClick(target)) return;
+
+    tryCountRate();
+  };
+
+  const handleQuickKeydown = (event) => {
+    if (!featureEnabled) return;
+    if (!event || event.isTrusted === false) return;
+
+    const settings = window.fjTweakerSettings || {};
+    if (settings.hideRateShortcuts) return;
+
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    let digit = null;
+    const key = event.key;
+    const code = event.code || '';
+    if (/^[1-9]$/.test(key)) digit = key;
+    else {
+      const m = code.match(/^Numpad([1-9])$/);
+      if (m) digit = m[1];
+    }
+    if (!digit) return;
+
+    const button = findQuickButtonForDigit(digit);
+    if (!button) return;
+
+    if (!shouldCountForClick(button)) return;
+
+    tryCountRate();
   };
 
   const observeContent = () => {
@@ -735,9 +839,43 @@
     if (featureEnabled) {
       ensureSkinButtonsBound();
       observeContent();
+      if (!quickMenuClickHandler) {
+        quickMenuClickHandler = handleQuickMenuClick;
+        const quickMenu = document.getElementById(QUICK_MENU_ID);
+        if (quickMenu) {
+          quickMenu.addEventListener('click', quickMenuClickHandler, true);
+        } else {
+          const attachQuickObserver = new MutationObserver(() => {
+            const qm = document.getElementById(QUICK_MENU_ID);
+            if (qm) {
+              qm.addEventListener('click', quickMenuClickHandler, true);
+              attachQuickObserver.disconnect();
+            }
+          });
+          if (document.body) attachQuickObserver.observe(document.body, { childList: true, subtree: true });
+        }
+      }
+
+      if (!quickKeydownHandler) {
+        quickKeydownHandler = handleQuickKeydown;
+        document.addEventListener('keydown', quickKeydownHandler, true);
+      }
     } else {
       stopObserving();
       detachSkinButtons();
+      try {
+        const quickMenu = document.getElementById(QUICK_MENU_ID);
+        if (quickMenu && quickMenuClickHandler) {
+          quickMenu.removeEventListener('click', quickMenuClickHandler, true);
+        }
+      } catch (error) {
+      }
+      quickMenuClickHandler = null;
+
+      if (quickKeydownHandler) {
+        document.removeEventListener('keydown', quickKeydownHandler, true);
+        quickKeydownHandler = null;
+      }
     }
   };
 

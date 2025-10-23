@@ -11,11 +11,25 @@
   const QUICK_MENU_ID = 'quickM';
   const QUICK_BUTTON_SELECTOR = '.ctButton4';
 
+  const getScrollOffsets = () => ({
+    left: window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0,
+    top: window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
+  });
+
+  const getPagePosition = (event) => {
+    const { left, top } = getScrollOffsets();
+    return {
+      x: event.pageX !== undefined ? event.pageX : event.clientX + left,
+      y: event.pageY !== undefined ? event.pageY : event.clientY + top
+    };
+  };
+
   let featureEnabled = true;
   let counterValue = 0;
   let countEditsEnabled = false;
   let panel = null;
   let countDisplay = null;
+  let lockButton = null;
   let plusButton = null;
   let minusButton = null;
   let resetButton = null;
@@ -27,6 +41,7 @@
 
   const skinButtonHandlers = new Map();
   let quickMenuClickHandler = null;
+  let quickKeydownHandler = null;
   const DEDUP_WINDOW_MS = 600;
   let lastRateCountAt = 0;
 
@@ -38,7 +53,9 @@
       } else {
         resolve({});
       }
-    } catch (e) { resolve({}); }
+    } catch (e) {
+      resolve({});
+    }
   });
   const storageSet = (items) => new Promise((resolve) => {
     try {
@@ -50,12 +67,13 @@
     } catch (e) {
       resolve();
     }
-
   });
 
   const tryCountRate = () => {
     const now = Date.now();
-    if (lastRateCountAt && now - lastRateCountAt < DEDUP_WINDOW_MS) return;
+    if (lastRateCountAt && now - lastRateCountAt < DEDUP_WINDOW_MS) {
+      return;
+    }
     lastRateCountAt = now;
     adjustCounter(1);
   };
@@ -77,24 +95,31 @@
         return Number.isFinite(parsed) ? parsed : 0;
       }
     } catch (_) {}
+
     try {
       const rawLs = localStorage.getItem(COUNT_KEY);
       if (rawLs) {
         const parsed = parseInt(rawLs, 10);
         const safe = Number.isFinite(parsed) ? parsed : 0;
-        await storageSet({ [COUNT_KEY]: safe });
         try {
-          localStorage.removeItem(COUNT_KEY);
-        }
+          await storageSet({ [COUNT_KEY]: safe });
+          try {
+            localStorage.removeItem(COUNT_KEY);
+          }
  catch (_) {}
+        } catch (_) {}
         return safe;
       }
     } catch (_) {}
+
     return 0;
   };
 
   const persistCounter = async () => {
-    try { await storageSet({ [COUNT_KEY]: String(counterValue) }); } catch (_) {}
+    try {
+      await storageSet({ [COUNT_KEY]: String(counterValue) });
+    } catch (error) {
+    }
   };
 
   const updateDisplay = () => {
@@ -187,18 +212,17 @@
   const loadPanelLocked = () => {
     try {
       const raw = localStorage.getItem(PANEL_LOCK_KEY);
-      if (raw === null || raw === undefined) return true;
+      if (raw === null || raw === undefined) return true; 
       return raw === '1' || raw === 'true';
     } catch (_) {
       return true;
     }
-
   };
+
   const persistPanelLocked = () => {
     try {
       localStorage.setItem(PANEL_LOCK_KEY, panelLocked ? '1' : '0');
-    }
- catch (_) {}
+    } catch (_) {}
   };
 
   const clampPanelPosition = (left, top) => {
@@ -206,20 +230,18 @@
       return { left, top };
     }
     const rect = panel.getBoundingClientRect();
-    const fallbackWidth = 96;
-    const fallbackHeight = 120;
+    const fallbackWidth = 180;
+    const fallbackHeight = 210;
     const width = rect.width || fallbackWidth;
     const height = rect.height || fallbackHeight;
+    const { left: scrollLeft, top: scrollTop } = getScrollOffsets();
     if (panelLocked) {
-      const minLeft = PANEL_MARGIN;
-      const minTop = PANEL_MARGIN;
-      const maxLeft = Math.max(minLeft, window.innerWidth - width - PANEL_MARGIN);
-      const maxTop = Math.max(minTop, window.innerHeight - height - PANEL_MARGIN);
-      const clampedLeft = Math.min(Math.max(left, minLeft), maxLeft);
-      const clampedTop = Math.min(Math.max(top, minTop), maxTop);
+      const maxLeft = Math.max(PANEL_MARGIN, window.innerWidth - width - PANEL_MARGIN);
+      const maxTop = Math.max(PANEL_MARGIN, window.innerHeight - height - PANEL_MARGIN);
+      const clampedLeft = Math.min(Math.max(left, PANEL_MARGIN), maxLeft);
+      const clampedTop = Math.min(Math.max(top, PANEL_MARGIN), maxTop);
       return { left: Math.round(clampedLeft), top: Math.round(clampedTop) };
     }
-    const { left: scrollLeft, top: scrollTop } = { left: window.scrollX, top: window.scrollY };
     const maxLeft = scrollLeft + Math.max(PANEL_MARGIN, window.innerWidth - width - PANEL_MARGIN);
     const maxTop = scrollTop + Math.max(PANEL_MARGIN, window.innerHeight - height - PANEL_MARGIN);
     const clampedLeft = Math.min(Math.max(left, scrollLeft + PANEL_MARGIN), maxLeft);
@@ -234,51 +256,50 @@
     if (!panel) {
       return;
     }
-    const rect = panel.getBoundingClientRect();
-    const fallbackWidth = 96;
-    const fallbackHeight = 120;
-    const width = rect.width || fallbackWidth;
-    const height = rect.height || fallbackHeight;
-
     if (!panelPosition) {
       if (panelLocked) {
         panel.style.position = 'fixed';
-        panel.style.left = (window.innerWidth - width - PANEL_MARGIN) + 'px';
-        panel.style.top = (window.innerHeight - height - PANEL_MARGIN) + 'px';
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.bottom = PANEL_MARGIN + 'px';
+        panel.style.right = PANEL_MARGIN + 'px';
       } else {
-        const defaultLeft = window.scrollX + window.innerWidth - width - PANEL_MARGIN;
-        const defaultTop = window.scrollY + window.innerHeight - height - PANEL_MARGIN;
+        const { left: scrollLeft, top: scrollTop } = getScrollOffsets();
+        const rect = panel.getBoundingClientRect();
+        const width = rect.width || 180;
+        const height = rect.height || 210;
+        const defaultLeft = scrollLeft + Math.max(PANEL_MARGIN, window.innerWidth - width - PANEL_MARGIN);
+        const defaultTop = scrollTop + Math.max(PANEL_MARGIN, window.innerHeight - height - PANEL_MARGIN);
         panelPosition = clampPanelPosition(defaultLeft, defaultTop);
         panel.style.position = 'absolute';
         panel.style.left = panelPosition.left + 'px';
         panel.style.top = panelPosition.top + 'px';
+        panel.style.bottom = '';
+        panel.style.right = '';
       }
-      panel.style.bottom = '';
-      panel.style.right = '';
       return;
     }
-    panelPosition = clampPanelPosition(panelPosition.left, panelPosition.top);
+    const clamped = clampPanelPosition(panelPosition.left, panelPosition.top);
+    panelPosition = clamped;
     if (panelLocked) {
       panel.style.position = 'fixed';
-      panel.style.left = panelPosition.left + 'px';
-      panel.style.top = panelPosition.top + 'px';
+      panel.style.left = clamped.left + 'px';
+      panel.style.top = clamped.top + 'px';
+      panel.style.bottom = '';
+      panel.style.right = '';
     } else {
       panel.style.position = 'absolute';
-      panel.style.left = panelPosition.left + 'px';
-      panel.style.top = panelPosition.top + 'px';
+      panel.style.left = clamped.left + 'px';
+      panel.style.top = clamped.top + 'px';
+      panel.style.bottom = '';
+      panel.style.right = '';
     }
-    panel.style.bottom = '';
-    panel.style.right = '';
   };
 
   const removeGlobalDragListeners = () => {
     window.removeEventListener('pointermove', handleDragMove);
     window.removeEventListener('pointerup', finishDrag);
     window.removeEventListener('pointercancel', finishDrag);
-
-    window.removeEventListener('touchmove', handleTouchMove);
-    window.removeEventListener('touchend', finishTouch);
-    window.removeEventListener('touchcancel', finishTouch);
   };
 
   const handleDragMove = (event) => {
@@ -286,41 +307,26 @@
       return;
     }
     stopPropagation(event);
-    event.preventDefault();
     let nextLeft, nextTop;
     if (panelLocked) {
       nextLeft = dragState.originLeft + (event.clientX - dragState.startClientX);
       nextTop = dragState.originTop + (event.clientY - dragState.startClientY);
     } else {
-      const currentPageX = event.pageX ?? (event.clientX + window.scrollX);
-      const currentPageY = event.pageY ?? (event.clientY + window.scrollY);
-      nextLeft = dragState.originLeft + (currentPageX - dragState.startPageX);
-      nextTop = dragState.originTop + (currentPageY - dragState.startPageY);
+      const { x, y } = getPagePosition(event);
+      nextLeft = dragState.originLeft + (x - dragState.startPageX);
+      nextTop = dragState.originTop + (y - dragState.startPageY);
     }
     const clamped = clampPanelPosition(nextLeft, nextTop);
     panelPosition = clamped;
-    panel.style.left = clamped.left + 'px';
-    panel.style.top = clamped.top + 'px';
-    panel.style.bottom = '';
-    panel.style.right = '';
-  };
-
-
-  const handleTouchMove = (event) => {
-    if (!dragState || !event.touches || event.touches.length === 0) {
-      return;
+    if (panelLocked) {
+      panel.style.position = 'fixed';
+      panel.style.left = clamped.left + 'px';
+      panel.style.top = clamped.top + 'px';
+    } else {
+      panel.style.position = 'absolute';
+      panel.style.left = clamped.left + 'px';
+      panel.style.top = clamped.top + 'px';
     }
-    stopPropagation(event);
-    event.preventDefault();
-    const touch = event.touches[0];
-    const currentPageX = touch.pageX;
-    const currentPageY = touch.pageY;
-    const nextLeft = dragState.originLeft + (currentPageX - dragState.startPageX);
-    const nextTop = dragState.originTop + (currentPageY - dragState.startPageY);
-    const clamped = clampPanelPosition(nextLeft, nextTop);
-    panelPosition = clamped;
-    panel.style.left = clamped.left + 'px';
-    panel.style.top = clamped.top + 'px';
     panel.style.bottom = '';
     panel.style.right = '';
   };
@@ -343,19 +349,6 @@
     persistPanelPosition();
   };
 
-
-  const finishTouch = (event) => {
-    if (!dragState) {
-      return;
-    }
-    stopPropagation(event);
-    panelPosition = clampPanelPosition(panelPosition.left, panelPosition.top);
-    applyPanelPosition();
-    removeGlobalDragListeners();
-    dragState = null;
-    persistPanelPosition();
-  };
-
   const startDrag = (event) => {
     if (!panel) {
       return;
@@ -368,25 +361,29 @@
     const rect = panel.getBoundingClientRect();
     panel.style.bottom = '';
     panel.style.right = '';
+    const { left: scrollLeft, top: scrollTop } = getScrollOffsets();
     if (panelLocked) {
-      const currentLeft = panelPosition ? panelPosition.left : rect.left;
-      const currentTop = panelPosition ? panelPosition.top : rect.top;
-      panelPosition = clampPanelPosition(currentLeft, currentTop);
+      const initialLeft = panelPosition ? panelPosition.left : rect.left;
+      const initialTop = panelPosition ? panelPosition.top : rect.top;
+      panelPosition = clampPanelPosition(initialLeft, initialTop);
+      panel.style.position = 'fixed';
+      panel.style.left = panelPosition.left + 'px';
+      panel.style.top = panelPosition.top + 'px';
     } else {
-      const currentLeft = panelPosition ? panelPosition.left : window.scrollX + rect.left;
-      const currentTop = panelPosition ? panelPosition.top : window.scrollY + rect.top;
-      panelPosition = clampPanelPosition(currentLeft, currentTop);
+      const initialLeft = panelPosition ? panelPosition.left : rect.left + scrollLeft;
+      const initialTop = panelPosition ? panelPosition.top : rect.top + scrollTop;
+      panelPosition = clampPanelPosition(initialLeft, initialTop);
+      panel.style.position = 'absolute';
+      panel.style.left = panelPosition.left + 'px';
+      panel.style.top = panelPosition.top + 'px';
     }
-    panel.style.left = panelPosition.left + 'px';
-    panel.style.top = panelPosition.top + 'px';
 
-    const startPageX = event.pageX ?? (event.clientX + window.scrollX);
-    const startPageY = event.pageY ?? (event.clientY + window.scrollY);
+    const startPosition = getPagePosition(event);
 
     dragState = {
       pointerId: event.pointerId,
-      startPageX,
-      startPageY,
+      startPageX: startPosition.x,
+      startPageY: startPosition.y,
       startClientX: event.clientX,
       startClientY: event.clientY,
       originLeft: panelPosition.left,
@@ -400,48 +397,9 @@
       }
     }
 
-    window.addEventListener('pointermove', handleDragMove, { passive: false });
+    window.addEventListener('pointermove', handleDragMove);
     window.addEventListener('pointerup', finishDrag);
     window.addEventListener('pointercancel', finishDrag);
-    
-
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', finishTouch);
-    window.addEventListener('touchcancel', finishTouch);
-  };
-
-
-  const startTouchDrag = (event) => {
-    if (!panel || !event.touches || event.touches.length === 0) {
-      return;
-    }
-    stopPropagation(event);
-    event.preventDefault();
-    
-    const touch = event.touches[0];
-    const rect = panel.getBoundingClientRect();
-    panel.style.bottom = '';
-    panel.style.right = '';
-    const currentLeft = panelPosition ? panelPosition.left : window.scrollX + rect.left;
-    const currentTop = panelPosition ? panelPosition.top : window.scrollY + rect.top;
-    panelPosition = clampPanelPosition(currentLeft, currentTop);
-    panel.style.left = panelPosition.left + 'px';
-    panel.style.top = panelPosition.top + 'px';
-
-    const startPageX = touch.pageX;
-    const startPageY = touch.pageY;
-
-    dragState = {
-      pointerId: 'touch',
-      startPageX,
-      startPageY,
-      originLeft: panelPosition.left,
-      originTop: panelPosition.top
-    };
-
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', finishTouch);
-    window.addEventListener('touchcancel', finishTouch);
   };
 
   const ensurePanel = () => {
@@ -454,25 +412,23 @@
     panel = document.createElement('div');
     panel.id = 'fj-rate-menu';
     Object.assign(panel.style, {
-      position: 'absolute',
-      bottom: 'auto',
+      position: 'fixed',
+      bottom: PANEL_MARGIN + 'px',
       top: 'auto',
-      right: 'auto',
-      left: 'auto',
-      width: '96px',
-      padding: '6px',
+      right: PANEL_MARGIN + 'px',
+      width: '180px',
+      padding: '12px',
       background: '#0d0d0d',
       color: '#f6f6f6',
       border: '1px solid #333',
-      borderRadius: '3px',
-      boxShadow: '0 3px 12px rgba(0, 0, 0, 0.45)',
-      font: "500 9px 'Segoe UI', sans-serif",
+      borderRadius: '6px',
+      boxShadow: '0 6px 18px rgba(0, 0, 0, 0.45)',
+      font: "500 15px 'Segoe UI', sans-serif",
       display: 'none',
       flexDirection: 'column',
       alignItems: 'center',
-      gap: '4px',
-      zIndex: '2147483646',
-      touchAction: 'none'
+      gap: '10px',
+      zIndex: '2147483646'
     });
 
     ['pointerdown', 'mousedown', 'click'].forEach((eventName) => {
@@ -486,38 +442,37 @@
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottom: '1px solid #1f1f1f',
-      padding: '1px 0',
-      gap: '4px'
+      padding: '2px 0',
+      gap: '8px'
     });
 
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
       cursor: 'move',
-      fontSize: '7px',
+      fontSize: '11px',
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
       color: '#a5a5a5',
       userSelect: 'none',
-      touchAction: 'none',
       flex: '1 1 auto'
     });
     dragHandle.textContent = 'Drag';
-    dragHandle.addEventListener('pointerdown', startDrag, { passive: false });
-    dragHandle.addEventListener('touchstart', startTouchDrag, { passive: false });
+    dragHandle.addEventListener('pointerdown', startDrag);
 
-    const lockButton = document.createElement('button');
+    lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '18px',
-      height: '18px',
-      lineHeight: '18px',
+      width: '24px',
+      height: '24px',
+      lineHeight: '24px',
       textAlign: 'center',
-      fontSize: '10px',
+      fontSize: '14px',
       border: '1px solid #2f2f2f',
-      borderRadius: '3px',
+      borderRadius: '4px',
       cursor: 'pointer',
       flex: '0 0 auto'
     });
     const applyLockButtonUI = () => {
+      if (!lockButton) return;
       if (panelLocked) {
         lockButton.textContent = '🔒︎';
         lockButton.style.background = '#142a14';
@@ -533,14 +488,20 @@
     lockButton.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      const scrollLeft = window.scrollX, scrollTop = window.scrollY;
+      
+      const { left: scrollLeft, top: scrollTop } = getScrollOffsets();
       if (!panelPosition) {
-        const rect2 = panel.getBoundingClientRect();
-        panelPosition = panelLocked ? { left: rect2.left, top: rect2.top } : { left: rect2.left + scrollLeft, top: rect2.top + scrollTop };
+        
+        const rect = panel.getBoundingClientRect();
+        panelPosition = panelLocked ? { left: rect.left, top: rect.top } : { left: rect.left + scrollLeft, top: rect.top + scrollTop };
       } else {
-        panelPosition = panelLocked
-          ? { left: panelPosition.left + scrollLeft, top: panelPosition.top + scrollTop }
-          : { left: panelPosition.left - scrollLeft, top: panelPosition.top - scrollTop };
+        if (panelLocked) {
+          
+          panelPosition = { left: panelPosition.left + scrollLeft, top: panelPosition.top + scrollTop };
+        } else {
+          
+          panelPosition = { left: panelPosition.left - scrollLeft, top: panelPosition.top - scrollTop };
+        }
       }
       panelLocked = !panelLocked;
       persistPanelLocked();
@@ -549,6 +510,7 @@
       persistPanelPosition();
     });
 
+    
     panelLocked = loadPanelLocked();
     applyLockButtonUI();
 
@@ -557,7 +519,7 @@
 
     countDisplay = document.createElement('div');
     Object.assign(countDisplay.style, {
-      fontSize: '16px',
+      fontSize: '32px',
       fontWeight: '700',
       lineHeight: '1',
       textAlign: 'center'
@@ -566,28 +528,22 @@
 
     const adjustRow = document.createElement('div');
     adjustRow.style.display = 'flex';
-    adjustRow.style.gap = '4px';
+    adjustRow.style.gap = '10px';
     adjustRow.style.justifyContent = 'center';
 
     const createAdjustButton = (text) => {
       const button = document.createElement('button');
       button.textContent = text;
       Object.assign(button.style, {
-        minWidth: '44px',
-        minHeight: '44px',
-        width: '44px',
-        height: '44px',
-        fontSize: '16px',
+        width: '48px',
+        height: '36px',
+        fontSize: '20px',
         fontWeight: '600',
         color: '#f8f8f8',
         background: '#1c1c1c',
         border: '1px solid #2f2f2f',
-        borderRadius: '3px',
-        cursor: 'pointer',
-        touchAction: 'manipulation',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
+        borderRadius: '4px',
+        cursor: 'pointer'
       });
       button.addEventListener('click', stopPropagation);
       return button;
@@ -611,16 +567,14 @@
     resetButton.textContent = 'Reset';
     Object.assign(resetButton.style, {
       width: '100%',
-      minHeight: '44px',
-      padding: '8px 5px',
-      fontSize: '12px',
+      padding: '6px 8px',
+      fontSize: '14px',
       fontWeight: '600',
       color: '#ffaa00',
       background: '#161616',
       border: '1px solid #332200',
-      borderRadius: '3px',
-      cursor: 'pointer',
-      touchAction: 'manipulation'
+      borderRadius: '4px',
+      cursor: 'pointer'
     });
     resetButton.addEventListener('click', (event) => {
       stopPropagation(event);
@@ -632,15 +586,15 @@
     const countEditsRow = document.createElement('label');
     countEditsRow.style.display = 'flex';
     countEditsRow.style.alignItems = 'center';
-    countEditsRow.style.gap = '4px';
+    countEditsRow.style.gap = '8px';
     countEditsRow.style.width = '100%';
     countEditsRow.style.cursor = 'pointer';
-    countEditsRow.style.fontSize = '8px';
+    countEditsRow.style.fontSize = '13px';
 
     countEditsCheckbox = document.createElement('input');
     countEditsCheckbox.type = 'checkbox';
-    countEditsCheckbox.style.width = '10px';
-    countEditsCheckbox.style.height = '10px';
+    countEditsCheckbox.style.width = '16px';
+    countEditsCheckbox.style.height = '16px';
     countEditsCheckbox.checked = countEditsEnabled;
 
     countEditsCheckbox.addEventListener('click', stopPropagation);
@@ -658,7 +612,6 @@
     applyPanelPosition();
   };
 
-  const updatePanelVisibility = () => {
   const updatePanelVisibility = () => {
     if (!panel) {
       return;
@@ -680,7 +633,6 @@
         panel.style.display = 'none';
       }
     }
-  };
   };
 
   const getRatedByAnchor = (originButton) => {
@@ -780,7 +732,9 @@
       }
 
       const handler = (event) => {
-        if (!event || event.isTrusted === false) return;
+        if (!event || event.isTrusted === false) {
+          return;
+        }
         handleSkinButtonClick(event.currentTarget);
       };
 
@@ -803,7 +757,9 @@
       const buttons = quickMenu.querySelectorAll(QUICK_BUTTON_SELECTOR);
       for (const b of buttons) {
         const sk = b.querySelector('.shortKey');
-        if (sk && (sk.textContent || '').trim() === String(digit)) return b;
+        if (sk && (sk.textContent || '').trim() === String(digit)) {
+          return b;
+        }
       }
     } catch (error) {
     }
@@ -813,11 +769,45 @@
   const handleQuickMenuClick = (event) => {
     if (!featureEnabled) return;
     if (!event || event.isTrusted === false) return;
+
     const settings = window.fjTweakerSettings || {};
     if (settings.hideRateShortcuts) return;
+
     const target = event.target && event.target.closest ? event.target.closest(QUICK_BUTTON_SELECTOR) : null;
     if (!target) return;
+
     if (!shouldCountForClick(target)) return;
+
+    tryCountRate();
+  };
+
+  const handleQuickKeydown = (event) => {
+    if (!featureEnabled) return;
+    if (!event || event.isTrusted === false) return;
+
+    const settings = window.fjTweakerSettings || {};
+    if (settings.hideRateShortcuts) return;
+
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    let digit = null;
+    const key = event.key;
+    const code = event.code || '';
+    if (/^[1-9]$/.test(key)) digit = key;
+    else {
+      const m = code.match(/^Numpad([1-9])$/);
+      if (m) digit = m[1];
+    }
+    if (!digit) return;
+
+    const button = findQuickButtonForDigit(digit);
+    if (!button) return;
+
+    if (!shouldCountForClick(button)) return;
+
     tryCountRate();
   };
 
@@ -852,8 +842,9 @@
       if (!quickMenuClickHandler) {
         quickMenuClickHandler = handleQuickMenuClick;
         const quickMenu = document.getElementById(QUICK_MENU_ID);
-        if (quickMenu) quickMenu.addEventListener('click', quickMenuClickHandler, true);
-        else {
+        if (quickMenu) {
+          quickMenu.addEventListener('click', quickMenuClickHandler, true);
+        } else {
           const attachQuickObserver = new MutationObserver(() => {
             const qm = document.getElementById(QUICK_MENU_ID);
             if (qm) {
@@ -864,14 +855,27 @@
           if (document.body) attachQuickObserver.observe(document.body, { childList: true, subtree: true });
         }
       }
+
+      if (!quickKeydownHandler) {
+        quickKeydownHandler = handleQuickKeydown;
+        document.addEventListener('keydown', quickKeydownHandler, true);
+      }
     } else {
       stopObserving();
       detachSkinButtons();
       try {
         const quickMenu = document.getElementById(QUICK_MENU_ID);
-        if (quickMenu && quickMenuClickHandler) quickMenu.removeEventListener('click', quickMenuClickHandler, true);
-      } catch (error) {}
+        if (quickMenu && quickMenuClickHandler) {
+          quickMenu.removeEventListener('click', quickMenuClickHandler, true);
+        }
+      } catch (error) {
+      }
       quickMenuClickHandler = null;
+
+      if (quickKeydownHandler) {
+        document.removeEventListener('keydown', quickKeydownHandler, true);
+        quickKeydownHandler = null;
+      }
     }
   };
 

@@ -2,20 +2,11 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'textcheck';
 
-
   if (!window.location.hostname.endsWith(targetHost)) {
     return;
   }
 
   
-  try {
-    const link = document.querySelector('a.modLinky[href="/mod-social/"]');
-    const ok = !!link && (link.textContent || '').trim() === 'ModSo';
-    if (!ok) return;
-  } catch (_) {
-    return;
-  }
-
 
 
   const PC_LIST = [
@@ -29,12 +20,11 @@
   ];
 
   const META_LIST = [
-    'admin', 'fj', 'funnyjunk', 'mods'
+    'admin', 'fj', 'funnyjunk'
   ];
 
   let isEnabled = false;
   let observer = null;
-
 
   document.addEventListener('fjTweakerSettingsChanged', (event) => {
     const settings = event.detail;
@@ -50,7 +40,6 @@
     isEnabled = true;
     console.log('TextCheck: Enabled - Auto-checking content for PC2 or Meta');
     
-
     startObserver();
     scanExistingContent();
   };
@@ -60,7 +49,6 @@
     isEnabled = false;
     console.log('TextCheck: Disabled');
     
-
     stopObserver();
     removeAllLabels();
   };
@@ -74,7 +62,6 @@
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-
             if (node.querySelector?.('h1.contentTitle, .innerContentDescription') ||
                 node.matches?.('h1.contentTitle, .innerContentDescription')) {
               shouldScan = true;
@@ -84,7 +71,6 @@
       });
       
       if (shouldScan) {
-
         setTimeout(scanExistingContent, 100);
       }
     });
@@ -102,37 +88,50 @@
     }
   };
 
+
   const scanExistingContent = () => {
     if (!isEnabled) return;
-    
-
     removeAllLabels();
-    
+
+    let allFoundWords = [];
+    let allMatches = [];
+
+    const addUnique = (arr, items) => {
+      items.forEach(item => {
+        if (!arr.includes(item)) arr.push(item);
+      });
+    };
 
     const contentTitle = document.querySelector('h1.contentTitle');
     if (contentTitle) {
-      scanElement(contentTitle, 'title');
+      const { matches, foundWords } = scanElement(contentTitle);
+      addUnique(allMatches, matches);
+      addUnique(allFoundWords, foundWords);
     }
-    
 
     const descriptions = document.querySelectorAll('.innerContentDescription');
-    descriptions.forEach((desc, index) => {
-      scanElement(desc, `desc-${index}`);
+    descriptions.forEach((desc) => {
+      const { matches, foundWords } = scanElement(desc);
+      addUnique(allMatches, matches);
+      addUnique(allFoundWords, foundWords);
     });
+
+    if (allMatches.length > 0 || allFoundWords.length > 0) {
+      addLabels(allMatches, allFoundWords, 'all');
+    }
   };
 
-  const scanElement = (element, identifier) => {
+  
+  const scanElement = (element) => {
     const text = element.textContent.toLowerCase();
     const matches = [];
     const foundWords = [];
-    
 
     PC_LIST.forEach(word => {
       if (text.includes(word.toLowerCase())) {
         if (!matches.includes('PC2')) {
           matches.push('PC2');
         }
-
         const regex = new RegExp(`\\b\\w*${word.toLowerCase()}\\w*\\b`, 'gi');
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
@@ -144,14 +143,12 @@
         }
       }
     });
-    
 
     META_LIST.forEach(word => {
       if (text.includes(word.toLowerCase())) {
         if (!matches.includes('Meta')) {
           matches.push('Meta');
         }
-
         const regex = new RegExp(`\\b\\w*${word.toLowerCase()}\\w*\\b`, 'gi');
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
@@ -163,10 +160,8 @@
         }
       }
     });
-    
-    if (matches.length > 0) {
-      addLabels(matches, foundWords, identifier);
-    }
+
+    return { matches, foundWords };
   };
 
   const addLabels = (matches, foundWords, identifier) => {
@@ -191,7 +186,6 @@
         align-items: flex-start;
         z-index: 1000;
       `;
-      
       document.body.appendChild(labelContainer);
     }
     
@@ -256,6 +250,7 @@
 
       const labelHeight = labelContainer.offsetHeight || 40;
       const centerOffset = labelHeight / 2;
+      
       
       labelContainer.style.top = (rect.top + scrollTop + (rect.height / 2) - centerOffset) + 'px';
       labelContainer.style.left = (rect.right + scrollLeft + 10) + 'px';

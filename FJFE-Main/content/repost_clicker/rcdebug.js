@@ -285,16 +285,52 @@
     state.container = null;
   }
 
+  function cleanupAll() {
+    cleanup();
+    if (state.toggleEl && state.toggleEl.parentNode) {
+      state.toggleEl.parentNode.removeChild(state.toggleEl);
+    }
+    state.toggleEl = null;
+  }
+
+  function isClickerEnabled() {
+    return window.fjTweakerSettings && window.fjTweakerSettings.clicker2;
+  }
+
+  function handleSettingsChange(e) {
+    const s = (e && e.detail) ? e.detail : window.fjTweakerSettings;
+    if (s && typeof s.clicker2 !== 'undefined') {
+      if (s.clicker2) {
+        
+        if (!state.toggleEl) {
+          init();
+        }
+      } else {
+        
+        cleanupAll();
+      }
+    }
+  }
+
+  
+  document.addEventListener('fjTweakerSettingsChanged', handleSettingsChange);
+
   
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+      if (isClickerEnabled()) {
+        init();
+      }
+    });
   } else {
-    init();
+    if (isClickerEnabled()) {
+      init();
+    }
   }
 
   window.fjfeRcDebug = {
     init,
-    cleanup,
+    cleanup: cleanupAll,
     refreshRaw: refreshRawOnly,
     resetMoney,
   };
