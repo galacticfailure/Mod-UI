@@ -59,8 +59,9 @@
   
   const initializeTileTimer = (tileIndex) => {
     tileTimers.set(tileIndex, {
-      watering: 0, 
-      weeding: WEEDING_INTERVAL, 
+      
+      watering: WATERING_INTERVAL,
+      weeding: WEEDING_INTERVAL,
       lastCheck: Date.now()
     });
   };

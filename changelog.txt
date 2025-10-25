@@ -1,3 +1,8 @@
+0.5.2
+- Fixed multiple bugs in the farm
+- Fixed misrate warning icon not appearing with EAS
+- Fixed misrate warning happening with videos of 60 seconds
+
 0.5.1
 - Updated warn system to include videos over 60 seconds
 - Fixed image missing in clicker
