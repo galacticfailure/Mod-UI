@@ -52,6 +52,17 @@
     return resourcePath;
   };
 
+  
+  const isNsfwPath = () => {
+    try {
+      const p = (window.location?.pathname || '').toLowerCase();
+      
+      return p.includes('/nsfw/');
+    } catch (_) {
+      return false;
+    }
+  };
+
   const isElementSelected = (element, selectedClass) => {
     if (!element) {
       return false;
@@ -236,6 +247,8 @@
 
   const canShowOverlayNow = () => {
     const settings = window.fjTweakerSettings || {};
+    
+    if (isNsfwPath()) return false;
     if (!settings.warnOnAll) return false;
     if (!currentConditionState.any) return false;
     if (hasRecentVoteElement() && !hasRepostBanner()) return false;
@@ -500,7 +513,8 @@
   const updateWarningBadge = (state) => {
     
     const settings = window.fjTweakerSettings || {};
-    const allowBadge = !!settings.misrateWarning && !!state?.any;
+    
+    const allowBadge = !isNsfwPath() && !!settings.misrateWarning && !!state?.any;
     if (!allowBadge) {
       if (warningBadge) {
         warningBadge.style.display = 'none';
@@ -692,6 +706,12 @@
   };
 
   const evaluateState = () => {
+    
+    if (isNsfwPath()) {
+      hideWarning();
+      updateWarningBadge({ any: false });
+      return;
+    }
     currentConditionState = computeConditionState();
     const allowOverlay = canShowOverlayNow();
     if (allowOverlay) showWarning(); else hideWarning();
@@ -865,6 +885,10 @@
       return;
     }
     if (window.location.hostname !== targetHost) {
+      return;
+    }
+    
+    if (isNsfwPath()) {
       return;
     }
     initialized = true;

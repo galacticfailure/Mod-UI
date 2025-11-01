@@ -14,13 +14,14 @@
     'deport', 'semetic', 'semitism', 'hitler', 'adolf', 'holocaust', 'nazi',
     '(((', ')))', 'jeet', 'globalist', ' adl', 'wef', 'right-wing', 'right wing',
     'left-wing', 'left wing', 'starmer', 'online safety act', 'digital id',
-    'mudslime', 'lgbt', 'trans', 'trann', 'homophob', 'racis', 'sexis', 'islam',
+    'mudslime', 'lgbt', ' trans', ' trann', 'homophob', 'racis', 'sexis', 'islam',
     'christian', 'obama', 'epstein', '9/11', 'leftis', 'conservative',
-    'nose tribe', 'hebrew', 'of satan', 'rfk', 'church', 'kkk'
+    'nose tribe', 'hebrew', 'of satan', 'rfk', 'church', 'kkk', 'government',
+    'shekel', 'genocide', 'gaza', 'fagg', 'democrat', 'republican', 'shitskin'
   ];
 
   const META_LIST = [
-    'admin', 'fj', 'funnyjunk'
+    'admin', 'fj', 'funnyjunk', 'pissname', 'bluename', 'whitename'
   ];
 
   let isEnabled = false;

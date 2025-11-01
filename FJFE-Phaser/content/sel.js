@@ -353,6 +353,73 @@ const createCheckboxRow = (id, label, checked, onChange) => {
   return { wrapper: row, input, infoButton };
 };
 
+
+const createSmallButtonRow = (id, label, onClick) => {
+  
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.gap = '8px';
+  row.style.width = '100%';
+  row.style.overflow = 'visible';
+
+  const innerLabel = document.createElement('label');
+  innerLabel.htmlFor = id;
+  innerLabel.style.display = 'flex';
+  innerLabel.style.alignItems = 'center';
+  innerLabel.style.gap = '8px';
+  innerLabel.style.flex = '1 1 auto';
+  innerLabel.style.cursor = 'pointer';
+
+  
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = id;
+  btn.textContent = '?';
+  Object.assign(btn.style, {
+    width: '18px',
+    height: '18px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    font: "700 13px 'Segoe UI', sans-serif",
+    color: '#ffffff',
+    background: '#822ef6',
+    border: '1px solid #822ef6',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    lineHeight: '1',
+    padding: '0',
+    flexShrink: '0'
+  });
+  if (typeof onClick === 'function') {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClick(e);
+    });
+  }
+
+  const span = document.createElement('span');
+  span.textContent = label;
+  span.style.flex = '1 1 auto';
+
+  innerLabel.append(btn, span);
+
+  const infoButton = createInfoButtonElement(label);
+  infoButton.style.alignSelf = 'center';
+  infoButton.style.flexShrink = '0';
+  infoButton.style.marginLeft = '4px';
+  infoButton.dataset.fjInfoTarget = id;
+
+  infoButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  row.append(innerLabel, infoButton);
+
+  return { wrapper: row, button: btn, infoButton };
+};
+
 const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow) => {
   
   const nextSettings = {
@@ -403,6 +470,17 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
   const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
   const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
   const farmRow = createCheckboxRow('fj-sel-farm', 'Farm', settings.farm);
+
+  
+  const rightClickInfoRow = createSmallButtonRow(
+    'fj-sel-right-click-info',
+    'Right-Click Info',
+    () => {
+      try {
+        alert('When right-clicking, there is now a new option: More Info. Selecting it will open FJEdu.\nIf certain elements are right-clicked, it will open to the relevant entry.\n\nElements include:\n- Skin level buttons\n- PC level buttons\n- Categories\n- no-index\n- Mods button\n- Flag buttons\n- Flag time selection\n- Flag type selection\nAnd so on.');
+      } catch (_) {}
+    }
+  );
 
   try {
     const labelEl = warnOnAllRow.wrapper.querySelector('label');
@@ -508,6 +586,7 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
     setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
     setInfoContent(farmRow.infoButton, 'A farm.');
+  setInfoContent(rightClickInfoRow.infoButton, 'Opens relevant FJEdu entries on right-click.');
 
     
     const tabGroups = {
@@ -516,6 +595,7 @@ const setInfoContent = (button, message, imagePath) => {
       tools: [
         misrateWarningRow.wrapper,
         warnOnAllRow.wrapper,
+        rightClickInfoRow.wrapper,
         modJSExtrasRow.wrapper,
         checkTextRow.wrapper,
         hideRateRow.wrapper,

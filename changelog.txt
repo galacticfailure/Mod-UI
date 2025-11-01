@@ -1,3 +1,13 @@
+0.5.4
+- Fixed more farm bugs
+- General bugfixing
+
+0.5.3
+- Fixed misrate warning occurring in NSFW section
+- Auto-unticks boxes for broken ModJS stuff
+- Fixed multiple farm bugs
+- Added right-click explanation
+
 0.5.2
 - Fixed multiple bugs in the farm
 - Fixed misrate warning icon not appearing with EAS

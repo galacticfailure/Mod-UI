@@ -5,6 +5,7 @@
   const LEGACY_SETTING_KEY = 'modJSRecall';
   const STORAGE_KEY = 'fjTweakerModJSState';
   const OVERLAY_ID = 'fj-modjs-overlay';
+  const BROKEN_TOOLTIP = 'Broken setting disabled. Press Submit to remove.';
   const INFO_COPY = {
     New7902: "Admin's up to something. Dunno what. Do not enable.",
     ComplaintBETA: 'Defunct.',
@@ -67,6 +68,7 @@
   let featureEnabled = true;
   let lastSavedState;
   let storageLoadPromise = null;
+   let enhancementsScheduled = false;
 
   const storageArea = typeof chrome !== 'undefined' && chrome?.storage?.local ? chrome.storage.local : null;
 
@@ -167,15 +169,8 @@
       const key = labelText.includes(':') ? labelText.split(':')[1].trim() : '';
       const infoTarget = key ? Object.keys(INFO_COPY).find(k => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')) : undefined;
 
-      if (infoTarget && brokenJS.includes(infoTarget)) {
-        
-        if (row && row.parentElement) {
-          row.remove();
-        } else {
-          label.remove();
-        }
-        return;
-      }
+      
+      
 
       const labelTitle = (label.textContent || '').replace(/\s+/g, ' ').trim() || key || 'Details';
       const infoCopy = infoTarget ? INFO_COPY[infoTarget] : undefined;
@@ -208,45 +203,70 @@
   
   
   const removeBrokenRows = (root) => {
+    
     if (!root) return;
 
-    
-    
-    const btns = root.querySelectorAll('[data-fj-info-target]');
-    btns.forEach((btn) => {
-      const target = btn?.dataset?.fjInfoTarget;
-      if (!target) return;
-      if (brokenJS.includes(target)) {
-        const row = btn.closest('.fj-modjs-info-row');
-        if (row) {
-          row.remove();
-        } else {
-          
-          const label = btn.previousElementSibling && btn.previousElementSibling.matches?.('label.listJS')
-            ? btn.previousElementSibling
-            : null;
-          if (label) {
-            label.remove();
-          }
-        }
-      }
-    });
-
-    
     const labels = root.querySelectorAll('label.listJS');
     labels.forEach((label) => {
-      const txt = (label.textContent || '').trim();
-      const key = txt.includes(':') ? txt.split(':')[1].trim() : '';
-      if (!key) return;
-      const infoTarget = Object.keys(INFO_COPY).find(
-        (k) => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')
-      );
-      if (infoTarget && brokenJS.includes(infoTarget)) {
-        const wrapRow = label.closest('.fj-modjs-info-row');
-        if (wrapRow) {
-          wrapRow.remove();
-        } else {
-          label.remove();
+      const row = label.closest('.fj-modjs-info-row');
+      const btnTarget = row?.querySelector?.('[data-fj-info-target]')?.dataset?.fjInfoTarget;
+      let infoTarget = btnTarget;
+      if (!infoTarget) {
+        const txt = (label.textContent || '').trim();
+        const key = txt.includes(':') ? txt.split(':')[1].trim() : '';
+        if (key) {
+          infoTarget = Object.keys(INFO_COPY).find(
+            (k) => k.toLowerCase().replace(/\s/g, '') === key.toLowerCase().replace(/\s/g, '')
+          );
+        }
+      }
+      if (!infoTarget || !brokenJS.includes(infoTarget)) return;
+
+      const input = label.querySelector?.('.idJS');
+      let autoUnticked = false;
+      if (input && input.checked) {
+        input.checked = false;
+        autoUnticked = true;
+        label.dataset.fjAutoUnticked = '1';
+        try {
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (_) {}
+      }
+
+      
+      if (!input) return;
+
+      
+      if (!input.checked && label.dataset.fjAutoUnticked !== '1') {
+        if (row) row.style.display = 'none'; else label.style.display = 'none';
+        return;
+      }
+
+      
+      if (label.dataset.fjAutoUnticked === '1') {
+        if (row) row.style.display = ''; else label.style.display = '';
+        
+        const targetEl = row || label;
+        if (targetEl) {
+          targetEl.style.removeProperty('background');
+          targetEl.style.removeProperty('border');
+          targetEl.style.removeProperty('border-radius');
+          targetEl.style.removeProperty('padding');
+        }
+        
+        label.style.color = '#e74c3c';
+        try { label.title = BROKEN_TOOLTIP; } catch (_) {}
+        
+        const infoBtn = row?.querySelector?.('[data-fj-info-target]');
+        if (infoBtn) {
+          const current = infoBtn.dataset?.fjInfoText || '';
+          if (current !== BROKEN_TOOLTIP) {
+            if (window.fjTweakerInfo?.updateTooltip) {
+              window.fjTweakerInfo.updateTooltip(infoBtn, BROKEN_TOOLTIP);
+            }
+            infoBtn.dataset.fjInfoText = BROKEN_TOOLTIP;
+            infoBtn.title = BROKEN_TOOLTIP;
+          }
         }
       }
     });
@@ -519,6 +539,9 @@
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
+
+    
+    removeBrokenRows(root);
   };
 
   const encodeState = (state) => {

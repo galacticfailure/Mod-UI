@@ -291,6 +291,9 @@
 					}
 				}
 			});
+
+			
+			try { window.fjTweakerModules?.farmtile?.refreshTooltipForHoveredTile?.(); } catch(_) {}
 		} catch (error) {
 			console.error('Growth check error:', error);
 		}
@@ -301,22 +304,26 @@
 		try {
 			const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
 			if (!plantData || !plantData.plantedAt || !plantData.seedName) return 0;
-            
+			
 			const seedInfo = SEED_TIPS[plantData.seedName];
 			if (!seedInfo) return 0;
-            
+			
 			const growthTimeMs = seedInfo.growtime * 60 * 60 * 1000;
-			
-			if (typeof plantData.progressMs === 'number') {
-				return Math.min(100, Math.max(0, Math.floor((plantData.progressMs / growthTimeMs) * 100)));
-			}
-            
-			
-			let elapsedTime = Date.now() - plantData.plantedAt;
 			const toolsModule = window.fjTweakerModules?.farmtools;
 			const speedModifier = (toolsModule && toolsModule.getGrowthSpeedModifier)
 			  ? toolsModule.getGrowthSpeedModifier(tileIndex)
 			  : 1.0;
+			
+			if (typeof plantData.progressMs === 'number') {
+				
+				const last = plantData.lastGrowCheck || plantData.plantedAt || Date.now();
+				const delta = Math.max(0, Date.now() - last);
+				const extrapolated = Math.min(growthTimeMs, (plantData.progressMs || 0) + Math.floor(delta * speedModifier));
+				return Math.min(100, Math.max(0, Math.floor((extrapolated / growthTimeMs) * 100)));
+			}
+			
+			
+			let elapsedTime = Date.now() - plantData.plantedAt;
 			const approx = Math.min(100, Math.floor(((elapsedTime * speedModifier) / growthTimeMs) * 100));
 			return Math.max(0, approx);
 		} catch (_) {

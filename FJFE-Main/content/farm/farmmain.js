@@ -16,6 +16,131 @@
   let menuHostEl = null;
   
   
+  const TAB_SESSION_KEY = 'fjFarmTabId';
+  let TAB_ID = null;
+  try {
+    TAB_ID = sessionStorage.getItem(TAB_SESSION_KEY);
+    if (!TAB_ID) {
+      TAB_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+      sessionStorage.setItem(TAB_SESSION_KEY, TAB_ID);
+    }
+  } catch(_) {
+    TAB_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+  }
+  let isFocusLocked = false; 
+  let focusOverlayEl = null; 
+  let switchFocusBtnEl = null;
+  const FOCUS_KEY = 'fjFarmFocusedTabId';
+  
+  const getFocusedTabId = () => {
+    try { return localStorage.getItem(FOCUS_KEY) || ''; } catch(_) { return ''; }
+  };
+  const isFocusedTab = () => getFocusedTabId() === TAB_ID;
+  const setFocusedTab = () => {
+    try {
+      localStorage.setItem(FOCUS_KEY, TAB_ID);
+      
+      try { if (typeof chrome !== 'undefined' && chrome.storage?.local) chrome.storage.local.set({ [FOCUS_KEY]: TAB_ID }); } catch(_) {}
+    } catch(_) {}
+    updateFocusUI(true);
+  };
+  const closeAllFarmMenus = () => {
+    const getModule = (name) => (window.fjTweakerModules && window.fjTweakerModules[name]) || null;
+    ['farmtools','farmseeds','farmcook','farmshop','farmtile','farminv','farmset'].forEach(n => {
+      try { getModule(n)?.close?.(); } catch (_) {}
+    });
+    try { getModule('farminteract')?.onMenuChange?.(); } catch(_) {}
+  };
+  const ensureFocusOverlay = () => {
+    if (!panelEl) return;
+    if (!focusOverlayEl) {
+      focusOverlayEl = document.createElement('div');
+      focusOverlayEl.id = 'fj-farm-focus-lock';
+      Object.assign(focusOverlayEl.style, {
+        position: 'absolute', inset: '0',
+        background: 'rgba(255,0,0,0.15)',
+        display: 'none',
+        pointerEvents: 'auto', 
+        zIndex: '2147483646',
+        alignItems: 'flex-start',
+        justifyContent: 'center'
+      });
+      
+      const btnWrap = document.createElement('div');
+      Object.assign(btnWrap.style, {
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginTop: '20px'
+      });
+      switchFocusBtnEl = document.createElement('button');
+      switchFocusBtnEl.type = 'button';
+      switchFocusBtnEl.textContent = 'Switch Focus';
+      Object.assign(switchFocusBtnEl.style, {
+        padding: '8px 14px', fontSize: '13px', fontWeight: '700',
+        background: '#a11', color: '#fff', border: '1px solid #c33', borderRadius: '6px', cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.35)'
+      });
+      switchFocusBtnEl.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        
+        setFocusedTab();
+        
+        try { loadFarmData(); } catch(_) {}
+      });
+      btnWrap.appendChild(switchFocusBtnEl);
+      focusOverlayEl.appendChild(btnWrap);
+      panelEl.appendChild(focusOverlayEl);
+    }
+  };
+  const lockUI = () => {
+    isFocusLocked = true;
+    try { ensureFocusOverlay(); } catch(_) {}
+    if (focusOverlayEl) focusOverlayEl.style.display = 'flex';
+    
+    try { closeAllFarmMenus(); } catch(_) {}
+  };
+  const unlockUI = () => {
+    isFocusLocked = false;
+    if (focusOverlayEl) focusOverlayEl.style.display = 'none';
+  };
+  const updateFocusUI = (claimedHere = false) => {
+    
+    if (isFocusedTab()) {
+      unlockUI();
+      if (!claimedHere) { try { loadFarmData(); } catch(_) {} }
+      
+      try {
+        if (currentEnabled) {
+          if (overlayEl) {
+            hideOverlay();
+            
+            setTimeout(() => {
+              try { showOverlay(); } catch(_) {}
+              try { window.fjTweakerModules?.farmseeds?.checkAndUpdatePlantGrowth?.(); } catch(_) {}
+              try { window.fjTweakerModules?.farmtools?.checkAndUpdateTimers?.(); } catch(_) {}
+            }, 240);
+            
+            setTimeout(() => {
+              try {
+                if (!overlayEl && currentEnabled) {
+                  showOverlay();
+                  try { window.fjTweakerModules?.farmseeds?.checkAndUpdatePlantGrowth?.(); } catch(_) {}
+                  try { window.fjTweakerModules?.farmtools?.checkAndUpdateTimers?.(); } catch(_) {}
+                }
+              } catch(_) {}
+            }, 500);
+          } else {
+            showOverlay();
+            try { window.fjTweakerModules?.farmseeds?.checkAndUpdatePlantGrowth?.(); } catch(_) {}
+            try { window.fjTweakerModules?.farmtools?.checkAndUpdateTimers?.(); } catch(_) {}
+          }
+        }
+      } catch(_) {}
+    } else {
+      lockUI();
+    }
+  };
+  
+  
   const resolveAssetUrl = (p) => (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
   
   
@@ -38,6 +163,10 @@
   let craftedEntries = {};
   
   let toolUnlocks = {};
+  
+  
+  
+  let maintenanceTimers = {};
   
   
   const OBJECT_SIZES = {
@@ -72,6 +201,8 @@
   
   const saveFarmData = () => {
     try {
+      
+      try { if (!isFocusedTab()) return; } catch(_) {}
       const farmData = {
         coins,
         tileTypes,
@@ -84,9 +215,16 @@
         seenItems,
         craftedEntries,
         toolUnlocks,
+        maintenanceTimers,
         version: 1
       };
-      localStorage.setItem('fjFarmData', JSON.stringify(farmData));
+      const payload = JSON.stringify(farmData);
+      
+      localStorage.setItem('fjFarmData', payload);
+      
+      try { localStorage.setItem('fjFarmDataBackup', payload); } catch(_) {}
+      
+      try { if (typeof chrome !== 'undefined' && chrome.storage?.local) chrome.storage.local.set({ fjFarmData: farmData, fjFarmDataBackup: farmData }); } catch(_) {}
       console.log('Saved farm data:', farmData);
     } catch(e) {
       console.warn('Failed to save farm data:', e);
@@ -95,13 +233,40 @@
 
   const loadFarmData = () => {
     try {
-      const stored = localStorage.getItem('fjFarmData');
-      if (!stored) {
-        console.log('No saved farm data found');
+      const storedStr = localStorage.getItem('fjFarmData') || localStorage.getItem('fjFarmDataBackup');
+      if (!storedStr) {
+        console.log('No saved farm data found in localStorage. Attempting extension storage...');
+        try {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.get(['fjFarmData','fjFarmDataBackup'], (res) => {
+              try {
+                const fromExt = res?.fjFarmData || res?.fjFarmDataBackup || null;
+                if (fromExt && fromExt.version === 1) {
+                  console.log('Restored farm data from extension storage');
+                  
+                  if (typeof fromExt.coins === 'number' && fromExt.coins >= 0) coins = fromExt.coins;
+                  if (Array.isArray(fromExt.tileTypes) && fromExt.tileTypes.length >= 8) tileTypes = fromExt.tileTypes;
+                  if (fromExt.plantPositions && typeof fromExt.plantPositions === 'object') plantPositions = fromExt.plantPositions;
+                  if (fromExt.objectPositions && typeof fromExt.objectPositions === 'object') objectPositions = fromExt.objectPositions;
+                  if (fromExt.cookUnlocks && typeof fromExt.cookUnlocks === 'object') cookUnlocks = { mb:false, st:false, ov:false, ...fromExt.cookUnlocks };
+                  if (fromExt.seenItems && typeof fromExt.seenItems === 'object') seenItems = { ...fromExt.seenItems };
+                  if (fromExt.craftedEntries && typeof fromExt.craftedEntries === 'object') craftedEntries = { ...fromExt.craftedEntries };
+                  if (fromExt.toolUnlocks && typeof fromExt.toolUnlocks === 'object') toolUnlocks = { ...fromExt.toolUnlocks };
+                  if (fromExt.maintenanceTimers && typeof fromExt.maintenanceTimers === 'object') maintenanceTimers = { ...fromExt.maintenanceTimers };
+                  if (typeof fromExt.expansions === 'number' && fromExt.expansions >= 0) expansions = fromExt.expansions;
+                  if (Array.isArray(fromExt.inventorySlots)) inventorySlots = fromExt.inventorySlots;
+                  if (fromExt.cookSlots && typeof fromExt.cookSlots === 'object') cookSlots = fromExt.cookSlots;
+
+                  try { window.dispatchEvent(new CustomEvent('fjFarmDataLoaded', { detail: fromExt })); } catch(_) {}
+                }
+              } catch(_) {}
+            });
+          }
+        } catch(_) {}
         return;
       }
       
-      const farmData = JSON.parse(stored);
+      const farmData = JSON.parse(storedStr);
       if (!farmData || farmData.version !== 1) {
         console.warn('Invalid or outdated farm data');
         return;
@@ -145,6 +310,11 @@
       
       if (farmData.toolUnlocks && typeof farmData.toolUnlocks === 'object') {
         toolUnlocks = { ...farmData.toolUnlocks };
+      }
+
+      
+      if (farmData.maintenanceTimers && typeof farmData.maintenanceTimers === 'object') {
+        maintenanceTimers = { ...farmData.maintenanceTimers };
       }
       
       
@@ -205,6 +375,19 @@
     getAllTileTypes: () => [...tileTypes],
     getAllPlants: () => ({...plantPositions}),
     getAllObjects: () => ({...objectPositions}),
+    
+    
+    getMaintenanceTimers: () => ({ ...maintenanceTimers }),
+    setMaintenanceTimers: (map) => {
+      try {
+        if (map && typeof map === 'object') {
+          maintenanceTimers = { ...map };
+          saveFarmData();
+        }
+      } catch (e) {
+        console.warn('Failed to set maintenance timers:', e);
+      }
+    },
     
     getInventory: () => inventorySlots,
     setInventory: (slots) => {
@@ -807,6 +990,12 @@
     document.body.appendChild(overlayEl);
 
     
+    try {
+      ensureFocusOverlay();
+      if (isFocusLocked && focusOverlayEl) focusOverlayEl.style.display = 'flex';
+    } catch(_) {}
+
+    
     try { window.fjfeFarmTT?.init?.({ anchorMenuEl: menuHostEl }); } catch(_) {}
   };
 
@@ -1173,16 +1362,14 @@
       return;
     }
     
-    const tiles = Array.from(tileStripEl.children);
-    console.log(`Restoring plants on ${tiles.length} tiles, plant data:`, plantPositions);
+  const tiles = Array.from(tileStripEl.children);
     
     for (let i = 0; i < tiles.length; i++) {
       const container = tiles[i];
       
       
       if (plantPositions[i]) {
-        const plant = plantPositions[i];
-        console.log(`Restoring plant ${plant.seedName} on tile ${i}`);
+  const plant = plantPositions[i];
         
         let plantImg = container.querySelector('.plant-overlay');
         if (!plantImg) {
@@ -1208,28 +1395,21 @@
         
         const seedsModule = window.fjTweakerModules?.farmseeds;
         let imageSuffix = '_growing';
-        if (seedsModule && seedsModule.getSeedTips) {
-          const seedTips = seedsModule.getSeedTips();
-          const seedInfo = seedTips[plant.seedName];
-          if (seedInfo && plant.plantedAt) {
-            const growthTimeMs = seedInfo.growtime * 60 * 60 * 1000;
-            const elapsedTime = Date.now() - plant.plantedAt;
-            if (elapsedTime >= growthTimeMs) {
-              imageSuffix = '_grown';
-            }
-          }
+        
+        if (seedsModule && seedsModule.getPlantGrowthInfo) {
+          try {
+            const growthInfo = seedsModule.getPlantGrowthInfo(i);
+            if (growthInfo?.isGrown) imageSuffix = '_grown';
+          } catch(_) {}
         }
 
         const plantSrc = resolveAssetUrl(`icons/farm/plants/${plant.seedName}${imageSuffix}.png`);
-        console.log(`Setting plant image source to: ${plantSrc}`);
         plantImg.src = plantSrc;
         plantImg.onerror = function() {
           console.warn(`Failed to load plant image: ${plantSrc}`);
           this.src = resolveAssetUrl('icons/error.png');
         };
-        plantImg.onload = function() {
-          console.log(`Successfully loaded plant image: ${plantSrc}`);
-        };
+        plantImg.onload = null;
       }
     }
   };
@@ -1323,6 +1503,13 @@
       document.addEventListener('fjTweakerSettingsChanged', onSettingsChanged, { capture: false });
       
       
+      window.addEventListener('storage', (e) => {
+        try {
+          if (e && e.key === FOCUS_KEY) updateFocusUI(false);
+        } catch(_) {}
+      });
+      
+      
       try {
         ['farmaudio','farmtools', 'farmseeds', 'farmcook', 'farmshop', 'farmtile', 'farminv', 'farmset', 'farminteract'].forEach(n => {
           try { window.fjTweakerModules?.[n]?.init?.(); } catch(_) {}
@@ -1331,6 +1518,11 @@
       
       
       loadFarmData();
+      
+      try {
+        const cur = getFocusedTabId();
+        if (!cur) setFocusedTab(); else updateFocusUI(false);
+      } catch(_) { updateFocusUI(false); }
       
       
       setTimeout(() => {
@@ -1361,6 +1553,22 @@
         const mo = new MutationObserver(() => { try { positionOverlay(); } catch(_) {} });
         mo.observe(container, { childList: true, subtree: true });
       }
+      
+      try {
+        document.addEventListener('pointerdown', (e) => {
+          try {
+            if (!isFocusLocked) return;
+            const t = e.target;
+            if (!panelEl) return;
+            if (!panelEl.contains(t)) return; 
+            if (focusOverlayEl && focusOverlayEl.contains(t)) return; 
+            e.preventDefault(); e.stopPropagation();
+          } catch(_) {}
+        }, { capture: true });
+        
+      } catch(_) {}
+      
+
     } catch (_) {}
   };
 
@@ -1377,28 +1585,20 @@
   (function(){
   const CACHE_KEY = 'fjFarmPriceCacheV4';
     let priceCache = null;
+
+    const toKey = (s) => String(s||'').trim().toLowerCase().replace(/\s+/g,'_');
     const loadCache = () => {
-      try { priceCache = JSON.parse(localStorage.getItem(CACHE_KEY)||'null') || { v:4, plants:{}, foods:{} }; } catch(_) { priceCache = { v:4, plants:{}, foods:{} }; }
-      if (!priceCache.plants) priceCache.plants = {};
-      if (!priceCache.foods) priceCache.foods = {};
+      try { priceCache = JSON.parse(localStorage.getItem(CACHE_KEY)||'null') || { v:4, plants:{}, foods:{} }; }
+      catch(_) { priceCache = { v:4, plants:{}, foods:{} }; }
     };
-    const saveCache = () => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(priceCache)); } catch(_){} };
-    const toKey = (n)=> String(n||'').trim().toLowerCase().replace(/\s+/g,'_');
-    const specialSeedFor = (raw)=> ({ egg:'eggvine', meat:'meatbulb' })[raw] || raw;
-    const getSeedPrice = (rawName) => {
-      try {
-        const seeds = window.fjTweakerModules?.farmseeds?.getSeedTips?.();
-        if (!seeds) return 0;
-        const key = toKey(specialSeedFor(toKey(rawName)));
-        const meta = seeds[key];
-        return (meta && typeof meta.prc==='number') ? meta.prc : 0;
-      } catch(_) { return 0; }
-    };
-    const priceForPlant = (name) => {
+    const saveCache = () => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(priceCache||{ v:4, plants:{}, foods:{} })); } catch(_) {} };
+
+    const priceForPlant = (rawName) => {
+      const key = toKey(rawName);
+      const seeds = window.fjTweakerModules?.farmseeds?.getSeedTips?.() || {};
+      const meta = seeds[key];
+      const seedP = Math.max(0, Number(meta?.prc) || 0);
       if (!priceCache) loadCache();
-      const key = toKey(name);
-      if (priceCache.plants[key] != null) return priceCache.plants[key];
-      const seedP = getSeedPrice(key);
       const p = Math.ceil(seedP * 1.25);
       priceCache.plants[key] = p;
       saveCache();

@@ -3,6 +3,10 @@
   let root = null;
   let isOpen = false;
   let buttonsMeta = [];
+  let TICK_COUNT = 0;
+
+  
+  const dlog = () => {};
 
   const TOOL_ICONS = [
     
@@ -51,33 +55,145 @@
 
   
   const tileTimers = new Map(); 
-  const WATERING_INTERVAL = 60 * 60 * 1000; 
-  const WEEDING_INTERVAL = 2.5 * 60 * 60 * 1000; 
+  let timersDirty = false;
+  let lastPersistAt = 0;
+  
+  const getScale = () => {
+    try {
+      const s = Number(window.fjFarm?.debug?.timerScale);
+      return isFinite(s) && s > 0 ? s : 1;
+    } catch(_) { return 1; }
+  };
+  const WATERING_INTERVAL_BASE = 60 * 60 * 1000; 
+  const WEEDING_INTERVAL_BASE = 2.5 * 60 * 60 * 1000; 
+  const WATERING_INTERVAL = () => Math.floor(WATERING_INTERVAL_BASE * getScale());
+  const WEEDING_INTERVAL = () => Math.floor(WEEDING_INTERVAL_BASE * getScale());
   const TIMER_CHECK_INTERVAL = 5000; 
   let timerCheckInterval = null;
 
   
-  const initializeTileTimer = (tileIndex) => {
-    tileTimers.set(tileIndex, {
+  const bootstrapTimersFromFarm = () => {
+    try {
+      const now = Date.now();
       
-      watering: WATERING_INTERVAL,
-      weeding: WEEDING_INTERVAL,
-      lastCheck: Date.now()
-    });
+      const persisted = window.fjFarm?.state?.getMaintenanceTimers?.() || {};
+
+      const tileStrip = document.getElementById('fj-farm-tiles');
+      const totalTiles = tileStrip ? tileStrip.children.length : 64;
+      const seedsModule = window.fjTweakerModules?.farmseeds;
+      for (let i = 0; i < totalTiles; i++) {
+        const plantData = window.fjFarm?.state?.getPlant?.(i);
+        const persistedEntry = persisted?.[i] || persisted?.[String(i)] || null;
+        const growthInfo = seedsModule?.getPlantGrowthInfo?.(i);
+        const isActive = !!(plantData?.plantedAt) && !(growthInfo?.isGrown);
+        if (isActive) {
+          
+          if (persistedEntry) {
+            if (persistedEntry.paused) {
+              const wRemain = Math.max(0, Number(persistedEntry.wateringMs)||0);
+              const weRemain = Math.max(0, Number(persistedEntry.weedingMs)||0);
+              tileTimers.set(i, { watering: wRemain, weeding: weRemain, lastCheck: now, paused: false });
+            } else if (persistedEntry.wateringExpiresAt || persistedEntry.weedingExpiresAt) {
+              const wRemain = Math.max(0, Math.floor((persistedEntry.wateringExpiresAt || (now + WATERING_INTERVAL())) - now));
+              const weRemain = Math.max(0, Math.floor((persistedEntry.weedingExpiresAt || (now + WEEDING_INTERVAL())) - now));
+              tileTimers.set(i, { watering: wRemain, weeding: weRemain, lastCheck: now, paused: false });
+            }
+          }
+          if (!tileTimers.has(i)) {
+            initializeTileTimer(i);
+          }
+          updateTileOverlays(i);
+        } else {
+          
+          if (persistedEntry) {
+            if (persistedEntry.paused) {
+              const wRemain = Math.max(0, Number(persistedEntry.wateringMs)||0);
+              const weRemain = Math.max(0, Number(persistedEntry.weedingMs)||0);
+              tileTimers.set(i, { watering: wRemain, weeding: weRemain, lastCheck: now, paused: true });
+            } else if (persistedEntry.wateringExpiresAt || persistedEntry.weedingExpiresAt) {
+              const wRemain = Math.max(0, Math.floor((persistedEntry.wateringExpiresAt || (now + WATERING_INTERVAL())) - now));
+              const weRemain = Math.max(0, Math.floor((persistedEntry.weedingExpiresAt || (now + WEEDING_INTERVAL())) - now));
+              tileTimers.set(i, { watering: wRemain, weeding: weRemain, lastCheck: now, paused: true });
+            }
+          } else {
+            const t = tileTimers.get(i);
+            if (t) { t.paused = true; t.lastCheck = now; }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error bootstrapping farm timers:', err);
+    }
+  };
+
+  
+  const persistTimersToState = (force = false) => {
+    try {
+      const now = Date.now();
+      if (!force && (now - lastPersistAt < 30000)) return; 
+      const out = {};
+      tileTimers.forEach((t, idx) => {
+        if (t?.paused) {
+          out[idx] = {
+            paused: true,
+            wateringMs: Math.max(0, t.watering || 0),
+            weedingMs: Math.max(0, t.weeding || 0)
+          };
+        } else {
+          out[idx] = {
+            paused: false,
+            wateringExpiresAt: now + Math.max(0, t.watering || 0),
+            weedingExpiresAt: now + Math.max(0, t.weeding || 0)
+          };
+        }
+      });
+      window.fjFarm?.state?.setMaintenanceTimers?.(out);
+      lastPersistAt = now;
+      timersDirty = false;
+      dlog('persistTimers', { count: Object.keys(out).length });
+    } catch (e) {
+      console.warn('Failed to persist maintenance timers:', e);
+    }
+  };
+
+  
+  const initializeTileTimer = (tileIndex) => {
+    const now = Date.now();
+    const exists = tileTimers.has(tileIndex);
+    if (exists) {
+      const t = tileTimers.get(tileIndex);
+      
+      t.paused = false;
+      t.lastCheck = now;
+    } else {
+      tileTimers.set(tileIndex, {
+        watering: WATERING_INTERVAL(),
+        weeding: WEEDING_INTERVAL(),
+        lastCheck: now,
+        paused: false
+      });
+    }
+    dlog('initializeTileTimer', { tileIndex, existed: exists, timers: tileTimers.size });
+    timersDirty = true;
   };
 
   
   const removeTileTimer = (tileIndex) => {
     tileTimers.delete(tileIndex);
+    dlog('removeTileTimer', { tileIndex, timers: tileTimers.size });
     updateTileOverlays(tileIndex);
+    timersDirty = true;
+    persistTimersToState(true);
   };
 
   
   const resetWateringTimer = (tileIndex) => {
     const timer = tileTimers.get(tileIndex);
     if (timer) {
-      timer.watering = WATERING_INTERVAL;
+      timer.watering = WATERING_INTERVAL();
       updateTileOverlays(tileIndex);
+      timersDirty = true;
+      persistTimersToState(true);
     }
   };
 
@@ -85,14 +201,17 @@
   const resetWeedingTimer = (tileIndex) => {
     const timer = tileTimers.get(tileIndex);
     if (timer) {
-      timer.weeding = WEEDING_INTERVAL;
+      timer.weeding = WEEDING_INTERVAL();
       updateTileOverlays(tileIndex);
+      timersDirty = true;
+      persistTimersToState(true);
     }
   };
 
   
   const updateTileOverlays = (tileIndex) => {
     try {
+      
       const tileStrip = document.getElementById('fj-farm-tiles');
       if (!tileStrip) return;
       
@@ -177,6 +296,7 @@
       }
 
       tile.appendChild(overlayContainer);
+      dlog('overlayShown', tileIndex, { needsWatering, needsWeeding });
     } catch (error) {
       console.error('Error updating tile overlays:', error);
     }
@@ -186,6 +306,43 @@
   const checkAndUpdateTimers = () => {
     try {
       const currentTime = Date.now();
+      TICK_COUNT++;
+
+      
+      try {
+        const tileStrip = document.getElementById('fj-farm-tiles');
+        const totalTiles = tileStrip ? tileStrip.children.length : 64;
+        const seedsModule = window.fjTweakerModules?.farmseeds;
+        for (let i = 0; i < totalTiles; i++) {
+          const plantData = window.fjFarm?.state?.getPlant?.(i);
+          const growthInfo = seedsModule?.getPlantGrowthInfo?.(i);
+          const isActive = !!(plantData?.plantedAt) && !(growthInfo?.isGrown);
+          if (isActive) {
+            if (!tileTimers.has(i)) initializeTileTimer(i);
+            const t = tileTimers.get(i);
+            if (t && t.paused) { t.paused = false; t.lastCheck = currentTime; timersDirty = true; }
+          } else {
+            const t = tileTimers.get(i);
+            if (t) {
+              if (!t.paused) { t.paused = true; timersDirty = true; }
+              t.lastCheck = currentTime;
+              
+              if (growthInfo?.isGrown && growthInfo?.seedName) {
+                try {
+                  const tileEl = tileStrip?.children?.[i];
+                  const plantImg = tileEl?.querySelector?.('.plant-overlay');
+                  const grownSrc = resolve(`icons/farm/plants/${growthInfo.seedName}_grown.png`);
+                  if (plantImg && plantImg.src !== grownSrc) {
+                    plantImg.src = grownSrc;
+                    plantImg.onerror = function(){ this.src = resolve('icons/error.png'); };
+                  }
+                } catch(_) {}
+              }
+            }
+          }
+          updateTileOverlays(i);
+        }
+      } catch(_) {}
 
       
       const allObjects = window.fjFarm?.state?.getAllObjects?.() || {};
@@ -209,43 +366,55 @@
         }
         return false;
       };
+
       
       tileTimers.forEach((timer, tileIndex) => {
         const deltaTime = currentTime - timer.lastCheck;
         timer.lastCheck = currentTime;
 
-        
+        if (timer.paused) return; 
+
         const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
-        if (!plantData || !plantData.plantedAt) {
-          
+        const growthInfo = window.fjTweakerModules?.farmseeds?.getPlantGrowthInfo?.(tileIndex);
+        const isActive = !!(plantData?.plantedAt) && !(growthInfo?.isGrown);
+        if (!isActive) {
+          timer.paused = true;
+          timersDirty = true;
           updateTileOverlays(tileIndex);
+          
+          if (growthInfo?.isGrown && growthInfo?.seedName) {
+            try {
+              const tileStrip = document.getElementById('fj-farm-tiles');
+              const tileEl = tileStrip ? tileStrip.children[tileIndex] : null;
+              const plantImg = tileEl?.querySelector?.('.plant-overlay');
+              const grownSrc = resolve(`icons/farm/plants/${growthInfo.seedName}_grown.png`);
+              if (plantImg && plantImg.src !== grownSrc) {
+                plantImg.src = grownSrc;
+                plantImg.onerror = function(){ this.src = resolve('icons/error.png'); };
+              }
+            } catch(_) {}
+          }
           return;
         }
 
-        const seedsModule = window.fjTweakerModules?.farmseeds;
-        if (!seedsModule) return;
-
-        const plantGrowthInfo = seedsModule.getPlantGrowthInfo(tileIndex);
-        if (!plantGrowthInfo || plantGrowthInfo.isGrown) {
-          
-          updateTileOverlays(tileIndex);
-          return;
-        }
-
-        
+        const beforeW = timer.watering, beforeWe = timer.weeding;
         timer.watering = Math.max(0, timer.watering - deltaTime);
         timer.weeding = Math.max(0, timer.weeding - deltaTime);
+        if (timer.watering !== beforeW || timer.weeding !== beforeWe) timersDirty = true;
 
-        
         if (isInRadius(tileIndex, sprinklerAnchors, 2)) {
-          timer.watering = WATERING_INTERVAL; 
+          const newW = WATERING_INTERVAL();
+          if (timer.watering !== newW) { timer.watering = newW; timersDirty = true; }
         }
         if (isInRadius(tileIndex, scarecrowAnchors, 2)) {
-          timer.weeding = WEEDING_INTERVAL; 
+          const newWe = WEEDING_INTERVAL();
+          if (timer.weeding !== newWe) { timer.weeding = newWe; timersDirty = true; }
         }
 
         updateTileOverlays(tileIndex);
       });
+
+      if (timersDirty) persistTimersToState(false);
     } catch (error) {
       console.error('Timer check error:', error);
     }
@@ -269,7 +438,7 @@
   };
 
   
-  const handleWateringTool = (toolKey, tileIndex) => {
+  const handleWateringTool = (toolKey, tileIndex, opts = {}) => {
     let tilesToWater = [];
 
     if (toolKey === 'wcbasic') {
@@ -298,12 +467,14 @@
     }
 
     const ok = wateredCount > 0;
-    try { if (ok) window.fjFarm?.audio?.play?.('watering'); } catch(_) {}
+    if (!opts?.silent) {
+      try { if (ok) window.fjFarm?.audio?.play?.('watering'); } catch(_) {}
+    }
     return ok;
   };
 
   
-  const handleWeedingTool = (toolKey, tileIndex) => {
+  const handleWeedingTool = (toolKey, tileIndex, opts = {}) => {
     let tilesToWeed = [];
 
     if (toolKey === 'weedbasic') {
@@ -332,7 +503,9 @@
     }
 
     const ok = weededCount > 0;
-    try { if (ok) window.fjFarm?.audio?.play?.('weeding'); } catch(_) {}
+    if (!opts?.silent) {
+      try { if (ok) window.fjFarm?.audio?.play?.('weeding'); } catch(_) {}
+    }
     return ok;
   };
 
@@ -377,11 +550,9 @@
     
     if (!timer) return 'Timer initialization failed';
 
-    const wateringHours = Math.max(0, timer.watering / (60 * 60 * 1000));
-    const weedingHours = Math.max(0, timer.weeding / (60 * 60 * 1000));
+    const fmtHrs = (ms) => `${(Math.max(0, ms) / 3600000).toFixed(1)} hrs`;
     const speedModifier = getGrowthSpeedModifier(tileIndex);
-
-    return `Watering: ${wateringHours.toFixed(1)}h remaining\nWeeding: ${weedingHours.toFixed(1)}h remaining\nGrowth Speed: ${(speedModifier * 100).toFixed(0)}%`;
+    return `Watering: ${fmtHrs(timer.watering)}\nWeeding: ${fmtHrs(timer.weeding)}\nGrowth Speed: ${(speedModifier * 100).toFixed(0)}%`;
   };
 
   
@@ -398,7 +569,7 @@
       updateTileOverlays(tileIndex);
     });
 
-    console.log(`Accelerated watering/weeding timers by ${hours} hour(s)`);
+    
   };
 
   
@@ -422,7 +593,7 @@
   
   const startTimerMonitoring = () => {
     if (timerCheckInterval) return; 
-
+    dlog('startTimerMonitoring');
     timerCheckInterval = setInterval(checkAndUpdateTimers, TIMER_CHECK_INTERVAL);
     checkAndUpdateTimers(); 
   };
@@ -432,6 +603,9 @@
     if (timerCheckInterval) {
       clearInterval(timerCheckInterval);
       timerCheckInterval = null;
+      dlog('stopTimerMonitoring');
+      
+      persistTimersToState(true);
     }
   };
 
@@ -599,7 +773,7 @@
               window.fjFarm?.audio?.play?.('deny');
             }
           } catch(_) {}
-        }, { capture: true });
+        });
       }
       return btn;
     };
@@ -654,6 +828,9 @@
       transform: 'translateX(-12px)', opacity: '0',
       transition: 'transform 160ms cubic-bezier(.2,.9,.2,1), opacity 140ms ease',
     });
+    
+    bootstrapTimersFromFarm();
+    startTimerMonitoring();
     buildUI(host);
     host.appendChild(root);
     requestAnimationFrame(() => { root.style.transform = 'translateX(0)'; root.style.opacity = '1'; });
@@ -737,7 +914,7 @@
       }
     }
     
-    console.log(`Sold ${objectData.objectName} for ${sellPrice} coins (50% of ${baseCost})`);
+    
     try { window.fjFarm?.audio?.play?.('sell'); } catch(_) {}
     return true;
   };
@@ -761,7 +938,15 @@
     window.fjFarm?.coins?.add?.(sellPrice);
     
     
-    window.fjFarm?.state?.setPlant?.(tileIndex, null);
+  window.fjFarm?.state?.setPlant?.(tileIndex, null);
+  
+  
+  const t = tileTimers.get(tileIndex);
+  if (t) {
+    t.paused = true;
+    timersDirty = true;
+    persistTimersToState(true);
+  }
     
     
     const plantOverlay = tileElement?.querySelector?.('.plant-overlay');
@@ -769,13 +954,17 @@
       plantOverlay.remove();
     }
     
-    console.log(`Sold ${plantData.seedName} plant for ${sellPrice} coins (50% of ${seedCost})`);
+    
     try { window.fjFarm?.audio?.play?.('sell'); } catch(_) {}
     return true;
   };
 
+  let initialized = false;
   const init = () => {
+    if (initialized) return;
+    initialized = true;
     
+    bootstrapTimersFromFarm();
     startTimerMonitoring();
 
     
@@ -785,6 +974,11 @@
       } else {
         startTimerMonitoring();
       }
+    });
+
+    
+    window.addEventListener('beforeunload', () => {
+      try { persistTimersToState(true); } catch(_) {}
     });
   };
 
@@ -810,4 +1004,16 @@
     waterTile, 
     weedTile
   };
+
+  
+  if (typeof document !== 'undefined') {
+    if (document.readyState !== 'loading') {
+      setTimeout(() => { try { init(); } catch(_){} }, 0);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => { try { init(); } catch(_){} }, { once: true });
+    }
+  }
+
+  
+  
 })();

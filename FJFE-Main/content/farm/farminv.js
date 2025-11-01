@@ -115,6 +115,8 @@
 	};
 
 	
+	let suppressPrune = false; 
+
 	const removeFromSlot = (slotIndex, count = 1) => {
 		if (slotIndex < 0 || slotIndex >= inventorySlots.length || !inventorySlots[slotIndex]) return null;
 		
@@ -141,6 +143,8 @@
 	
 	const pruneEmptyTrailingRows = () => {
 		try {
+			
+			if (suppressPrune) return;
 			
 			try {
 				const interact = window.fjTweakerModules?.farminteract;
@@ -448,6 +452,8 @@
 					pickupCount = slot.count;
 				}
 				
+				
+				suppressPrune = true;
 				const pickedItem = removeFromSlot(slotIndex, pickupCount);
 				if (pickedItem) {
 					try { window.fjFarm?.audio?.play?.('click'); } catch(_) {}
@@ -467,6 +473,14 @@
 							`icons/farm/food/${pickedItem.item}.png`
 					};
 					interactModule.selectItem(selection, null);
+					
+					suppressPrune = false;
+					setTimeout(() => {
+						try {
+							const hasSel = window.fjTweakerModules?.farminteract?.hasSelection?.();
+							if (!hasSel) pruneEmptyTrailingRows();
+						} catch(_) {}
+					}, 0);
 				}
 			}
 		}

@@ -452,6 +452,21 @@
       window.fjfeFarmTT?.hide?.();
     } catch (_) {}
   };
+  
+  
+  let hoveredTileIndex = null;
+  const refreshTooltipForHoveredTile = () => {
+    try {
+      if (hoveredTileIndex == null) return;
+      const tileStrip = document.getElementById('fj-farm-tiles');
+      if (!tileStrip) return;
+      const tiles = Array.from(tileStrip.children);
+      const tile = tiles[hoveredTileIndex];
+      if (tile) {
+        showTileTooltip(tile, hoveredTileIndex);
+      }
+    } catch (_) {}
+  };
 
   
   const handleGlove = (tileElement, tileIndex) => {
@@ -1065,7 +1080,9 @@
         if (!interactModule?.hasSelection?.()) {
           hideTileTooltip();
         }
+        hoveredTileIndex = null;
       });
+      tile.addEventListener('mouseenter', () => { hoveredTileIndex = index; });
     });
   };
 
@@ -1106,7 +1123,7 @@
       if (!toolsModule) return;
       
       allPlantTiles.forEach(tileIndex => {
-        toolsModule.waterTile?.(tileIndex);
+        toolsModule.handleWateringTool?.('wcbasic', tileIndex, { silent: true });
       });
       
       console.log(`Watered ${allPlantTiles.length} crops`);
@@ -1124,7 +1141,7 @@
       if (!toolsModule) return;
       
       allPlantTiles.forEach(tileIndex => {
-        toolsModule.weedTile?.(tileIndex);
+        toolsModule.handleWeedingTool?.('weedbasic', tileIndex, { silent: true });
       });
       
       console.log(`Weeded ${allPlantTiles.length} crops`);
@@ -1172,6 +1189,7 @@
 
   window.fjTweakerModules = window.fjTweakerModules || {};
   window.fjTweakerModules[MODULE_KEY] = {
+  refreshTooltipForHoveredTile,
     init,
     getTileTips,
     open,

@@ -40,7 +40,7 @@
   let audioGain = null;
   let marqueeState = null; 
   let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, longVideo: false, metaNoIndex: false, any: false };
-  let hasLongVideoOver60 = false; 
+  let hasLongVideoOver61 = false; 
   const videoDurationCache = new Map(); 
   let badgeRepositionTimer = null;
   let badgeRepositionAttempts = 0;
@@ -50,6 +50,17 @@
       return chrome.runtime.getURL(resourcePath);
     }
     return resourcePath;
+  };
+
+  
+  const isNsfwPath = () => {
+    try {
+      const p = (window.location?.pathname || '').toLowerCase();
+      
+      return p.includes('/nsfw/');
+    } catch (_) {
+      return false;
+    }
   };
 
   const isElementSelected = (element, selectedClass) => {
@@ -111,22 +122,22 @@
   };
 
   const updateLongVideoFlagAndEvaluate = () => {
-    const prev = hasLongVideoOver60;
+    const prev = hasLongVideoOver61;
     
     let anyLong = false;
     try {
       for (const val of videoDurationCache.values()) {
         const dur = typeof val === 'number' ? val : (val === true ? 61 : 0);
-        if (dur > 60) { anyLong = true; break; }
+        if (dur >= 61) { anyLong = true; break; }
       }
       if (!anyLong) {
         document.querySelectorAll(VIDEO_TAG_SELECTOR).forEach((v) => {
-          if (v && isFinite(v.duration) && v.duration > 60) anyLong = true;
+          if (v && isFinite(v.duration) && v.duration >= 61) anyLong = true;
         });
       }
     } catch (_) {}
-    hasLongVideoOver60 = anyLong;
-    if (prev !== hasLongVideoOver60) {
+    hasLongVideoOver61 = anyLong;
+    if (prev !== hasLongVideoOver61) {
       evaluateState();
     }
   };
@@ -202,8 +213,8 @@
     const politicsWithoutPcLevel = isPoliticsSelected() && !isPcLevel2Selected() && !isPcLevel3Selected();
     const skin3WithoutSpicy = isSkinLevel3Selected() && !isSpicySelected();
     const otherWithSpicyOrMeta = isOtherMemesSelected() && (isSpicySelected() || isMetaSelected());
-    const multiViolation = hasMultiCategoryViolation();
-    const longVideoViolation = hasLongVideoOver60 && !isNoIndexPressed();
+  const multiViolation = hasMultiCategoryViolation();
+  const longVideoViolation = hasLongVideoOver61 && !isNoIndexPressed();
     const metaNeedsNoIndex = isMetaSelected() && !isNoIndexPressed();
     return {
       politics: politicsWithoutPcLevel,
@@ -236,6 +247,8 @@
 
   const canShowOverlayNow = () => {
     const settings = window.fjTweakerSettings || {};
+    
+    if (isNsfwPath()) return false;
     if (!settings.warnOnAll) return false;
     if (!currentConditionState.any) return false;
     if (hasRecentVoteElement() && !hasRepostBanner()) return false;
@@ -403,7 +416,7 @@
       messages.push('Multi-Category only allowed for Spicy and Meta');
     }
     if (state.longVideo) {
-      messages.push('Video over 60 seconds.');
+      messages.push('Video 61 seconds or longer.');
     }
     if (state.metaNoIndex) {
       messages.push('No-Index required for Meta.');
@@ -500,7 +513,8 @@
   const updateWarningBadge = (state) => {
     
     const settings = window.fjTweakerSettings || {};
-    const allowBadge = !!settings.misrateWarning && !!state?.any;
+    
+    const allowBadge = !isNsfwPath() && !!settings.misrateWarning && !!state?.any;
     if (!allowBadge) {
       if (warningBadge) {
         warningBadge.style.display = 'none';
@@ -692,6 +706,12 @@
   };
 
   const evaluateState = () => {
+    
+    if (isNsfwPath()) {
+      hideWarning();
+      updateWarningBadge({ any: false });
+      return;
+    }
     currentConditionState = computeConditionState();
     const allowOverlay = canShowOverlayNow();
     if (allowOverlay) showWarning(); else hideWarning();
@@ -865,6 +885,10 @@
       return;
     }
     if (window.location.hostname !== targetHost) {
+      return;
+    }
+    
+    if (isNsfwPath()) {
       return;
     }
     initialized = true;

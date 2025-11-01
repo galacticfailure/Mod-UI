@@ -40,14 +40,27 @@
   let audioGain = null;
   let marqueeState = null; 
   let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, longVideo: false, metaNoIndex: false, any: false };
-  let hasLongVideoOver60 = false; 
+  let hasLongVideoOver61 = false; 
   const videoDurationCache = new Map(); 
+  let badgeRepositionTimer = null;
+  let badgeRepositionAttempts = 0;
 
   const getResourceUrl = (resourcePath) => {
     if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
       return chrome.runtime.getURL(resourcePath);
     }
     return resourcePath;
+  };
+
+  
+  const isNsfwPath = () => {
+    try {
+      const p = (window.location?.pathname || '').toLowerCase();
+      
+      return p.includes('/nsfw/');
+    } catch (_) {
+      return false;
+    }
   };
 
   const isElementSelected = (element, selectedClass) => {
@@ -109,22 +122,22 @@
   };
 
   const updateLongVideoFlagAndEvaluate = () => {
-    const prev = hasLongVideoOver60;
+    const prev = hasLongVideoOver61;
     
     let anyLong = false;
     try {
       for (const val of videoDurationCache.values()) {
         const dur = typeof val === 'number' ? val : (val === true ? 61 : 0);
-        if (dur > 60) { anyLong = true; break; }
+        if (dur >= 61) { anyLong = true; break; }
       }
       if (!anyLong) {
         document.querySelectorAll(VIDEO_TAG_SELECTOR).forEach((v) => {
-          if (v && isFinite(v.duration) && v.duration > 60) anyLong = true;
+          if (v && isFinite(v.duration) && v.duration >= 61) anyLong = true;
         });
       }
     } catch (_) {}
-    hasLongVideoOver60 = anyLong;
-    if (prev !== hasLongVideoOver60) {
+    hasLongVideoOver61 = anyLong;
+    if (prev !== hasLongVideoOver61) {
       evaluateState();
     }
   };
@@ -200,8 +213,8 @@
     const politicsWithoutPcLevel = isPoliticsSelected() && !isPcLevel2Selected() && !isPcLevel3Selected();
     const skin3WithoutSpicy = isSkinLevel3Selected() && !isSpicySelected();
     const otherWithSpicyOrMeta = isOtherMemesSelected() && (isSpicySelected() || isMetaSelected());
-    const multiViolation = hasMultiCategoryViolation();
-    const longVideoViolation = hasLongVideoOver60 && !isNoIndexPressed();
+  const multiViolation = hasMultiCategoryViolation();
+  const longVideoViolation = hasLongVideoOver61 && !isNoIndexPressed();
     const metaNeedsNoIndex = isMetaSelected() && !isNoIndexPressed();
     return {
       politics: politicsWithoutPcLevel,
@@ -234,6 +247,8 @@
 
   const canShowOverlayNow = () => {
     const settings = window.fjTweakerSettings || {};
+    
+    if (isNsfwPath()) return false;
     if (!settings.warnOnAll) return false;
     if (!currentConditionState.any) return false;
     if (hasRecentVoteElement() && !hasRepostBanner()) return false;
@@ -401,7 +416,7 @@
       messages.push('Multi-Category only allowed for Spicy and Meta');
     }
     if (state.longVideo) {
-      messages.push('Video over 60 seconds.');
+      messages.push('Video 61 seconds or longer.');
     }
     if (state.metaNoIndex) {
       messages.push('No-Index required for Meta.');
@@ -414,19 +429,41 @@
       return;
     }
     
-    let target = document.querySelector(OTHER_MEMES_SELECTOR);
+    const isElementVisible = (el) => {
+      if (!el || !el.isConnected) return false;
+      try {
+        const style = window.getComputedStyle(el);
+        if (!style || style.display === 'none' || style.visibility === 'hidden') return false;
+        const rects = el.getClientRects?.();
+        if (rects && rects.length === 0) return false;
+      } catch (_) {}
+      return true;
+    };
+
+    const findVisible = (selector) => {
+      const nodes = document.querySelectorAll(selector);
+      for (const n of nodes) {
+        if (isElementVisible(n)) return n;
+      }
+      return nodes[0] || null;
+    };
+
+    
+    let target = findVisible(`${OTHER_MEMES_SELECTOR}, span[data-id="6"]`);
     if (!target) {
-      
-      target = document.querySelector('span[data-id="6"]');
+      target = findVisible(CATEGORY_SELECTOR);
     }
+
     
     let container = null;
-    if (target && target.parentNode) {
-      container = target.parentNode;
+    if (target && target.parentElement) {
+      container = target.parentElement;
     } else {
-      container = document.getElementById('catControls') || document.querySelector('#catControls') || null;
+      const catControls = document.getElementById('catControls') || document.querySelector('#catControls');
+      container = isElementVisible(catControls) ? catControls : null;
     }
-    if ((!target && !container) || (container && container.offsetParent === null)) {
+
+    if (!target && !container) {
       
       warningBadge.style.display = 'none';
       if (warningBadge.parentNode) {
@@ -434,7 +471,7 @@
       }
       return;
     }
-    
+
     try {
       if (target && target.parentNode) {
         if (target.nextSibling !== warningBadge) {
@@ -446,17 +483,38 @@
         }
       }
     } catch (_) {}
-    
+
     warningBadge.style.position = 'static';
     warningBadge.style.top = '';
     warningBadge.style.left = '';
     warningBadge.style.display = 'inline-block';
   };
 
+  const scheduleBadgeReposition = () => {
+    if (!warningBadge || warningBadge.style.display === 'none') return;
+    if (badgeRepositionTimer) {
+      try { clearTimeout(badgeRepositionTimer); } catch (_) {}
+      badgeRepositionTimer = null;
+    }
+    badgeRepositionAttempts = 0;
+    const tick = () => {
+      positionWarningBadge();
+      badgeRepositionAttempts += 1;
+      if (badgeRepositionAttempts < 6) {
+        badgeRepositionTimer = setTimeout(tick, 100);
+      } else {
+        badgeRepositionTimer = null;
+      }
+    };
+    
+    tick();
+  };
+
   const updateWarningBadge = (state) => {
     
     const settings = window.fjTweakerSettings || {};
-    const allowBadge = !!settings.misrateWarning && !!state?.any;
+    
+    const allowBadge = !isNsfwPath() && !!settings.misrateWarning && !!state?.any;
     if (!allowBadge) {
       if (warningBadge) {
         warningBadge.style.display = 'none';
@@ -648,6 +706,12 @@
   };
 
   const evaluateState = () => {
+    
+    if (isNsfwPath()) {
+      hideWarning();
+      updateWarningBadge({ any: false });
+      return;
+    }
     currentConditionState = computeConditionState();
     const allowOverlay = canShowOverlayNow();
     if (allowOverlay) showWarning(); else hideWarning();
@@ -707,6 +771,8 @@
           scanVideosForDuration();
         }
         evaluateState();
+        positionWarningBadge();
+        scheduleBadgeReposition();
         return;
       }
       if (mutation.type === 'childList') {
@@ -716,12 +782,16 @@
               scanVideosForDuration();
             }
             evaluateState();
+            positionWarningBadge();
+            scheduleBadgeReposition();
             return;
           }
         }
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement && (matchesRelevantElement(node) || matchesVoteOrRepost(node) || node.querySelector?.(POLITICS_SELECTOR) || node.querySelector?.(SPICY_SELECTOR) || node.querySelector?.(META_SELECTOR) || node.querySelector?.(CATEGORY_SELECTOR) || node.querySelector?.(`#${PC_LEVEL_2_ID}`) || node.querySelector?.(`#${PC_LEVEL_3_ID}`) || node.querySelector?.(`#${SKIN_LEVEL_3_ID}`) || node.querySelector?.(`#${HEADER_ID}`) || node.querySelector?.(NO_INDEX_BUTTON_SELECTOR) || node.querySelector?.(VIDEO_ANCHOR_SELECTOR) || node.querySelector?.(VIDEO_TAG_SELECTOR))) {
             evaluateState();
+            positionWarningBadge();
+            scheduleBadgeReposition();
             return;
           }
         }
@@ -772,6 +842,8 @@
         
         scanVideosForDuration();
         evaluateState();
+        positionWarningBadge();
+        scheduleBadgeReposition();
       }, 50);
     }
   };
@@ -815,6 +887,10 @@
     if (window.location.hostname !== targetHost) {
       return;
     }
+    
+    if (isNsfwPath()) {
+      return;
+    }
     initialized = true;
     evaluateState();
     scanVideosForDuration();
@@ -832,6 +908,10 @@
         warningBadge.remove();
         warningBadge = null;
         lastBadgeMessage = '';
+      }
+      if (badgeRepositionTimer) {
+        try { clearTimeout(badgeRepositionTimer); } catch (_) {}
+        badgeRepositionTimer = null;
       }
     });
   };
