@@ -6,6 +6,7 @@
   const AUTO_REFRESH_KEY = '__fj_apichk_last_auto_refresh__';
   const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
   const AUTO_RETRY_MS = 60 * 60 * 1000; 
+  const EXCLUDED_USERNAMES = ['galacticfailure', 'gubbels'];
 
   
   const REFRESH_WINDOW_MS = 5 * 60 * 1000; 
@@ -13,7 +14,7 @@
   const REFRESH_WINDOW_START_KEY = '__fj_apichk_refresh_window_start__';
   const REFRESH_USES_LEFT_KEY = '__fj_apichk_refresh_uses_left__';
 
-  let cached = { username: null, rankText: null, level: null, fetchedAt: 0, fetched: false };
+  let cached = { username: null, rankText: null, level: null, excluded: false, fetchedAt: 0, fetched: false };
   let autoRefreshTimer = null;
 
   const isAuthorized = () => {
@@ -21,9 +22,45 @@
     return Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined'));
   };
 
+  const getLevel = () => {
+    if (!cached) return null;
+    if (typeof cached.level === 'number') return cached.level;
+    const parsed = parseInt(cached.level, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalizeUsername = (username) => {
+    if (!username || typeof username !== 'string') return '';
+    return username.trim().toLowerCase();
+  };
+
+  const isUsernameExcluded = (username) => {
+    const normalized = normalizeUsername(username);
+    if (!normalized) return false;
+    return EXCLUDED_USERNAMES.some((entry) => normalizeUsername(entry) === normalized);
+  };
+
+  const isExcluded = () => {
+    return Boolean(isUsernameExcluded(cached && cached.username));
+  };
+
+  const isRestricted = () => {
+    const level = getLevel();
+    if (!isAuthorized()) return false;
+    if (isExcluded()) return false;
+    return level === 1;
+  };
+
   const dispatchStatus = () => {
     try {
-      const detail = { authorized: isAuthorized(), username: cached.username || null, rankText: cached.rankText || null, level: cached.level || null };
+      const detail = {
+        authorized: isAuthorized(),
+        username: cached.username || null,
+        rankText: cached.rankText || null,
+        level: getLevel(),
+        restricted: isRestricted(),
+        excluded: isExcluded()
+      };
       document.dispatchEvent(new CustomEvent('fjApichkStatus', { detail }));
     } catch (_) {}
   };
@@ -113,7 +150,8 @@
       if (!obj || typeof obj !== 'object') return null;
       const age = Date.now() - (obj.fetchedAt || 0);
       if (age >= CACHE_TTL_MS) return null;
-      return obj;
+      const excluded = isUsernameExcluded(obj.username);
+      return { ...obj, excluded };
     } catch (_) {
       return null;
     }
@@ -122,7 +160,7 @@
 
   const saveCache = (obj) => {
     try {
-      const toSave = { ...obj, fetchedAt: Date.now() };
+      const toSave = { ...obj, excluded: Boolean(obj && obj.excluded), fetchedAt: Date.now() };
       localStorage.setItem(CACHE_KEY, JSON.stringify(toSave));
     } catch (_) {}
   };
@@ -131,7 +169,8 @@
     if (!force) {
       const fromStore = loadCache();
       if (fromStore) {
-        cached = { ...fromStore, fetched: true };
+        const excluded = isUsernameExcluded(fromStore.username);
+        cached = { ...fromStore, excluded, fetched: true };
         dispatchStatus();
         return cached;
       }
@@ -140,7 +179,7 @@
     try {
       const username = await getUsername();
       if (!username) {
-        cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
+        cached = { username: null, rankText: null, level: null, excluded: false, fetchedAt: Date.now(), fetched: true };
         saveCache(cached);
         dispatchStatus();
         return cached;
@@ -149,12 +188,13 @@
       const entry = findRankForUser(list, username);
       const rankText = entry && entry.rank ? String(entry.rank) : null;
       const level = extractLevel(rankText);
-      cached = { username, rankText, level, fetchedAt: Date.now(), fetched: true };
+      const excluded = isUsernameExcluded(username);
+      cached = { username, rankText, level, excluded, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
       dispatchStatus();
       return cached;
     } catch (e) {
-      cached = { username: null, rankText: null, level: null, fetchedAt: Date.now(), fetched: true };
+      cached = { username: null, rankText: null, level: null, excluded: false, fetchedAt: Date.now(), fetched: true };
       saveCache(cached);
       dispatchStatus();
       return cached;
@@ -413,7 +453,10 @@
   window.fjApichk = {
     ensureFetched: ensureRankFetched,
     isAuthorized,
-    getCached: () => ({ ...cached }),
+    isRestricted,
+    isExcluded,
+  getLevel,
+  getCached: () => ({ ...cached, level: getLevel(), excluded: isExcluded() }),
     canUseManualRefresh,
     requestManualRefresh: async () => {
       const st = canUseManualRefresh();

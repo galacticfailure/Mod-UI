@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Phaser FJ Feature Extender",
     "description": "Bunch of helper stuff.",
-    "version": "0.5.4",
+    "version": "0.5.9",
     "browser_specific_settings": {
         "gecko": {
             "id": "phaser-fj-tweaker@nonsense.com",
@@ -37,6 +37,7 @@
                 "content/farm/farminv.js",
                 "content/farm/farmset.js",
                 "content/ratetrack.js",
+                "content/hunt.js",
                 "content/sccustom.js",
                 "content/userpop.js",
                 "content/nextmove.js",
@@ -78,6 +79,7 @@
         "icons/farm/plants/*",
         "icons/farm/tools/*",
         "icons/farm/objects/*",
-        "icons/farm/sounds/*"
+        "icons/farm/sounds/*",
+        "content/farm/farmdebug-page.js"
     ]
 }

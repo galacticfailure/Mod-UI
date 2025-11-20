@@ -4,6 +4,219 @@
   
   const log = (..._args) => {  };
 
+  const FARM_DATA_KEY = 'fjFarmData';
+  const FARM_DATA_BACKUP_KEY = 'fjFarmDataBackup';
+  const FARM_META_KEY = 'fjFarmDataMeta';
+  const FARM_STORAGE_KEYS = [FARM_DATA_KEY, FARM_DATA_BACKUP_KEY, FARM_META_KEY];
+
+  const simpleHashString = (input) => {
+    if (typeof input !== 'string') return null;
+    let hash = 0;
+    for (let i = 0; i < input.length; i += 1) {
+      hash = ((hash << 5) - hash) + input.charCodeAt(i);
+      hash |= 0;
+    }
+    return `h${(hash >>> 0).toString(16).padStart(8, '0')}`;
+  };
+
+  const safeJsonParseQuiet = (raw) => {
+    if (typeof raw !== 'string' || raw.length === 0) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const safeDeepClone = (value) => {
+    try {
+      if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+      }
+    } catch (_) {}
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return value;
+    }
+  };
+
+  const summarizeFarmDataSnapshot = (data) => {
+    if (!data || typeof data !== 'object') return null;
+    const tileArray = Array.isArray(data.tileTypes) ? data.tileTypes : [];
+    const tileTypeCounts = {};
+    const nonBaseSamples = [];
+    for (let i = 0; i < tileArray.length; i += 1) {
+      const value = tileArray[i];
+      tileTypeCounts[value] = (tileTypeCounts[value] || 0) + 1;
+      if (value && value !== 'dirt' && nonBaseSamples.length < 25) {
+        nonBaseSamples.push({ index: i, value });
+      }
+    }
+    const collectKeys = (obj) => (obj && typeof obj === 'object') ? Object.keys(obj) : [];
+    const plantKeys = collectKeys(data.plantPositions).sort();
+    const objectKeys = collectKeys(data.objectPositions).sort();
+    return {
+      coins: typeof data.coins === 'number' ? data.coins : null,
+      expansions: typeof data.expansions === 'number' ? data.expansions : null,
+      tileCount: tileArray.length,
+      tilledCount: tileTypeCounts.tilled || 0,
+      tileTypeCounts,
+      nonBaseTileSamples: nonBaseSamples,
+      plantCount: plantKeys.length,
+      plantKeysSample: plantKeys.slice(0, 25),
+      objectCount: objectKeys.length,
+      objectKeysSample: objectKeys.slice(0, 25),
+      inventorySlots: Array.isArray(data.inventorySlots) ? data.inventorySlots.length : (data.inventorySlots === null ? null : undefined),
+      cookSlotCount: collectKeys(data.cookSlots).length,
+      maintenanceTimerKeys: collectKeys(data.maintenanceTimers).sort(),
+      seenItemsCount: collectKeys(data.seenItems).length,
+      toolUnlockCount: collectKeys(data.toolUnlocks).length,
+      craftedEntryCount: collectKeys(data.craftedEntries).length
+    };
+  };
+
+  const captureFarmDataForSerialization = () => {
+    return {
+      coins,
+      tileTypes: safeDeepClone(tileTypes),
+      plantPositions: safeDeepClone(plantPositions),
+      objectPositions: safeDeepClone(objectPositions),
+      expansions,
+      inventorySlots: safeDeepClone(inventorySlots),
+      cookSlots: safeDeepClone(cookSlots),
+      cookUnlocks: safeDeepClone(cookUnlocks),
+      seenItems: safeDeepClone(seenItems),
+      craftedEntries: safeDeepClone(craftedEntries),
+      toolUnlocks: safeDeepClone(toolUnlocks),
+      maintenanceTimers: safeDeepClone(maintenanceTimers),
+      version: 1
+    };
+  };
+
+  const diffKeySets = (prev = [], next = []) => {
+    const removed = prev.filter((k) => !next.includes(k));
+    const added = next.filter((k) => !prev.includes(k));
+    return { added, removed };
+  };
+
+  const diffFarmDataSnapshots = (prev, next) => {
+    if (!prev) return { previous: null, nextSummary: summarizeFarmDataSnapshot(next) };
+    const prevTiles = Array.isArray(prev.tileTypes) ? prev.tileTypes : [];
+    const nextTiles = Array.isArray(next.tileTypes) ? next.tileTypes : [];
+    const maxLen = Math.max(prevTiles.length, nextTiles.length);
+    let tileChanges = 0;
+    const tileSamples = [];
+    for (let i = 0; i < maxLen; i += 1) {
+      const a = prevTiles[i];
+      const b = nextTiles[i];
+      if (a !== b) {
+        tileChanges += 1;
+        if (tileSamples.length < 25) tileSamples.push({ index: i, from: a, to: b });
+      }
+    }
+    const prevPlantKeys = prev.plantPositions && typeof prev.plantPositions === 'object' ? Object.keys(prev.plantPositions).sort() : [];
+    const nextPlantKeys = next.plantPositions && typeof next.plantPositions === 'object' ? Object.keys(next.plantPositions).sort() : [];
+    const prevObjectKeys = prev.objectPositions && typeof prev.objectPositions === 'object' ? Object.keys(prev.objectPositions).sort() : [];
+    const nextObjectKeys = next.objectPositions && typeof next.objectPositions === 'object' ? Object.keys(next.objectPositions).sort() : [];
+    return {
+      previousSummary: summarizeFarmDataSnapshot(prev),
+      nextSummary: summarizeFarmDataSnapshot(next),
+      tileChanges,
+      tileChangeSamples: tileSamples,
+      plantKeyDiff: diffKeySets(prevPlantKeys, nextPlantKeys),
+      objectKeyDiff: diffKeySets(prevObjectKeys, nextObjectKeys)
+    };
+  };
+
+  const logFarmStorageMutation = () => {};
+
+  let lastSavedDataObject = null;
+  let lastSavedSummary = null;
+  let lastSavedHash = null;
+  let lastSaveStamp = null;
+  let lastSaveReason = null;
+  let lastLoadedSummary = null;
+
+  const logStorageInstrumentationGroup = (_title, cb) => {
+    if (typeof cb === 'function') cb();
+  };
+
+  const STORAGE_TIMELINE_SESSION_KEY = 'fjFarmDebugTimeline';
+  const STORAGE_TIMELINE_MAX = 400;
+  let storageTimeline = [];
+  let currentTabIdRef = null;
+
+  const getTabIdForTimeline = () => currentTabIdRef;
+
+  const sanitizeSnapshotForTimeline = (snapshot) => {
+    if (!snapshot) return null;
+    return {
+      exists: snapshot.exists,
+      bytes: snapshot.bytes,
+      hash: snapshot.hash,
+      summary: snapshot.summary,
+      meta: snapshot.meta,
+      preview: snapshot.preview
+    };
+  };
+
+  const persistStorageTimeline = () => {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      sessionStorage.setItem(STORAGE_TIMELINE_SESSION_KEY, JSON.stringify(storageTimeline));
+    } catch (_) {}
+  };
+
+  const clearStorageTimeline = () => {
+    try {
+      storageTimeline = [];
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(STORAGE_TIMELINE_SESSION_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const recordStorageTimelineEvent = (event) => {
+    try {
+      const entry = {
+        ...event,
+        stamp: new Date().toISOString(),
+        tabId: getTabIdForTimeline(),
+        location: typeof window !== 'undefined' ? window.location?.href || null : null
+      };
+      storageTimeline.push(entry);
+      if (storageTimeline.length > STORAGE_TIMELINE_MAX) {
+        storageTimeline = storageTimeline.slice(storageTimeline.length - STORAGE_TIMELINE_MAX);
+      }
+      persistStorageTimeline();
+    } catch (_) {}
+  };
+
+  const restoreStorageTimeline = () => {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      const raw = sessionStorage.getItem(STORAGE_TIMELINE_SESSION_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        storageTimeline = parsed;
+      }
+    } catch (_) {}
+  };
+
+  restoreStorageTimeline();
+
+  const instrumentStorageGlobals = () => {};
+
+  const installChromeStorageChangeMonitor = () => {};
+
+  const startFarmStorageStateWatcher = () => {};
+
+  instrumentStorageGlobals();
+  installChromeStorageChangeMonitor();
+  startFarmStorageStateWatcher();
+
   let overlayEl = null;
   let panelEl = null;
   let repositionTimer = null;
@@ -27,6 +240,7 @@
   } catch(_) {
     TAB_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
   }
+  currentTabIdRef = TAB_ID;
   let isFocusLocked = false; 
   let focusOverlayEl = null; 
   let switchFocusBtnEl = null;
@@ -89,6 +303,19 @@
       btnWrap.appendChild(switchFocusBtnEl);
       focusOverlayEl.appendChild(btnWrap);
       panelEl.appendChild(focusOverlayEl);
+    }
+
+    if (foundBeeBox) {
+      try {
+        window.fjTweakerModules?.farmtile?.ensureBeeBoxMonitor?.();
+        window.fjTweakerModules?.farmtile?.refreshBeeBoxes?.();
+      } catch (_) {}
+    }
+    if (foundRainBarrel) {
+      try {
+        window.fjTweakerModules?.farmtile?.ensureRainBarrelMonitor?.();
+        window.fjTweakerModules?.farmtile?.refreshRainBarrels?.();
+      } catch (_) {}
     }
   };
   const lockUI = () => {
@@ -167,6 +394,8 @@
   
   
   let maintenanceTimers = {};
+  let foundBeeBox = false;
+  let foundRainBarrel = false;
   
   
   const OBJECT_SIZES = {
@@ -176,8 +405,19 @@
     small_pond: { width: 3, height: 3 },
     arch: { width: 2, height: 2 },
     gazebo: { width: 3, height: 3 },
+    tree: { width: 3, height: 3 },
+    lamp_post: { width: 1, height: 2 },
     
   };
+
+  const COMPOST_BIN_KEY = 'compost_bin';
+  const COMPOST_BIN_FULL_THRESHOLD = 300;
+  const BEE_BOX_KEY = 'beebox';
+  const BEE_BOX_ICON_EMPTY = 'bee_box_empty';
+  const BEE_BOX_ICON_FULL = 'bee_box_full';
+  const RAIN_BARREL_KEY = 'rain_barrel';
+  const RAIN_BARREL_ICON_EMPTY = 'rain_barrel_empty';
+  const RAIN_BARREL_ICON_FULL = 'rain_barrel_full';
   
   const getObjectSize = (objectName) => {
     return OBJECT_SIZES[objectName] || { width: 1, height: 1 };
@@ -189,7 +429,7 @@
       const nv = Math.max(0, Math.floor(Number(v)||0));
       if (nv === coins) return coins;
       coins = nv;
-      saveFarmData(); 
+      saveFarmData('coins.set'); 
       try {
         window.dispatchEvent(new CustomEvent('fjFarmCoinsChanged', { detail: { coins } }));
       } catch(_) {}
@@ -199,51 +439,138 @@
   };
 
   
-  const saveFarmData = () => {
+  const captureCallSiteReason = (fallback) => {
     try {
-      
-      try { if (!isFocusedTab()) return; } catch(_) {}
-      const farmData = {
-        coins,
-        tileTypes,
-        plantPositions,
-        objectPositions,
-        expansions,
-        inventorySlots,
-        cookSlots,
-        cookUnlocks,
-        seenItems,
-        craftedEntries,
-        toolUnlocks,
-        maintenanceTimers,
-        version: 1
-      };
+      const err = new Error('capture reason');
+      if (!err.stack) return fallback;
+      const lines = String(err.stack).split(/\r?\n/);
+      const interesting = [];
+      for (const line of lines) {
+        if (!line) continue;
+        const norm = line.trim();
+        if (!norm) continue;
+        if (norm.includes('capture reason')) continue;
+        if (norm.includes('captureCallSiteReason')) continue;
+        if (norm.includes('saveFarmData')) continue;
+        interesting.push(norm);
+        return `${fallback} :: ${norm}`;
+      }
+      if (interesting.length === 0 && lines.length) {
+        return fallback;
+      }
+    } catch (_) {}
+    return fallback;
+  };
+
+  const saveFarmData = (reasonInput = 'unspecified') => {
+    const reason = reasonInput === 'unspecified' ? captureCallSiteReason(reasonInput) : reasonInput;
+    const stamp = new Date().toISOString();
+    let focusAllowed = true;
+    try {
+      try {
+        if (!isFocusedTab()) {
+          focusAllowed = false;
+          let documentHasFocus = false;
+          try {
+            if (typeof document !== 'undefined' && typeof document.hasFocus === 'function') {
+              documentHasFocus = Boolean(document.hasFocus());
+            }
+          } catch (_) {}
+
+          if (documentHasFocus) {
+            recordStorageTimelineEvent({
+              source: 'saveFarmData',
+              operation: 'focus-auto-claim',
+              context: 'focus',
+              reason,
+              note: 'document.hasFocus true while focus key mismatched'
+            });
+            try {
+              setFocusedTab();
+              focusAllowed = true;
+            } catch (_) {
+              focusAllowed = true;
+            }
+          }
+
+          if (!focusAllowed) {
+            recordStorageTimelineEvent({
+              source: 'saveFarmData',
+              operation: 'focus-abort',
+              context: 'focus',
+              reason,
+              note: 'focused tab id mismatch'
+            });
+            return;
+          }
+        }
+      } catch (_) {}
+
+      const farmData = captureFarmDataForSerialization();
+      const farmSummary = summarizeFarmDataSnapshot(farmData);
+      const diffFromPrevious = diffFarmDataSnapshots(lastSavedDataObject, farmData);
       const payload = JSON.stringify(farmData);
-      
-      localStorage.setItem('fjFarmData', payload);
-      
-      try { localStorage.setItem('fjFarmDataBackup', payload); } catch(_) {}
-      
-      try { if (typeof chrome !== 'undefined' && chrome.storage?.local) chrome.storage.local.set({ fjFarmData: farmData, fjFarmDataBackup: farmData }); } catch(_) {}
-      console.log('Saved farm data:', farmData);
-    } catch(e) {
-      console.warn('Failed to save farm data:', e);
-    }
+      const payloadHash = simpleHashString(payload);
+      const sizeBytes = payload ? new Blob([payload]).size : 0;
+      const meta = {
+        stamp,
+        reason,
+        tabId: TAB_ID,
+        isFocusedTab: focusAllowed,
+        bytes: sizeBytes,
+        stringLength: payload?.length ?? 0,
+        payloadHash,
+        summary: farmSummary,
+        diffPreview: diffFromPrevious && typeof diffFromPrevious.tileChanges === 'number' ? {
+          tileChanges: diffFromPrevious.tileChanges,
+          tileChangeSamples: diffFromPrevious.tileChangeSamples,
+          plantKeyDiff: diffFromPrevious.plantKeyDiff,
+          objectKeyDiff: diffFromPrevious.objectKeyDiff
+        } : null
+      };
+
+      try {
+        localStorage.setItem('fjFarmData', payload);
+      } catch (_) {}
+
+      try {
+        localStorage.setItem('fjFarmDataBackup', payload);
+      } catch (_) {}
+
+      try {
+        localStorage.setItem(FARM_META_KEY, JSON.stringify(meta));
+      } catch (_) {}
+
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local?.set) {
+          const chromePayload = safeDeepClone(farmData);
+          const chromePayloadBackup = safeDeepClone(farmData);
+          chrome.storage.local.set({ fjFarmData: chromePayload, fjFarmDataBackup: chromePayloadBackup, fjFarmDataMeta: meta }, () => {
+            chrome.runtime?.lastError;
+          });
+        }
+      } catch (_) {}
+
+      lastSavedDataObject = safeDeepClone(farmData);
+      lastSavedSummary = farmSummary;
+      lastSavedHash = payloadHash;
+      lastSaveStamp = stamp;
+      lastSaveReason = reason;
+    } catch(_) {}
   };
 
   const loadFarmData = () => {
     try {
-      const storedStr = localStorage.getItem('fjFarmData') || localStorage.getItem('fjFarmDataBackup');
+      const primaryRaw = localStorage.getItem('fjFarmData');
+      const backupRaw = localStorage.getItem('fjFarmDataBackup');
+      const storedStr = primaryRaw || backupRaw;
       if (!storedStr) {
-        console.log('No saved farm data found in localStorage. Attempting extension storage...');
         try {
           if (typeof chrome !== 'undefined' && chrome.storage?.local) {
             chrome.storage.local.get(['fjFarmData','fjFarmDataBackup'], (res) => {
               try {
                 const fromExt = res?.fjFarmData || res?.fjFarmDataBackup || null;
                 if (fromExt && fromExt.version === 1) {
-                  console.log('Restored farm data from extension storage');
-                  
                   if (typeof fromExt.coins === 'number' && fromExt.coins >= 0) coins = fromExt.coins;
                   if (Array.isArray(fromExt.tileTypes) && fromExt.tileTypes.length >= 8) tileTypes = fromExt.tileTypes;
                   if (fromExt.plantPositions && typeof fromExt.plantPositions === 'object') plantPositions = fromExt.plantPositions;
@@ -267,12 +594,13 @@
       }
       
       const farmData = JSON.parse(storedStr);
+      simpleHashString(storedStr);
+      summarizeFarmDataSnapshot(farmData);
       if (!farmData || farmData.version !== 1) {
-        console.warn('Invalid or outdated farm data');
         return;
       }
-      
-      console.log('Loading farm data:', farmData);
+      Array.isArray(farmData.tileTypes) ? farmData.tileTypes.filter((t) => t === 'tilled').length : null;
+      diffFarmDataSnapshots(captureFarmDataForSerialization(), farmData);
       
       
       if (typeof farmData.coins === 'number' && farmData.coins >= 0) {
@@ -282,19 +610,16 @@
       
       if (Array.isArray(farmData.tileTypes) && farmData.tileTypes.length >= 8) {
         tileTypes = farmData.tileTypes;
-        console.log(`Loaded ${tileTypes.length} tiles:`, tileTypes);
       }
       
       
       if (farmData.plantPositions && typeof farmData.plantPositions === 'object') {
         plantPositions = farmData.plantPositions;
-        console.log('Loaded plants:', plantPositions);
       }
       
       
       if (farmData.objectPositions && typeof farmData.objectPositions === 'object') {
         objectPositions = farmData.objectPositions;
-        console.log('Loaded objects:', objectPositions);
       }
       
       if (farmData.cookUnlocks && typeof farmData.cookUnlocks === 'object') {
@@ -320,24 +645,20 @@
       
       if (typeof farmData.expansions === 'number' && farmData.expansions >= 0) {
         expansions = farmData.expansions;
-        console.log(`Loaded ${expansions} expansions`);
       }
       
       if (Array.isArray(farmData.inventorySlots)) {
         inventorySlots = farmData.inventorySlots;
-        console.log(`Loaded inventory with ${inventorySlots.length} slots`);
       }
       
       if (farmData.cookSlots && typeof farmData.cookSlots === 'object') {
         cookSlots = farmData.cookSlots;
-        console.log(`Loaded ${Object.keys(cookSlots).length} cooking slots`);
       }
       
       try { window.dispatchEvent(new CustomEvent('fjFarmDataLoaded', { detail: farmData })); } catch(_) {}
+      lastLoadedSummary = summarizeFarmDataSnapshot(captureFarmDataForSerialization());
       
-    } catch(e) {
-      console.warn('Failed to load farm data:', e);
-    }
+    } catch(_) {}
   };
 
   
@@ -346,31 +667,28 @@
     setTileType: (index, type) => {
       if (index >= 0 && index < tileTypes.length) {
         tileTypes[index] = type;
-        saveFarmData();
-        console.log(`Saved tile ${index} as ${type}`);
+        saveFarmData('tileType.set');
       }
     },
     getPlant: (index) => plantPositions[index] || null,
     setPlant: (index, plantData) => {
       if (plantData) {
         plantPositions[index] = plantData;
-        console.log(`Saved plant ${plantData.seedName} at tile ${index}`);
+        saveFarmData('plant.set');
       } else {
         delete plantPositions[index];
-        console.log(`Removed plant from tile ${index}`);
+        saveFarmData('plant.clear');
       }
-      saveFarmData();
     },
     getObject: (index) => objectPositions[index] || null,
     setObject: (index, objectData) => {
       if (objectData) {
         objectPositions[index] = objectData;
-        console.log(`Saved object ${objectData.objectName} at tile ${index}`);
+        saveFarmData('object.set');
       } else {
         delete objectPositions[index];
-        console.log(`Removed object from tile ${index}`);
+        saveFarmData('object.clear');
       }
-      saveFarmData();
     },
     getAllTileTypes: () => [...tileTypes],
     getAllPlants: () => ({...plantPositions}),
@@ -382,11 +700,9 @@
       try {
         if (map && typeof map === 'object') {
           maintenanceTimers = { ...map };
-          saveFarmData();
+          saveFarmData('maintenanceTimers.set');
         }
-      } catch (e) {
-        console.warn('Failed to set maintenance timers:', e);
-      }
+      } catch (_) {}
     },
     
     getInventory: () => inventorySlots,
@@ -394,12 +710,9 @@
       try {
         if (Array.isArray(slots)) {
           inventorySlots = slots;
-          saveFarmData();
-          console.log(`Saved inventory with ${slots.length} slots`);
+          saveFarmData('inventory.set');
         }
-      } catch (e) {
-        console.warn('Failed to set inventory:', e);
-      }
+      } catch (_) {}
     },
     
     getCookSlots: () => ({ ...cookSlots }),
@@ -407,12 +720,9 @@
       try {
         if (map && typeof map === 'object') {
           cookSlots = { ...map };
-          saveFarmData();
-          console.log(`Saved ${Object.keys(cookSlots).length} cooking slots`);
+          saveFarmData('cookSlots.set');
         }
-      } catch (e) {
-        console.warn('Failed to set cooking slots:', e);
-      }
+      } catch (_) {}
     },
     
     getCookUnlocks: () => ({ ...cookUnlocks }),
@@ -423,10 +733,10 @@
         if (!k) return false;
         if (!cookUnlocks[k]) {
           cookUnlocks[k] = true;
-          saveFarmData();
+          saveFarmData('cookUnlocks.unlock');
         }
         return true;
-      } catch(e) { console.warn('Failed to unlock cooking section:', e); return false; }
+      } catch(_) { return false; }
     },
     
     hasSeenItem: (name) => {
@@ -437,9 +747,9 @@
       try {
         const k = String(name||'').trim().toLowerCase().replace(/\s+/g,'_');
         if (!k) return false;
-        if (!seenItems[k]) { seenItems[k] = 1; saveFarmData(); }
+        if (!seenItems[k]) { seenItems[k] = 1; saveFarmData('seenItems.mark'); }
         return true;
-      } catch(e) { console.warn('Failed to mark seen item:', e); return false; }
+      } catch(_) { return false; }
     },
     getSeenItems: () => Object.keys(seenItems),
     hasCraftedEntry: (name) => {
@@ -450,9 +760,9 @@
       try {
         const k = String(name||'').trim().toLowerCase().replace(/\s+/g,'_');
         if (!k) return false;
-        if (!craftedEntries[k]) { craftedEntries[k] = 1; saveFarmData(); }
+        if (!craftedEntries[k]) { craftedEntries[k] = 1; saveFarmData('craftedEntries.mark'); }
         return true;
-      } catch(e) { console.warn('Failed to mark crafted entry:', e); return false; }
+      } catch(_) { return false; }
     }
     ,
     
@@ -464,9 +774,9 @@
       try {
         const k = String(name||'').trim().toLowerCase();
         if (!k) return false;
-        if (!toolUnlocks[k]) { toolUnlocks[k] = true; saveFarmData(); }
+        if (!toolUnlocks[k]) { toolUnlocks[k] = true; saveFarmData('toolUnlocks.unlock'); }
         return true;
-      } catch(e) { console.warn('Failed to unlock tool:', e); return false; }
+      } catch(_) { return false; }
     }
   };
 
@@ -812,21 +1122,14 @@
     
     setTimeout(() => {
       try { 
-        console.log('Initializing tile handlers...');
         window.fjTweakerModules?.farmtile?.initTileClickHandlers?.(); 
-      } catch(e) {
-        console.error('Failed to init tile handlers:', e);
-      }
-      
+      } catch(_) {}
       
       setTimeout(() => {
         try { 
-          console.log('Restoring plants and objects...');
           restorePlants(); 
           restoreObjects();
-        } catch(e) {
-          console.error('Failed to restore plants/objects:', e);
-        }
+        } catch(_) {}
       }, 100);
     }, 50);
 
@@ -925,7 +1228,6 @@
       const TOPBAR_H = 56;
       const availableHeight = overlayRect.height - TOPBAR_H - 6;
       if ((rowsAfter * tileSize) > availableHeight + 0.5) {
-        console.log('Cannot purchase more land: no space available');
         try { window.fjFarm?.audio?.play?.('deny'); } catch(_) {}
         return;
       }
@@ -943,10 +1245,10 @@
 		  
 		  
 		  tileTypes.push(...Array(8).fill('dirt'));
-		  
-		  
-		  expansions++;
-		  saveFarmData();
+      
+      
+      expansions++;
+      saveFarmData('expansion.purchase');
 		  
 		  
 		  const currentRows = Math.ceil(tileStripEl.children.length / 8);
@@ -959,10 +1261,8 @@
 		  
 		  try { window.fjTweakerModules?.farmtile?.initTileClickHandlers?.(); } catch(_) {}
 		  
-      console.log(`Purchased land expansion for ${cost} coins. Next expansion will cost ${Math.floor(50 * Math.pow(1.1, expansions))} coins.`);
       try { window.fjFarm?.audio?.play?.('expand'); } catch(_) {}
 		} else {
-      console.log(`Cannot afford land expansion. Need ${cost} coins, have ${currentCoins}.`);
       try { window.fjFarm?.audio?.play?.('deny'); } catch(_) {}
 		}
 	});
@@ -1046,18 +1346,29 @@
     if (topBarEl) topBarEl.style.background = bg;
 
     
-    const tileSize = Math.max(1, Math.floor(width / 8));
+    
+    let tileSize = Math.max(1, Math.floor(width / 8));
+    try {
+      if (tileStripEl && tileStripEl.children && tileStripEl.children.length > 0) {
+        const firstTile = tileStripEl.children[0];
+        const tw = firstTile.getBoundingClientRect().width;
+        if (tw && isFinite(tw) && tw > 0) tileSize = tw; 
+      }
+    } catch(_) {}
     if (tileStripEl) {
       const totalTiles = tileStripEl.children.length;
       const rows = Math.ceil(totalTiles / 8);
-      tileStripEl.style.height = (tileSize * rows) + 'px';
+      const stripHeightPx = (tileSize * rows);
+      tileStripEl.style.height = stripHeightPx + 'px';
     }
     if (purchaseBtnEl && tileStripEl) {
       const TOPBAR_H = 56;
       
-      const tileRect = tileStripEl.getBoundingClientRect();
-      const tileStripHeight = tileRect.height || 0;
-      purchaseBtnEl.style.top = (TOPBAR_H + tileStripHeight + 6) + 'px';
+      const totalTiles = tileStripEl.children.length;
+      const rows = Math.ceil(totalTiles / 8);
+      const tileStripHeight = tileSize * rows;
+      const baseTop = (tileStripEl.offsetTop || TOPBAR_H); 
+      purchaseBtnEl.style.top = (baseTop + tileStripHeight + 6) + 'px';
 
       
       const overlayRect = overlayEl.getBoundingClientRect();
@@ -1083,9 +1394,12 @@
         menuHostEl.style.top = Math.round(orect.top) + 'px';
       } else {
         
-        const alignTop = Math.round(orect.top);
+        const GAP = 6;
+        const TIP_EST = 40; 
+        const MARGIN = 100 + GAP + TIP_EST; 
+        const desiredTop = Math.max(Math.round(orect.top), MARGIN);
         menuHostEl.style.left = sideLeft + 'px';
-        menuHostEl.style.top = alignTop + 'px';
+        menuHostEl.style.top = desiredTop + 'px';
       }
       menuHostEl.style.zIndex = String((parseInt(overlayEl.style.zIndex || '1000', 10) || 1000) + 1);
     }
@@ -1209,228 +1523,109 @@
   };
 
   
-  const addDebugCoinButton = () => {
-    
-    const existing = document.getElementById('fj-farm-debug-coins');
-    if (existing) existing.remove();
-    
-    const debugBtn = document.createElement('button');
-    debugBtn.id = 'fj-farm-debug-coins';
-    debugBtn.type = 'button';
-    debugBtn.textContent = '+100';
-    Object.assign(debugBtn.style, {
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      width: '50px',
-      height: '30px',
-      background: '#4a9eff',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: '700',
-      cursor: 'pointer',
-      zIndex: '2147483640',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-    });
-    
-    debugBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      debugBtn.style.transform = 'scale(0.9)';
-      debugBtn.style.transition = 'transform 0.1s ease';
-      setTimeout(() => {
-        debugBtn.style.transform = 'scale(1.05)';
-        setTimeout(() => {
-          debugBtn.style.transform = 'scale(1)';
-        }, 60);
-      }, 100);
-      
-      
-      coinsApi.add(100);
-      console.log('Added 100 coins. Total:', coinsApi.get());
-    });
-    
-    document.body.appendChild(debugBtn);
-  };
-
   
-  const addDebugGrowthButton = () => {
-    
-    const existing = document.getElementById('fj-farm-debug-growth');
-    if (existing) existing.remove();
-    
-    const debugBtn = document.createElement('button');
-    debugBtn.id = 'fj-farm-debug-growth';
-    debugBtn.type = 'button';
-    debugBtn.textContent = '+1 hr';
-    Object.assign(debugBtn.style, {
-      position: 'fixed',
-      bottom: '60px', 
-      right: '20px',
-      width: '50px',
-      height: '30px',
-      background: '#ff9f4a',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '4px',
-      fontSize: '10px',
-      fontWeight: '700',
-      cursor: 'pointer',
-      zIndex: '2147483640',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-    });
-    
-    debugBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      debugBtn.style.transform = 'scale(0.9)';
-      debugBtn.style.transition = 'transform 0.1s ease';
-      setTimeout(() => {
-        debugBtn.style.transform = 'scale(1.05)';
-        setTimeout(() => {
-          debugBtn.style.transform = 'scale(1)';
-        }, 60);
-      }, 100);
-      
-      
-      const seedsModule = window.fjTweakerModules?.farmseeds;
-      if (seedsModule && seedsModule.accelerateAllPlants) {
-        seedsModule.accelerateAllPlants(1);
-      }
-    });
-    
-    document.body.appendChild(debugBtn);
-  };
-
-  
-  let debugToggleEl = null;
-  let debugVisible = false;
-
-  const showDebugButtons = () => {
-    if (debugVisible) return;
-    debugVisible = true;
-    try { addDebugCoinButton(); } catch(_) {}
-    try { addDebugGrowthButton(); } catch(_) {}
-  };
-
-  const hideDebugButtons = () => {
-    debugVisible = false;
+  const cleanupLegacyFarmDebug = () => {
     try { document.getElementById('fj-farm-debug-coins')?.remove(); } catch(_) {}
     try { document.getElementById('fj-farm-debug-growth')?.remove(); } catch(_) {}
+    try { document.getElementById('fj-farm-debug-toggle')?.remove(); } catch(_) {}
   };
-
-  const ensureDebugToggle = () => {
-    if (debugToggleEl && document.body.contains(debugToggleEl)) return;
-    debugToggleEl = document.createElement('button');
-    debugToggleEl.id = 'fj-farm-debug-toggle';
-    debugToggleEl.type = 'button';
-    Object.assign(debugToggleEl.style, {
-      position: 'fixed',
-      right: '0',
-      bottom: '0',
-      width: '24px',
-      height: '24px',
-      opacity: '0',
-      background: 'transparent',
-      border: 'none',
-      padding: '0',
-      margin: '0',
-      cursor: 'default',
-      zIndex: '2147483640',
-      pointerEvents: 'auto',
-    });
-    debugToggleEl.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      if (debugVisible) hideDebugButtons(); else showDebugButtons();
-    });
-    document.body.appendChild(debugToggleEl);
-  };
-
-  const removeDebugToggle = () => {
-    try { debugToggleEl?.remove(); } catch(_) {}
-    debugToggleEl = null;
-  };
+  const ensureDebugToggle = () => { cleanupLegacyFarmDebug(); };
+  const removeDebugToggle = () => { cleanupLegacyFarmDebug(); };
+  const hideDebugButtons = () => { cleanupLegacyFarmDebug(); };
 
   
   const restorePlants = () => {
-    if (!tileStripEl) {
-      console.warn('No tile strip found for plant restoration');
-      return;
-    }
-    
-  const tiles = Array.from(tileStripEl.children);
-    
+    if (!tileStripEl) return;
+
+    const seedsModule = window.fjTweakerModules?.farmseeds;
+    if (!seedsModule) return;
+
+    const tiles = Array.from(tileStripEl.children);
+
     for (let i = 0; i < tiles.length; i++) {
       const container = tiles[i];
-      
-      
-      if (plantPositions[i]) {
-  const plant = plantPositions[i];
-        
-        let plantImg = container.querySelector('.plant-overlay');
-        if (!plantImg) {
-          plantImg = document.createElement('img');
-          plantImg.className = 'plant-overlay';
-          plantImg.alt = `${plant.seedName} growing`;
-          plantImg.draggable = false;
-          plantImg.decoding = 'async';
-          plantImg.loading = 'lazy';
-          Object.assign(plantImg.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            pointerEvents: 'none',
-            zIndex: '1'
-          });
-          container.appendChild(plantImg);
-        }
-        
-        
-        const seedsModule = window.fjTweakerModules?.farmseeds;
-        let imageSuffix = '_growing';
-        
-        if (seedsModule && seedsModule.getPlantGrowthInfo) {
-          try {
-            const growthInfo = seedsModule.getPlantGrowthInfo(i);
-            if (growthInfo?.isGrown) imageSuffix = '_grown';
-          } catch(_) {}
-        }
+      if (!container) continue;
 
-        const plantSrc = resolveAssetUrl(`icons/farm/plants/${plant.seedName}${imageSuffix}.png`);
+      const anchorEntry = seedsModule.resolvePlantAnchor?.(i);
+      const existingOverlay = container.querySelector('.plant-overlay');
+
+      if (!anchorEntry) {
+        if (existingOverlay) existingOverlay.remove();
+        container.style.overflow = '';
+        continue;
+      }
+
+      const { index: anchorIndex, data: anchorData } = anchorEntry;
+      if (anchorIndex !== i) {
+        if (existingOverlay) existingOverlay.remove();
+        container.style.overflow = '';
+        continue;
+      }
+
+      const isTree = !!anchorData.isTree;
+      const footprint = isTree
+        ? (anchorData.size ? { ...anchorData.size } : (seedsModule.getSeedFootprint?.(anchorData.seedName) || { width: 1, height: 1 }))
+        : { width: 1, height: 1 };
+
+      let plantImg = existingOverlay;
+      if (!plantImg) {
+        plantImg = document.createElement('img');
+        plantImg.className = 'plant-overlay';
+        plantImg.draggable = false;
+        plantImg.decoding = 'async';
+        plantImg.loading = 'lazy';
+        Object.assign(plantImg.style, {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          pointerEvents: 'none',
+          zIndex: '1',
+          objectFit: 'cover'
+        });
+        container.appendChild(plantImg);
+      }
+
+      const growthInfo = seedsModule.getPlantGrowthInfo?.(anchorIndex);
+      const isGrown = !!growthInfo?.isGrown;
+      const stage = isGrown ? 'grown' : 'growing';
+      const plantSrc = resolveAssetUrl(`icons/farm/plants/${anchorData.seedName}_${stage}.png`);
+
+      plantImg.alt = `${anchorData.seedName} ${stage}`;
+      if (plantImg.src !== plantSrc) {
         plantImg.src = plantSrc;
         plantImg.onerror = function() {
-          console.warn(`Failed to load plant image: ${plantSrc}`);
           this.src = resolveAssetUrl('icons/error.png');
         };
-        plantImg.onload = null;
+      }
+
+      if (isTree) {
+        const widthMultiplier = Math.max(1, Number(footprint.width) || 1);
+        const heightMultiplier = Math.max(1, Number(footprint.height) || 1);
+        plantImg.style.width = `${widthMultiplier * 100}%`;
+        plantImg.style.height = `${heightMultiplier * 100}%`;
+        container.style.overflow = 'visible';
+      } else {
+        plantImg.style.width = '100%';
+        plantImg.style.height = '100%';
+        container.style.overflow = '';
       }
     }
   };
 
   
   const restoreObjects = () => {
-    if (!tileStripEl) {
-      console.warn('No tile strip found for object restoration');
-      return;
-    }
+    if (!tileStripEl) return;
     
     const tiles = Array.from(tileStripEl.children);
-    console.log(`Restoring objects on ${tiles.length} tiles, object data:`, objectPositions);
     
+    foundBeeBox = false;
+    foundRainBarrel = false;
     for (let i = 0; i < tiles.length; i++) {
       const container = tiles[i];
       
       
       if (objectPositions[i]) {
         const obj = objectPositions[i];
-        console.log(`Restoring object ${obj.objectName} on tile ${i}`);
         
         const size = getObjectSize(obj.objectName);
         
@@ -1446,33 +1641,73 @@
             objectImg.loading = 'lazy';
             
             
-            Object.assign(objectImg.style, {
+            const commonStyle = {
               position: 'absolute',
               top: '0',
               left: '0',
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
               pointerEvents: 'none',
-              zIndex: '2', 
-              transformOrigin: 'top left',
-              transform: `scale(${size.width}, ${size.height})`
-            });
+              zIndex: '2',
+              transformOrigin: 'top left'
+            };
+            if (obj.objectName === 'lamp_post') {
+              Object.assign(objectImg.style, commonStyle, {
+                left: '50%',
+                width: 'auto',
+                height: '200%',
+                objectFit: 'unset',
+                objectPosition: 'center center',
+                transform: 'translateX(-50%)'
+              });
+            } else {
+              Object.assign(objectImg.style, commonStyle, {
+                objectFit: 'cover',
+                transform: `scale(${size.width}, ${size.height})`
+              });
+            }
             container.appendChild(objectImg);
           }
           
-          const objectSrc = resolveAssetUrl(`icons/farm/objects/${obj.objectName}.png`);
-          console.log(`Setting object image source to: ${objectSrc}`);
+            const objNameLower = String(obj.objectName || '').toLowerCase();
+            if (objNameLower === BEE_BOX_KEY) {
+              foundBeeBox = true;
+            } else if (objNameLower === RAIN_BARREL_KEY) {
+              foundRainBarrel = true;
+            }
+            const compostValue = objNameLower === COMPOST_BIN_KEY ? Math.max(0, Math.round(Number(obj.compostValue) || 0)) : 0;
+            const beeBoxIconKey = objNameLower === BEE_BOX_KEY ? (obj.honeyReady ? BEE_BOX_ICON_FULL : BEE_BOX_ICON_EMPTY) : null;
+            const rainWaterStored = objNameLower === RAIN_BARREL_KEY ? Math.max(0, Math.round(Number(obj.rainWaterStored) || 0)) : 0;
+            const rainBarrelIconKey = objNameLower === RAIN_BARREL_KEY
+              ? (rainWaterStored > 0 ? RAIN_BARREL_ICON_FULL : RAIN_BARREL_ICON_EMPTY)
+              : null;
+            const iconKey = objNameLower === COMPOST_BIN_KEY
+              ? (compostValue >= COMPOST_BIN_FULL_THRESHOLD ? 'compost_bin_full' : 'compost_bin_empty')
+              : objNameLower === BEE_BOX_KEY
+                ? beeBoxIconKey
+                : objNameLower === RAIN_BARREL_KEY
+                  ? rainBarrelIconKey
+                  : obj.objectName;
+          const objectSrc = resolveAssetUrl(`icons/farm/objects/${iconKey}.png`);
           objectImg.src = objectSrc;
           objectImg.onerror = function() {
-            console.warn(`Failed to load object image: ${objectSrc}`);
             this.src = resolveAssetUrl('icons/error.png');
-          };
-          objectImg.onload = function() {
-            console.log(`Successfully loaded object image: ${objectSrc}`);
           };
         }
       }
+    }
+
+    if (foundBeeBox) {
+      try {
+        window.fjTweakerModules?.farmtile?.ensureBeeBoxMonitor?.();
+        window.fjTweakerModules?.farmtile?.refreshBeeBoxes?.();
+      } catch (_) {}
+    }
+    if (foundRainBarrel) {
+      try {
+        window.fjTweakerModules?.farmtile?.ensureRainBarrelMonitor?.();
+        window.fjTweakerModules?.farmtile?.refreshRainBarrels?.();
+      } catch (_) {}
     }
   };
 
@@ -1495,6 +1730,7 @@
       }
     } catch (_) {}
   };
+
 
   const init = () => {
     try {
@@ -1583,43 +1819,86 @@
   window.fjFarm.getObjectSize = getObjectSize;
   
   (function(){
-  const CACHE_KEY = 'fjFarmPriceCacheV4';
+  const CACHE_VERSION = 6;
+    const CACHE_KEY = `fjFarmPriceCacheV${CACHE_VERSION}`;
+    const PRICE_STEP_MULTIPLIER = 1.1; 
     let priceCache = null;
 
-    const toKey = (s) => String(s||'').trim().toLowerCase().replace(/\s+/g,'_');
-    const loadCache = () => {
-      try { priceCache = JSON.parse(localStorage.getItem(CACHE_KEY)||'null') || { v:4, plants:{}, foods:{} }; }
-      catch(_) { priceCache = { v:4, plants:{}, foods:{} }; }
+    const defaultCache = () => ({ v: CACHE_VERSION, plants: {}, foods: {} });
+    const normalizeCache = (candidate) => {
+      if (!candidate || candidate.v !== CACHE_VERSION) return defaultCache();
+      const plants = candidate.plants && typeof candidate.plants === 'object' ? candidate.plants : {};
+      const foods = candidate.foods && typeof candidate.foods === 'object' ? candidate.foods : {};
+      return { v: CACHE_VERSION, plants, foods };
     };
-    const saveCache = () => { try { localStorage.setItem(CACHE_KEY, JSON.stringify(priceCache||{ v:4, plants:{}, foods:{} })); } catch(_) {} };
+    const roundPrice = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 0;
+      return Math.max(0, Math.round(numeric));
+    };
+    const toKey = (s) => String(s||'').trim().toLowerCase().replace(/\s+/g,'_');
+    const SPECIAL_ITEM_PRICES = Object.freeze({
+      water: 2,
+      fertilizer: 32,
+      honey: 14,
+    });
+    const lookupSpecialPrice = (rawName) => {
+      const key = toKey(rawName);
+      return Object.prototype.hasOwnProperty.call(SPECIAL_ITEM_PRICES, key) ? SPECIAL_ITEM_PRICES[key] : null;
+    };
+    const loadCache = () => {
+      try { priceCache = normalizeCache(JSON.parse(localStorage.getItem(CACHE_KEY)||'null')); }
+      catch(_) { priceCache = defaultCache(); }
+    };
+    const saveCache = () => {
+      if (!priceCache) loadCache();
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(priceCache || defaultCache())); } catch(_) {}
+    };
 
     const priceForPlant = (rawName) => {
       const key = toKey(rawName);
-      const seeds = window.fjTweakerModules?.farmseeds?.getSeedTips?.() || {};
-      const meta = seeds[key];
-      const seedP = Math.max(0, Number(meta?.prc) || 0);
       if (!priceCache) loadCache();
-      const p = Math.ceil(seedP * 1.25);
-      priceCache.plants[key] = p;
+      const cached = priceCache.plants && typeof priceCache.plants[key] === 'number' ? priceCache.plants[key] : null;
+      if (cached !== null) return cached;
+
+  const seedsModule = window.fjTweakerModules?.farmseeds;
+  const seeds = seedsModule?.getSeedTips?.() || {};
+  const sourceSeedKey = seedsModule?.resolveSeedForHarvest?.(key) || key;
+  const meta = seeds[sourceSeedKey];
+  if (!meta) return 0;
+  const basePrice = Math.max(0, Number(meta?.prc) || 0);
+  const perYieldPrice = (seedsModule?.isTreeSeed?.(sourceSeedKey))
+    ? Math.max(0, Math.ceil(basePrice / 9))
+    : basePrice;
+      const computed = perYieldPrice > 0 ? roundPrice(perYieldPrice * PRICE_STEP_MULTIPLIER) : 0;
+      priceCache.plants[key] = computed;
       saveCache();
-      return p;
+      return computed;
     };
     const parseIngToken = (t) => { const m = String(t||'').match(/^(.*?)(\d+)$/); return m ? { key: toKey(m[1]), count: parseInt(m[2],10)||1 } : { key: toKey(t), count: 1 }; };
     
     const isPlantName = (rawName) => {
       try {
-        const seeds = window.fjTweakerModules?.farmseeds?.getSeedTips?.();
+        const seedsModule = window.fjTweakerModules?.farmseeds;
+        const seeds = seedsModule?.getSeedTips?.();
         if (!seeds) return false;
-        const meta = seeds[toKey(rawName)];
-        return !!meta;
+        const resolved = seedsModule?.resolveSeedForHarvest?.(rawName);
+        return resolved ? !!seeds[resolved] : false;
       } catch(_) { return false; }
     };
     
     const getPriceForName = (rawName) => {
       const nameKey = toKey(rawName);
+      if (typeof SPECIAL_ITEM_PRICES[nameKey] === 'number') return SPECIAL_ITEM_PRICES[nameKey];
+      if (!priceCache) loadCache();
       if (isPlantName(nameKey)) {
+        const plantCached = priceCache.plants && typeof priceCache.plants[nameKey] === 'number' ? priceCache.plants[nameKey] : null;
+        if (plantCached !== null) return plantCached;
         return priceForPlant(nameKey);
       }
+
+      const cachedFood = priceCache.foods && typeof priceCache.foods[nameKey] === 'number' ? priceCache.foods[nameKey] : null;
+      if (cachedFood !== null) return cachedFood;
       
       try {
         const cook = window.fjTweakerModules?.farmcook;
@@ -1642,27 +1921,34 @@
           return price;
         }
       } catch(_) {}
+      const specialFallback = SPECIAL_ITEM_PRICES[nameKey];
+      if (typeof specialFallback === 'number') return specialFallback;
       return 0;
     };
     
     const priceForComposite = (tokens) => {
-      if (!Array.isArray(tokens)) return 0;
+      if (!Array.isArray(tokens) || tokens.length === 0) return 0;
       let sum = 0;
       for (const tok of tokens) {
         const parts = String(tok||'').split(',').map(s => s.trim()).filter(Boolean);
         for (const part of parts) {
           const { key, count } = parseIngToken(part);
-          const unit = getPriceForName(key);
-          sum += (unit * (count||1));
+          const qty = Math.max(1, count || 1);
+          const unit = Math.max(0, getPriceForName(key));
+          sum += (unit * PRICE_STEP_MULTIPLIER) * qty;
         }
       }
       
-      return Math.ceil(sum * 1.25);
+      return roundPrice(sum);
     };
     window.fjFarm.pricing = {
       getPriceForItem(name, kind='plant', opts={}){
         try {
-          if (kind === 'plant') return priceForPlant(name);
+          if (kind === 'plant') {
+            const special = lookupSpecialPrice(name);
+            if (special != null) return special;
+            return priceForPlant(name);
+          }
           if (kind === 'ingredient' || kind === 'recipe') {
             if (Array.isArray(opts.tokens)) return priceForComposite(opts.tokens);
             const cook = window.fjTweakerModules?.farmcook;
@@ -1677,6 +1963,13 @@
             }
             return 0;
           }
+          if (kind === 'food' || kind === 'special') {
+            const special = lookupSpecialPrice(name);
+            if (special != null) return special;
+            return getPriceForName(name);
+          }
+          const fallbackSpecial = lookupSpecialPrice(name);
+          if (fallbackSpecial != null) return fallbackSpecial;
         } catch(_) {}
         return 0;
       },
@@ -1694,7 +1987,7 @@
           recs.forEach(e => { try { getPriceForName(e.name); } catch(_) {} });
         } catch(_) {}
       },
-  clearCache(){ priceCache = { v:4, plants:{}, foods:{} }; saveCache(); },
+  clearCache(){ priceCache = defaultCache(); saveCache(); },
     };
   })();
   
@@ -1737,6 +2030,7 @@
   try { localStorage.removeItem('fjFarmPriceCacheV1'); } catch(_) {}
   try { localStorage.removeItem('fjFarmPriceCacheV2'); } catch(_) {}
   try { localStorage.removeItem('fjFarmPriceCacheV3'); } catch(_) {}
+  try { localStorage.removeItem('fjFarmPriceCacheV4'); } catch(_) {}
       
       
       try {
@@ -1744,9 +2038,7 @@
         if (invModule && invModule.resetInventory) {
           invModule.resetInventory();
         }
-      } catch (invError) {
-        console.warn('Failed to reset inventory:', invError);
-      }
+      } catch (_) {}
       
       
       try {
@@ -1761,10 +2053,8 @@
         }, 200);
       }
       
-  console.log('Farm reset: coins=100, tiles=8 dirt, plants=none, expansions=0, inventory=empty');
       return true;
     } catch(e) {
-      console.error('Reset farm failed:', e);
       return false;
     }
   };
@@ -1776,7 +2066,19 @@
     resetFarm,
     getTileTypes: () => tileTypes,
     getPlantPositions: () => plantPositions,
-    getExpansions: () => expansions
+    getExpansions: () => expansions,
+    getStorageTimeline: () => {
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          const raw = sessionStorage.getItem(STORAGE_TIMELINE_SESSION_KEY);
+          if (raw) {
+            return JSON.parse(raw);
+          }
+        }
+      } catch (_) {}
+      return storageTimeline.slice();
+    },
+    clearStorageTimeline
   };
   
   if (document.readyState === 'loading') {

@@ -1,3 +1,24 @@
+0.5.9
+- Killed Sushi branch
+
+0.5.8
+- Farm rain barrel now works, new recipes added
+- You can now click the Rate Tracker number to provide direct input
+- Chrome farm saving bugfix
+- Click+Drag on the farm will only work while a Tool Shed is placed; subsequently, its price has been lowered
+
+0.5.7
+- Farm improvements
+- Extension now limits features for rank 1, 2, and 3
+- Fixed compat bug with Rate Tracker and Custom Shortcuts
+- Fixed "AcknowledgeStop" error in Text Check
+
+0.5.6
+- Added Hunt Assist
+
+0.5.5
+- Substantial farm bugfixes
+
 0.5.4
 - Fixed more farm bugs
 - General bugfixing

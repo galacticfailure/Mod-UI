@@ -4,6 +4,8 @@
   if (window.location.hostname !== targetHost) {
     return;
   }
+  
+  
 
   const HEHE_KEY = 'fjfe_hehe_overlay_shown';
   const heheImg = 'icons/hehe.png';
@@ -116,12 +118,13 @@
   }
 
   let __fjfe_baselineInit = false;
+  let __fjfe_limitedModulesInit = false;
   let __fjfe_proModulesInit = false;
   const initModules = () => {
     if (!window.fjTweakerModules) {
       return;
     }
-    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, remtz, walcorn, apichk, warn } = window.fjTweakerModules;
+    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, remtz, walcorn, apichk, warn, hunt } = window.fjTweakerModules;
     
     if (!__fjfe_baselineInit) {
       if (sel && typeof sel.init === 'function') sel.init();
@@ -129,22 +132,47 @@
       __fjfe_baselineInit = true;
     }
     
+    const initLimitedModules = () => {
+      if (__fjfe_limitedModulesInit) return;
+      if (modjs && typeof modjs.init === 'function') modjs.init();
+      if (ratetrack && typeof ratetrack.init === 'function') ratetrack.init();
+      if (userpop && typeof userpop.init === 'function') userpop.init();
+      if (warn && typeof warn.init === 'function') warn.init();
+      __fjfe_limitedModulesInit = true;
+    };
+
+    const initProModules = () => {
+      if (__fjfe_proModulesInit) return;
+      if (hunt && typeof hunt.init === 'function') hunt.init();
+      if (sccustom && typeof sccustom.init === 'function') sccustom.init();
+      if (nextMove && typeof nextMove.init === 'function') nextMove.init();
+      if (remtz && typeof remtz.init === 'function') remtz.init();
+      if (walcorn && typeof walcorn.init === 'function') walcorn.init();
+      __fjfe_proModulesInit = true;
+    };
+
     const authorized = (window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') ? window.fjApichk.isAuthorized() : true;
-    if (!authorized || __fjfe_proModulesInit) return;
-    if (modjs && typeof modjs.init === 'function') modjs.init();
-    if (ratetrack && typeof ratetrack.init === 'function') ratetrack.init();
-    if (sccustom && typeof sccustom.init === 'function') sccustom.init();
-    if (userpop && typeof userpop.init === 'function') userpop.init();
-    if (nextMove && typeof nextMove.init === 'function') nextMove.init();
-    if (remtz && typeof remtz.init === 'function') remtz.init();
-    if (walcorn && typeof walcorn.init === 'function') walcorn.init();
-    if (warn && typeof warn.init === 'function') warn.init();
-    __fjfe_proModulesInit = true;
+    if (!authorized) return;
+
+    const restricted = (window.fjApichk && typeof window.fjApichk.isRestricted === 'function') ? window.fjApichk.isRestricted() : false;
+    if (restricted) {
+      initLimitedModules();
+      return;
+    }
+
+    initLimitedModules();
+    initProModules();
   };
 
   const run = () => {
     
     checkAndShowHehe();
+    
+    
+    try {
+      document.querySelectorAll("[data-role='fjfe-debug-toggle-hotzone'],[data-role='fjfe-farm-debug-toggle-hotzone']").forEach(el => el.remove());
+    } catch(_) {}
+    
     initModules();
 
     

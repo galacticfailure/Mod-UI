@@ -29,6 +29,7 @@
   let countEditsEnabled = false;
   let panel = null;
   let countDisplay = null;
+  let countInput = null;
   let lockButton = null;
   let plusButton = null;
   let minusButton = null;
@@ -42,6 +43,8 @@
   const skinButtonHandlers = new Map();
   let quickMenuClickHandler = null;
   let quickKeydownHandler = null;
+  let customShortcutEventListener = null;
+
   const DEDUP_WINDOW_MS = 600;
   let lastRateCountAt = 0;
 
@@ -142,6 +145,88 @@
 
   const resetCounter = () => {
     setCounter(0);
+  };
+
+  let isEditingCounter = false;
+
+  const parseManualCountInput = (raw) => {
+    if (typeof raw !== 'string') {
+      return null;
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return null;
+    }
+    if (!/^-?\d+$/.test(trimmed)) {
+      return null;
+    }
+    const parsed = parseInt(trimmed, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const setCounterInputInvalid = (invalid) => {
+    if (!countInput) {
+      return;
+    }
+    countInput.style.borderColor = invalid ? '#dd6666' : 'rgba(255, 255, 255, 0.25)';
+  };
+
+  const focusCounterInput = () => {
+    if (!countInput) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      countInput.focus();
+      countInput.select();
+    });
+  };
+
+  const applyCounterInput = () => {
+    if (!countInput) {
+      return false;
+    }
+    const parsed = parseManualCountInput(countInput.value);
+    if (parsed === null) {
+      setCounterInputInvalid(true);
+      focusCounterInput();
+      return false;
+    }
+    setCounter(parsed);
+    setCounterInputInvalid(false);
+    return true;
+  };
+
+  const exitCounterEditMode = (shouldApply) => {
+    if (!countInput || !isEditingCounter) {
+      return;
+    }
+    if (shouldApply) {
+      if (!applyCounterInput()) {
+        return;
+      }
+    } else {
+      countInput.value = String(counterValue);
+      setCounterInputInvalid(false);
+    }
+    isEditingCounter = false;
+    countInput.style.display = 'none';
+    if (countDisplay) {
+      countDisplay.style.display = '';
+    }
+  };
+
+  const enterCounterEditMode = () => {
+    if (!countInput || isEditingCounter) {
+      return;
+    }
+    isEditingCounter = true;
+    countInput.value = String(counterValue);
+    setCounterInputInvalid(false);
+    if (countDisplay) {
+      countDisplay.style.display = 'none';
+    }
+    countInput.style.display = 'block';
+    focusCounterInput();
   };
 
   const stopPropagation = (event) => {
@@ -517,14 +602,72 @@
     header.append(dragHandle, lockButton);
     panel.append(header);
 
+    const countWrapper = document.createElement('div');
+    Object.assign(countWrapper.style, {
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '42px',
+      position: 'relative'
+    });
+
     countDisplay = document.createElement('div');
     Object.assign(countDisplay.style, {
       fontSize: '32px',
       fontWeight: '700',
       lineHeight: '1',
-      textAlign: 'center'
+      textAlign: 'center',
+      cursor: 'pointer',
+      width: '100%'
     });
-    panel.append(countDisplay);
+    countDisplay.title = 'Click to set value';
+    countDisplay.addEventListener('click', (event) => {
+      stopPropagation(event);
+      enterCounterEditMode();
+    });
+
+    countInput = document.createElement('input');
+    countInput.type = 'text';
+    countInput.inputMode = 'numeric';
+    countInput.pattern = '-?[0-9]*';
+    countInput.autocomplete = 'off';
+    countInput.spellcheck = false;
+    Object.assign(countInput.style, {
+      display: 'none',
+      width: '100%',
+      fontSize: '32px',
+      fontWeight: '700',
+      lineHeight: '1',
+      textAlign: 'center',
+      background: 'rgba(0, 0, 0, 0)',
+      color: '#f6f6f6',
+      border: '1px solid rgba(255, 255, 255, 0.25)',
+      borderRadius: '4px',
+      padding: '2px',
+      outline: 'none'
+    });
+    countInput.addEventListener('click', stopPropagation);
+    countInput.addEventListener('pointerdown', stopPropagation);
+    countInput.addEventListener('keydown', (event) => {
+      stopPropagation(event);
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        exitCounterEditMode(true);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        exitCounterEditMode(false);
+      }
+    });
+    countInput.addEventListener('blur', () => {
+      exitCounterEditMode(true);
+    });
+    countInput.addEventListener('input', () => {
+      setCounterInputInvalid(false);
+    });
+
+    countWrapper.append(countDisplay, countInput);
+    panel.append(countWrapper);
 
     const adjustRow = document.createElement('div');
     adjustRow.style.display = 'flex';
@@ -671,17 +814,17 @@
 
   const shouldCountForClick = (originButton) => {
     const ratedByUsername = getRatedByUsername(originButton);
-    if (!countEditsEnabled) {
-      return !ratedByUsername;
-    }
-    if (!ratedByUsername) {
-      return true;
-    }
-    const currentUser = getLoggedInUsername();
-    if (!currentUser) {
-      return true;
-    }
-    return ratedByUsername.toLowerCase() !== currentUser.toLowerCase();
+      if (!countEditsEnabled) {
+        return !ratedByUsername;
+      }
+      if (!ratedByUsername) {
+        return true;
+      }
+      const currentUser = getLoggedInUsername();
+      if (!currentUser) {
+        return true;
+      }
+      return ratedByUsername.toLowerCase() !== currentUser.toLowerCase();
   };
 
   const isSkinSelectionActive = (originButton) => {
@@ -777,7 +920,6 @@
     if (!target) return;
 
     if (!shouldCountForClick(target)) return;
-
     tryCountRate();
   };
 
@@ -807,7 +949,6 @@
     if (!button) return;
 
     if (!shouldCountForClick(button)) return;
-
     tryCountRate();
   };
 
@@ -860,6 +1001,30 @@
         quickKeydownHandler = handleQuickKeydown;
         document.addEventListener('keydown', quickKeydownHandler, true);
       }
+
+      if (!customShortcutEventListener) {
+        customShortcutEventListener = (event) => {
+          if (!featureEnabled || !event || !event.detail) {
+            return;
+          }
+          let { button, slot } = event.detail;
+          if (!button || typeof button.matches !== 'function') {
+            const slotNumber = Number(slot);
+            if (Number.isFinite(slotNumber) && slotNumber > 0) {
+              button = document.querySelector(`.ctButton4.desktopRate[data-sccustom-slot="${slotNumber}"]`) ||
+                       document.querySelector(`.ctButton4.mobQuickRate[data-sccustom-slot="${slotNumber}"]`);
+            }
+            if (!button || typeof button.matches !== 'function') {
+              return;
+            }
+          }
+          if (!shouldCountForClick(button)) {
+            return;
+          }
+          tryCountRate();
+        };
+        window.addEventListener('fjCustomShortcutTriggered', customShortcutEventListener, true);
+      }
     } else {
       stopObserving();
       detachSkinButtons();
@@ -875,6 +1040,11 @@
       if (quickKeydownHandler) {
         document.removeEventListener('keydown', quickKeydownHandler, true);
         quickKeydownHandler = null;
+      }
+
+      if (customShortcutEventListener) {
+        window.removeEventListener('fjCustomShortcutTriggered', customShortcutEventListener, true);
+        customShortcutEventListener = null;
       }
     }
   };

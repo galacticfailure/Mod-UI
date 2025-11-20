@@ -45,6 +45,16 @@
     showTextSpoilers: 'Auto-shows text spoilers.'
   };
 
+  const SUPPRESSED_DIALOGS = [
+    {
+      id: 'flashM',
+      titlePattern: /posttwo extension/i,
+      messagePattern: /please enable arrive/i
+    }
+  ];
+
+  const SUPPRESSED_MODAL_PATTERNS = [/you dumb fuck/i];
+
   const brokenJS = [
     'admincsstest', 
     'djTools', 
@@ -68,9 +78,107 @@
   let featureEnabled = true;
   let lastSavedState;
   let storageLoadPromise = null;
-   let enhancementsScheduled = false;
+  let enhancementsScheduled = false;
+  const patchedDialogFns = {};
 
   const storageArea = typeof chrome !== 'undefined' && chrome?.storage?.local ? chrome.storage.local : null;
+
+  const suppressHtmlDialogs = () => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    let dialogSuppressed = false;
+
+    SUPPRESSED_DIALOGS.forEach((config) => {
+      const node = document.getElementById(config.id);
+      if (!node) {
+        return;
+      }
+
+      const titleElement = node.querySelector?.('.ui-dialog-title');
+      const titleText = titleElement?.textContent || '';
+      if (config.titlePattern && !config.titlePattern.test(titleText)) {
+        return;
+      }
+
+      const messageText = node.textContent || '';
+      if (config.messagePattern && !config.messagePattern.test(messageText)) {
+        return;
+      }
+
+      const dialogContainer = node.classList?.contains('ui-dialog') ? node : node.closest?.('.ui-dialog');
+      if (dialogContainer) {
+        dialogContainer.remove();
+      } else {
+        node.remove();
+      }
+      dialogSuppressed = true;
+    });
+
+    if (dialogSuppressed) {
+      document.querySelectorAll('.ui-widget-overlay').forEach((overlay) => {
+        overlay.remove();
+      });
+    }
+  };
+
+  const interceptDialogMethod = (method) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (patchedDialogFns[method]) {
+      return;
+    }
+
+    const original = window[method];
+    if (typeof original !== 'function') {
+      return;
+    }
+
+    const suppressedReturn = method === 'confirm' ? false : method === 'prompt' ? null : undefined;
+
+    const patched = function patchedDialogMethod(...args) {
+      if (args.length > 0) {
+        try {
+          const message = args[0] == null ? '' : String(args[0]);
+          if (SUPPRESSED_MODAL_PATTERNS.some((pattern) => pattern.test(message))) {
+            return suppressedReturn;
+          }
+        } catch (_) {}
+      }
+      return original.apply(this, args);
+    };
+
+    patchedDialogFns[method] = { original, patched };
+    window[method] = patched;
+  };
+
+  const ensureModalSuppression = () => {
+    ['alert', 'confirm', 'prompt'].forEach(interceptDialogMethod);
+  };
+
+  const restoreDialogMethod = (method) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const record = patchedDialogFns[method];
+    if (!record) {
+      return;
+    }
+
+    if (window[method] === record.patched) {
+      window[method] = record.original;
+    }
+
+    delete patchedDialogFns[method];
+  };
+
+  const restoreModalSuppression = () => {
+    ['alert', 'confirm', 'prompt'].forEach(restoreDialogMethod);
+  };
 
   const resolveSettingFlag = (source) => {
     if (!source) {
@@ -758,6 +866,7 @@
       if (!featureEnabled) {
         return;
       }
+      suppressHtmlDialogs();
       const panel = document.getElementById('pollzlistJS');
       if (panel) {
         ensurePanelEnhancements(panel);
@@ -778,12 +887,15 @@
     featureEnabled = enabled;
 
     if (featureEnabled) {
+      ensureModalSuppression();
+      suppressHtmlDialogs();
       startObserver();
       const panel = document.getElementById('pollzlistJS');
       if (panel) {
         ensurePanelEnhancements(panel);
       }
     } else {
+      restoreModalSuppression();
       stopObserver();
       cleanupPanel();
       closeOverlay();

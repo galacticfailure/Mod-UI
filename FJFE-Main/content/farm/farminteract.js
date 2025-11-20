@@ -1,5 +1,7 @@
 (() => {
   const MODULE_KEY = 'farminteract';
+  const FERTILIZER_ITEM_KEY = 'fertilizer';
+  const FERTILIZED_TAG_LABEL = 'Fertilized';
   
   let cursorEl = null;
   let cursorBadgeEl = null; 
@@ -8,6 +10,7 @@
   let lastMousePos = { x: 0, y: 0 };
   
   const resolve = (p) => (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
+  const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
   
   
   const createCursor = () => {
@@ -130,24 +133,17 @@
       try {
         const invModule = window.fjTweakerModules?.farminv;
         if (invModule && invModule.addToInventory) {
-          
+			
           const itemName = selectedItem.key;
           const itemType = 'object';
           const itemCost = selectedItem.originalCost || 0;
 
-          if (invModule.addToInventory(itemName, 1, itemType)) {
-            console.log(`Returned ${selectedItem.key} to inventory`);
-          } else {
-            console.warn(`Failed to return ${selectedItem.key} to inventory - may be full`);
-            
+          if (!invModule.addToInventory(itemName, 1, itemType)) {
             const sellPrice = Math.ceil(itemCost * 0.5);
             window.fjFarm?.coins?.add?.(sellPrice);
-            console.log(`Sold ${selectedItem.key} for ${sellPrice} coins (inventory full)`);
           }
         }
-      } catch (error) {
-        console.error('Error returning moved object to inventory:', error);
-      }
+        } catch (_) {}
     }
 
     
@@ -164,9 +160,7 @@
             invModule.addToInventory?.(item, count, itemType);
           }
         }
-      } catch (error) {
-        console.error('Error returning inventory item to slot:', error);
-      }
+      } catch (_) {}
     }
 
     
@@ -175,9 +169,7 @@
         const invModule = window.fjTweakerModules?.farminv;
         const cnt = Math.max(1, Number(selectedItem.count || 1));
         invModule?.addToInventory?.(selectedItem.key, cnt, 'object');
-      } catch (error) {
-        console.error('Error returning inventory object to inventory:', error);
-      }
+      } catch (_) {}
     }
     
     if (selectedButton) {
@@ -239,9 +231,7 @@
           tileModule.harvestAllGrownCrops?.();
           break;
       }
-    } catch (error) {
-      console.error(`Error executing ${toolKey}:`, error);
-    }
+    } catch (_) {}
   };
 
   
@@ -432,9 +422,7 @@
       if (Object.keys(tooltipData).length > 0) {
         window.fjfeFarmTT.show(tooltipData);
       }
-    } catch (error) {
-      console.error('Tooltip update error:', error);
-    }
+    } catch (_) {}
   };
 
   

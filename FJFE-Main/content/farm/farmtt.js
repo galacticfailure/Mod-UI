@@ -104,19 +104,43 @@
     });
     imgWrap.appendChild(img);
 
+    const nameWrap = document.createElement('div');
+    Object.assign(nameWrap.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '4px',
+      minWidth: 0,
+      flex: '1 1 auto',
+    });
+
     const name = document.createElement('div');
     name.setAttribute('data-role', 'name');
     Object.assign(name.style, {
       fontWeight: '800',
       fontSize: '14px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
+      whiteSpace: 'normal',
+      overflow: 'visible',
       color: '#fff',
-      maxWidth: '100%',
+      maxWidth: '100%'
     });
+
+    const tagsWrap = document.createElement('div');
+    tagsWrap.setAttribute('data-role', 'tags');
+    Object.assign(tagsWrap.style, {
+      display: 'none',
+      flexDirection: 'row',
+      flexWrap: 'nowrap',
+      gap: '4px',
+      maxWidth: '100%',
+      alignItems: 'center',
+    });
+
+    nameWrap.appendChild(name);
+    nameWrap.appendChild(tagsWrap);
+
     left.appendChild(imgWrap);
-    left.appendChild(name);
+    left.appendChild(nameWrap);
 
   const cost = document.createElement('div');
     cost.setAttribute('data-role', 'cost');
@@ -202,6 +226,7 @@
     const lineTop = tip.querySelector('[data-role="bodyTop"]');
     const lineMid = tip.querySelector('[data-role="bodyMid"]');
     const lineTT = tip.querySelector('[data-role="bodyTT"]');
+  const tagWrap = tip.querySelector('[data-role="tags"]');
 
     const imageSrc = data && data.imageSrc ? data.imageSrc : '';
     const nameText = (data && data.name) ? String(data.name) : '???';
@@ -225,6 +250,41 @@
       } catch (_) {}
     }
     if (name) name.textContent = nameText;
+
+    if (tagWrap) {
+      tagWrap.textContent = '';
+      const rawTags = data && data.tags;
+      let tags = [];
+      if (Array.isArray(rawTags)) {
+        tags = rawTags;
+      } else if (typeof rawTags === 'string') {
+        tags = rawTags.split(',');
+      }
+      tags = tags
+        .map((tag) => String(tag || '').trim())
+        .filter(Boolean);
+
+      if (tags.length) {
+        tagWrap.style.display = 'flex';
+        for (const tag of tags) {
+          const chip = document.createElement('span');
+          chip.textContent = tag;
+          Object.assign(chip.style, {
+            background: '#d9d9d9',
+            color: '#111',
+            fontSize: '10px',
+            fontWeight: '600',
+            padding: '1px 6px',
+            borderRadius: '999px',
+            lineHeight: '1.2',
+            whiteSpace: 'nowrap',
+          });
+          tagWrap.appendChild(chip);
+        }
+      } else {
+        tagWrap.style.display = 'none';
+      }
+    }
 
     if (costContainer) costContainer.style.display = hideCost ? 'none' : 'flex';
     if (!hideCost) {

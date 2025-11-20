@@ -4,8 +4,20 @@
   const originalButtonState = window.fjCustomShortcutOriginals || {};
   window.fjCustomShortcutOriginals = originalButtonState;
   
+  const CUSTOM_SHORTCUT_EVENT = 'fjCustomShortcutTriggered';
   const buttonHandlers = window.fjCustomShortcutHandlers || new WeakMap();
   window.fjCustomShortcutHandlers = buttonHandlers;
+
+  const dispatchCustomShortcutEvent = (button, slot, source = 'custom-button') => {
+    if (!button) {
+      return;
+    }
+    const detail = { button, slot, source };
+    const eventInit = { detail, bubbles: true, composed: true };
+    try {
+      window.dispatchEvent(new CustomEvent(CUSTOM_SHORTCUT_EVENT, eventInit));
+    } catch (_) {}
+  };
 
   
   function formatHotkeyDisplay(label) {
@@ -146,6 +158,7 @@
     try {
       customSettings = JSON.parse(localStorage.getItem('fjCustomShortcuts') || '{}');
     } catch (e) { customSettings = {}; }
+
 
     
     (function ensureShortKeyCenteringStyles() {
@@ -375,6 +388,8 @@
       const handleClick = function(e) {
         e.preventDefault();
         e.stopPropagation();
+        const source = e && e.isTrusted === false ? 'synthetic-click' : 'custom-button';
+        dispatchCustomShortcutEvent(el, idx + 1, source);
         try {
           const settingsForBtn = customSettings[idx+1] || {};
           
@@ -465,7 +480,7 @@
               quickMArg = el.dataset.sccustomQuickm;
             }
             if (!quickMArg && orig && orig.onclick) {
-              const m = orig.onclick.match(/quickM\(['"]([^'\"]+)['"]/);
+              const m = orig.onclick.match(/quickM\(['"]([^'\"]+)['"]\)/);
               quickMArg = m ? m[1] : null;
             }
             
@@ -485,8 +500,8 @@
               } catch (err) {
               }
               
-              try {
-                el.click();
+                try {
+                  el.click();
               } catch (err) {
               }
               
@@ -1288,6 +1303,7 @@
                 e.stopPropagation();
                 e.stopImmediatePropagation();
                 try {
+                  dispatchCustomShortcutEvent(btn, i, 'hotkey-direct');
                   btn.click();
                 }
  catch (_) {}
@@ -1332,6 +1348,7 @@
                   e.stopPropagation();
                   e.stopImmediatePropagation();
                   try {
+                    dispatchCustomShortcutEvent(btn, n, 'hotkey-default');
                     btn.click();
                   }
  catch (_) {}

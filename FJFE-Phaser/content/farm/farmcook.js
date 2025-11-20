@@ -1,7 +1,7 @@
 (() => {
 	const MODULE_KEY='farmcook';
 	const DEBUG_REC=false; 
-	const dlog=(...args)=>{ try{ if(DEBUG_REC) console.log('[farmcook]',...args);}catch(_){} };
+	const dlog=()=>{};
 	let root=null,isOpen=false;
 	let buttonsMeta=[]; 
 	let cookSlotsCache = {}; 
@@ -56,52 +56,70 @@
 	const INGREDIENTS = [
 		{ name: 'Flour', desc: 'Did you know this stuff can explode?', ing: ['wheat2'], cook: 'mb' },
 		{ name: 'Sugar', desc: 'The most addictive substance on the planet, in your kitchen!', ing: ['sugarcane2'], cook: 'mb' },
-		{ name: 'Milk', desc: 'Well, technically almond milk. Had to make do.', ing: ['almond2'], cook: 'mb' },
-		{ name: 'Fruit Jam', desc: 'The fruit is strawberries. Nothing else, really.', ing: ['strawberry2,sugar1'], cook: 'st' },
-		{ name: 'Tomato Sauce', desc: 'A tomato you can drink!', ing: ['tomato2,onion1,pepper_spice1'], cook: 'st' },
-		{ name: 'Pumpkin Puree', desc: 'Well, it certainly smells like pumpkin.', ing: ['pumpkin1,sugar1'], cook: 'ov' },
-		{ name: 'Cocoa Powder', desc: 'Does not taste as good as you think it might.', ing: ['cocoa2'], cook: 'mb' },
-		{ name: 'Mashed Potato Base', desc: 'Not mashed potatoes yet.', ing: ['potato2,milk1'], cook: 'st' },
-		{ name: 'Ground Meat', desc: 'Looks kinda like a brain, huh?', ing: ['meat2'], cook: 'mb' },
-		{ name: 'Savory Broth', desc: 'The good stuff.', ing: ['onion2,tomato1,pepper_spice1,meat1'], cook: 'st' },
-		{ name: 'Chocolate Ganache', desc: 'Similar to icing. Very tasty!', ing: ['cocoa_powder1,milk1,sugar1'], cook: 'st' },
-		{ name: 'Pineapple Glaze', desc: 'Very sweet, very fruity, very yellow.', ing: ['pineapple1,sugar1'], cook: 'st' },
-		{ name: 'Toasted Almond Meal', desc: 'This will probably kill you if you eat it raw.', ing: ['almond2'], cook: 'ov' },
-		{ name: 'Roasted Tomato Base', desc: "NOT tomato sauce, there's a DIFFERENCE.", ing: ['tomato2,onion1'], cook: 'ov' },
-		{ name: 'Pepper Spice', desc: 'What spice is this? What spice is this NOT?', ing: ['pepper2'], cook: 'mb' }
+		{ name: 'Butter', desc: 'I can never say this without thinking of that butter frog from CWACOM 2.', ing: ['milk2'], cook: 'mb' },
+		{ name: 'Cheese', desc: 'Hard drugs, according to your brain.', ing: ['milk2,spices1'], cook: 'st' },
+		{ name: 'Spices', desc: 'What spice is this? What spice is this NOT?', ing: ['pepper2'], cook: 'mb' },
+		{ name: 'Cooking Oil', desc: 'Chug! Chug! Chug!', ing: ['olives2'], cook: 'mb' },
+		{ name: 'Chocolate', desc: 'Back in the great depression, this stuff was more common than flour. Wild.', ing: ['cocoa2,sugar1'], cook: 'st' },
+		{ name: 'Pumpkin Puree', desc: 'Well, it certainly smells like pumpkin.', ing: ['pumpkin2,sugar1'], cook: 'st' },
+		{ name: 'Pineapple Glaze', desc: 'Very sweet, very fruity, very yellow.', ing: ['pineapple2,sugar1'], cook: 'st' },
+		{ name: 'Jam', desc: 'Why not add fruit jam? Lazy.', ing: ['berries2,sugar1'], cook: 'st' },
+		{ name: 'Dough', desc: 'Nearly destroyed New York City once.', ing: ['flour1,water1'], cook: 'mb' },
+		{ name: 'Mashed Potato', desc: "You've ruined a perfectly good potato is what you've done.", ing: ['potato2,milk1'], cook: 'st' },
+		{ name: 'Tomato Sauce', desc: 'A tomato you can drink!', ing: ['tomato2,onion1,spices1'], cook: 'st' },
+		{ name: 'Ground Meat', desc: 'Looks kinda like a brain, huh?', ing: ['meat2'], cook: 'st' },
+		{ name: 'Guacamole', desc: 'I saw someone make this using a grenade and poker chips once.', ing: ['avocado2,tomato1,onion1,pepper1'], cook: 'mb' },
+		{ name: 'Pasta', desc: 'Break in case of Italian.', ing: ['dough2,water1'], cook: 'st' },
+		{ name: 'Ice Cream', desc: 'How are you keeping this cold?', ing: ['milk2,sugar1'], cook: 'mb' },
+		{ name: 'Bread', desc: "Best thing since sliced dough. I'm funny, shut up.", ing: ['dough1,butter1'], cook: 'ov' }
 	];
 
 	const RECIPES = [
-		{ name: 'Fresh Salsa', desc: 'So tasy, so spicy, so fresh!', ing: ['tomato2,onion1,pepper_spice1,sugar1'], cook: 'mb' },
-		{ name: 'Strawberry Watermelon Salad', desc: 'An odd combo, but one that works.', ing: ['strawberry2,watermelon1,sugar1'], cook: 'mb' },
-		{ name: 'Cocoa Bites', desc: 'Basically just brownies with less ingredients.', ing: ['cocoa_powder1,milk1,sugar1'], cook: 'mb' },
-		{ name: 'Sweet Roll', desc: 'Good chance this will be stolen.', ing: ['flour2,milk1,sugar1'], cook: 'mb' },
-		{ name: 'Pepper Tomato Slaw', desc: 'A very strange dish. Best not to think about it.', ing: ['tomato1,onion1,pepper_spice1'], cook: 'mb' },
-		{ name: 'Watermelon Cooler', desc: 'A good drink on a hot day.', ing: ['watermelon1,milk1,sugar1'], cook: 'mb' },
-		{ name: 'Fruit Parfait', desc: 'Not ice cream, but just as good.', ing: ['strawberry1,milk1,sugar1'], cook: 'mb' },
-		{ name: 'Chocolate Milk', desc: 'Some say you can still hear Batman declaring his love for the stuff.', ing: ['cocoa_powder1,milk1,sugar1'], cook: 'mb' },
-		{ name: 'Egg Salad', desc: 'Eat quickly, do NOT leave out.', ing: ['egg2,onion1,pepper_spice1'], cook: 'mb' },
-		{ name: 'Meat Spread', desc: "Well...it's food.", ing: ['ground_meat1,onion1,pepper_spice1'], cook: 'mb' },
-		{ name: 'Tomato Omelette', desc: 'The most omelette an omelette can be.', ing: ['egg2,tomato_sauce1,pepper_spice1'], cook: 'st' },
-		{ name: 'Rice Pancakes', desc: 'Yes, I know we have flour. Stop asking questions.', ing: ['rice2,milk1,sugar1'], cook: 'st' },
-		{ name: 'Potato Cakes', desc: 'Like a regular potato, but so much better.', ing: ['mashed_potato_base1,flour1,pepper_spice1'], cook: 'st' },
-		{ name: 'Hot Cocoa', desc: 'I can still hear Tom Hanks singing about this.', ing: ['chocolate_ganache1,milk1'], cook: 'st' },
-		{ name: 'Meatballs', desc: 'No spaghetti, sorry.', ing: ['ground_meat2,onion1,pepper_spice1'], cook: 'st' },
-		{ name: 'Rice Porridge', desc: 'We out of oats.', ing: ['rice2,milk1,sugar1'], cook: 'st' },
-		{ name: 'Jam Pancakes', desc: 'Now THIS is a pancake.', ing: ['flour2,milk1,fruit_jam1'], cook: 'st' },
-		{ name: 'Onion Pepper Omelette', desc: 'If an egg could fight back.', ing: ['egg2,onion1,pepper_spice1'], cook: 'st' },
-		{ name: 'Pineapple Cakes', desc: 'Mmm, yellow cubes.', ing: ['flour2,milk1,pineapple_glaze1'], cook: 'st' },
-		{ name: 'Steak and Eggs', desc: "Can't go wrong with a classic.", ing: ['meat2,egg2,pepper_spice1'], cook: 'st' },
-		{ name: 'Pumpkin Pie', desc: 'It should not be as good as it is...and yet.', ing: ['pumpkin_puree1,flour2,milk1,sugar1'], cook: 'ov' },
-		{ name: 'Chocolate Cake', desc: "And that's terrible.", ing: ['flour2,chocolate_ganache1,milk1,sugar1'], cook: 'ov' },
-		{ name: 'Strawberry Tart', desc: 'You get one strawberry.', ing: ['fruit_jam1,flour2,toasted_almond_meal1,sugar1'], cook: 'ov' },
-		{ name: 'Pineapple Upside-Down Cake', desc: "This feels like a depression-era recipe. It's not, but it feels like it.", ing: ['pineapple_glaze1,flour2,milk1,sugar1'], cook: 'ov' },
-		{ name: 'Meat and Potatoes', desc: 'Only good if the potatoes are crispy. I will fight people on this.', ing: ['ground_meat2,mashed_potato_base1,onion1,pepper_spice1'], cook: 'ov' },
-		{ name: 'Stuffed Tomatoes', desc: 'What if bread bowl...but tomato?', ing: ['roasted_tomato_base1,rice1,pepper_spice1'], cook: 'st' },
-		{ name: 'Watermelon Sorbet', desc: 'Actual ice cream.', ing: ['watermelon2,sugar1,milk1'], cook: 'mb' },
-		{ name: 'Almond Cookies', desc: 'Hey, had to use the almonds somehow.', ing: ['flour2,toasted_almond_meal1,milk1,sugar1'], cook: 'ov' },
-		{ name: 'Pepper Bread', desc: 'This is the only bread here and I made it spicy to spite you.', ing: ['flour2,pepper_spice2,milk1,sugar1'], cook: 'ov' },
-		{ name: 'Fish Stew', desc: 'How did you make a meatbulb into this? What?', ing: ['savory_broth1,potato1,onion1,meat1'], cook: 'st' }
+		{ name: 'Pancakes', desc: 'Easy to make and easy to enjoy!', ing: ['flour2,milk1,egg1,sugar1'], cook: 'st' },
+		{ name: 'Waffles', desc: 'Bumpy pancake. Or is a pancake just a flat waffle?', ing: ['dough2,egg1,butter1,sugar1'], cook: 'ov' },
+		{ name: 'French Toast', desc: 'High-effort sugar toast.', ing: ['bread1,egg1,milk1,honey1'], cook: 'st' },
+		{ name: 'Berry Muffins', desc: 'Regular muffins with occasional bursts of fruity flavor!', ing: ['flour2,butter1,berries1,sugar1'], cook: 'ov' },
+		{ name: 'Chocolate Cake', desc: "And that's terrible.", ing: ['flour2,chocolate1,butter1,egg1'], cook: 'ov' },
+		{ name: 'Pumpkin Pie', desc: 'It should not be as good as it is...and yet.', ing: ['pumpkin_puree2,dough1,milk1,sugar1'], cook: 'ov' },
+		{ name: 'Sweet Roll', desc: 'Good chance this will be stolen.', ing: ['dough2,butter1,sugar1,honey1'], cook: 'ov' },
+		{ name: 'Nut Bread', desc: 'Heh.', ing: ['dough2,nuts1,honey1,butter1'], cook: 'ov' },
+		{ name: 'Omelette', desc: 'The most omelette an omelette can be.', ing: ['egg2,cheese1,milk1,spices1'], cook: 'st' },
+		{ name: 'Steak and Eggs', desc: "Can't go wrong with a classic.", ing: ['meat2,egg2,spices1'], cook: 'st' },
+		{ name: 'Burrito', desc: 'Fart cylinder.', ing: ['dough1,ground_meat2,cheese1,tomato_sauce1'], cook: 'st' },
+		{ name: 'Stuffed Peppers', desc: 'Who came up with this? A madman.', ing: ['pepper2,ground_meat1,rice1,guacamole1'], cook: 'ov' },
+		{ name: 'Fried Rice', desc: 'What if we take rice...and cook it again?', ing: ['rice2,egg1,cooking_oil1,spices1'], cook: 'st' },
+		{ name: 'Tomato Soup', desc: 'Liquid tomato, now with even more liquid tomato.', ing: ['tomato_sauce2,milk1,onion1,spices1'], cook: 'st' },
+		{ name: 'Mashed Potatoes', desc: "But...didn't you already...?", ing: ['mashed_potato2,butter1,spices1'], cook: 'st' },
+		{ name: 'Potato Soup', desc: "Just pretend the potatoes are in chunks. I'm not redoing it.", ing: ['mashed_potato1,cheese1,spices1,milk1'], cook: 'st' },
+		{ name: 'Avocado Toast', desc: 'Rich kid breakfast.', ing: ['bread1,avocado1,spices1'], cook: 'st' },
+		{ name: 'Curry Bowl', desc: 'Do not eat with your hands. Please. I beg.', ing: ['rice2,meat1,spices1,tomato_sauce1'], cook: 'st' },
+		{ name: 'Chocolate Pudding', desc: 'As opposed to regular pudding.', ing: ['chocolate1,milk2,sugar1,butter1'], cook: 'mb' },
+		{ name: 'Pie', desc: 'What flavor?', ing: ['dough2,jam1,butter1,sugar1'], cook: 'ov' },
+		{ name: 'Fruit Tart', desc: 'Now with more tart!', ing: ['dough2,pineapple_glaze1,fruit1,butter1'], cook: 'ov' },
+		{ name: 'Pineapple Cake', desc: "This feels like a depression-era recipe. It's not, but it feels like it.", ing: ['pineapple_glaze1,flour2,butter1,egg1'], cook: 'ov' },
+		{ name: 'Chocolate Bar', desc: 'Way too much effort for this thing.', ing: ['chocolate2,sugar1,butter1'], cook: 'mb' },
+		{ name: 'Jelly Donut', desc: 'As seen on TV!', ing: ['dough2,jam1,butter1,sugar1'], cook: 'ov' },
+		{ name: 'Fruit Salad', desc: 'This is high-effort fruit salad, this is.', ing: ['fruit2,pineapple_glaze1,honey1'], cook: 'mb' },
+		{ name: 'Honey Cookies', desc: 'Surprisingly tasty!', ing: ['dough2,sugar1,honey1,butter1'], cook: 'ov' },
+		{ name: 'Honey Cake', desc: 'Bees not included.', ing: ['flour2,butter1,honey1,egg1'], cook: 'ov' },
+		{ name: 'Candied Pumpkin', desc: 'Not the whole pumpkin, of course. Unless...?', ing: ['pumpkin_puree2,sugar1,honey1'], cook: 'st' },
+		{ name: 'Tacos', desc: 'Remember when it was raining these? I remember.', ing: ['dough1,ground_meat1,cheese1,spices1'], cook: 'st' },
+		{ name: 'Spaghetti and Meatballs', desc: 'So easy to make, yet no restaurant can ever get them right.', ing: ['pasta1,tomato_sauce1,ground_meat1,onion1'], cook: 'st' },
+		{ name: 'Ham and Cheese Sandwich', desc: 'Best after swimming.', ing: ['bread1,meat1,cheese1'], cook: 'mb' },
+		{ name: 'Lasagna', desc: '[Garfield joke]', ing: ['pasta2,ground_meat1,tomato_sauce1,cheese1'], cook: 'ov' },
+		{ name: 'Macaroni and Cheese', desc: 'Either a struggle meal or the best thing ever, or both.', ing: ['pasta2,cheese1,milk1,butter1'], cook: 'st' },
+		{ name: 'Cheeseburger', desc: 'Can has.', ing: ['bread1,meat1,cheese1,tomato1'], cook: 'st' },
+		{ name: 'Fruit Parfait', desc: 'You would think this uses ice cream, but no.', ing: ['milk1,berries1,fruit1,honey1'], cook: 'mb' },
+		{ name: 'Watermelon Sorbet', desc: 'Watermelon, but sweeter, if possible.', ing: ['watermelon1,sugar1,ice_cream1'], cook: 'mb' },
+		{ name: 'Honey Glazed Ham', desc: 'This or turkey. Which way, western man?', ing: ['meat3,honey1,spices1'], cook: 'ov' },
+		{ name: 'Roast Turkey', desc: 'Merry Christmas! Wait, no. Thanksgiving. My bad.', ing: ['meat3,onion1,spices1'], cook: 'ov' },
+		{ name: 'Spaghetti Alfredo', desc: "You add chicken to this? I don't, but to each their own.", ing: ['pasta2,milk1,butter1'], cook: 'st' },
+		{ name: 'Ramen', desc: 'Include egg. Always.', ing: ['pasta1,egg1,meat1,spices1'], cook: 'st' },
+		{ name: 'Cider', desc: 'Not hard cider. Just normal cider. For now.', ing: ['fruit2,sugar1'], cook: 'st' },
+		{ name: 'Beef Stew', desc: 'Meat water.', ing: ['meat2,potato1,onion1,spices1'], cook: 'st' },
+		{ name: 'Pizza', desc: 'You get pepperoni.', ing: ['dough1,tomato_sauce1,cheese1,meat1'], cook: 'ov' },
+		{ name: 'Stuffed Potato', desc: 'Either this tastes incredibly amazing, or it tastes like a warm potato. No in-between.', ing: ['potato1,cheese1,butter1,meat1'], cook: 'ov' },
+		{ name: 'Grilled Cheese', desc: 'Mmm, sammich.', ing: ['bread1,cheese1,butter1,spices1'], cook: 'st' }
 	];
 
 	const SECTIONS=['Mixing Bowl','Stovetop','Oven'];
@@ -648,9 +666,41 @@
 			}
 			return { req, crafts: (crafts===Infinity?0:crafts) };
 		};
-		for (const e of INGREDIENTS) { const res = canMake(e); if (res && res.crafts >= 1) return { kind:'ingredient', entry:e, req:res.req, crafts:res.crafts }; }
-		for (const e of RECIPES) { const res = canMake(e); if (res && res.crafts >= 1) return { kind:'recipe', entry:e, req:res.req, crafts:res.crafts }; }
-		return null;
+		const candidates = [];
+		const evaluateEntry = (entry, kind, index, typeRank) => {
+			const res = canMake(entry);
+			if (!res || res.crafts < 1) return;
+			const counts = res.req.map(r => r.count || 1);
+			const maxCount = counts.length ? Math.max(...counts) : 0;
+			const totalCount = counts.reduce((sum, c) => sum + c, 0);
+			candidates.push({
+				kind,
+				entry,
+				req: res.req,
+				crafts: res.crafts,
+				priority: {
+					maxCount,
+					totalCount,
+					crafts: res.crafts,
+					typeRank,
+					index,
+				},
+			});
+		};
+		INGREDIENTS.forEach((entry, idx) => evaluateEntry(entry, 'ingredient', idx, 0));
+		RECIPES.forEach((entry, idx) => evaluateEntry(entry, 'recipe', idx, 1));
+		if (!candidates.length) return null;
+		const best = candidates.reduce((currentBest, candidate) => {
+			if (!currentBest) return candidate;
+			const a = candidate.priority;
+			const b = currentBest.priority;
+			if (a.maxCount !== b.maxCount) return (a.maxCount > b.maxCount) ? candidate : currentBest;
+			if (a.totalCount !== b.totalCount) return (a.totalCount > b.totalCount) ? candidate : currentBest;
+			if (a.crafts !== b.crafts) return (a.crafts > b.crafts) ? candidate : currentBest;
+			if (a.typeRank !== b.typeRank) return (a.typeRank < b.typeRank) ? candidate : currentBest;
+			return (a.index < b.index) ? candidate : currentBest;
+		}, null);
+		return best ? { kind: best.kind, entry: best.entry, req: best.req, crafts: best.crafts } : null;
 	};
 
 	

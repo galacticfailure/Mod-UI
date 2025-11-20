@@ -123,6 +123,12 @@
   };
 
   
+  const sanitizeMatch = (text) => {
+    if (!text) return '';
+    const cleaned = text.replace(/AcknowledgeStop$/i, '').trim();
+    return cleaned;
+  };
+
   const scanElement = (element) => {
     const text = element.textContent.toLowerCase();
     const matches = [];
@@ -137,8 +143,9 @@
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
           originalMatches.forEach(match => {
-            if (!foundWords.includes(match)) {
-              foundWords.push(match);
+            const cleanedMatch = sanitizeMatch(match);
+            if (cleanedMatch && !foundWords.includes(cleanedMatch)) {
+              foundWords.push(cleanedMatch);
             }
           });
         }
@@ -154,8 +161,9 @@
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
           originalMatches.forEach(match => {
-            if (!foundWords.includes(match)) {
-              foundWords.push(match);
+            const cleanedMatch = sanitizeMatch(match);
+            if (cleanedMatch && !foundWords.includes(cleanedMatch)) {
+              foundWords.push(cleanedMatch);
             }
           });
         }

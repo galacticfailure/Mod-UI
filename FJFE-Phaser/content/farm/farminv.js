@@ -26,7 +26,6 @@
 	const expandInventory = () => {
 		const newSlots = Array(COLS).fill(null);
 		inventorySlots.push(...newSlots);
-		console.log(`Expanded inventory to ${inventorySlots.length} slots (${getCurrentRows()} rows)`);
 		return true;
 	};
 	
@@ -56,6 +55,24 @@
 	const resolve = (p) => {
 		try { return (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p; } catch (_) { return p; }
 	};
+
+	const parseTags = (value) => {
+		if (!value) return [];
+		if (Array.isArray(value)) {
+			return value
+				.map((tag) => String(tag || '').trim())
+				.filter(Boolean);
+		}
+		if (typeof value === 'string') {
+			return value
+				.split(/[|,]/)
+				.map((tag) => String(tag || '').trim())
+				.filter(Boolean);
+		}
+		return [];
+	};
+
+	const FERTILIZER_TAG = 'Fertilized';
 
 	
 	const addToInventory = (itemName, count = 1, itemType = 'plant') => {
@@ -178,9 +195,7 @@
 			if (window.fjFarm && window.fjFarm.state && window.fjFarm.state.setInventory) {
 				window.fjFarm.state.setInventory(inventorySlots);
 			}
-		} catch (e) {
-			console.error('Failed to save inventory:', e);
-		}
+		} catch (_) {}
 	};
 
 	
@@ -198,9 +213,7 @@
 					}
 				}
 			}
-		} catch (e) {
-			console.error('Failed to load inventory:', e);
-		}
+		} catch (_) {}
 	};
 
 	const buildUI=()=>{
@@ -221,7 +234,7 @@
 
 		
 		const coinRow=document.createElement('div');
-		Object.assign(coinRow.style,{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'2px', marginBottom:'8px' });
+		Object.assign(coinRow.style,{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', marginBottom:'8px' });
 		
 		
 		const coinPart=document.createElement('div');
@@ -243,7 +256,7 @@
 		coinPart.append(coinImg, coinText);
 		
 		
-		const sellBtn=document.createElement('button');
+			const sellBtn=document.createElement('button');
 		sellBtn.type='button';
 		sellBtn.textContent='Sell';
 		Object.assign(sellBtn.style,{
@@ -251,8 +264,31 @@
 			border:'1px solid #c33',borderRadius:'4px',cursor:'pointer'
 		});
 		sellBtn.addEventListener('click', handleSellToggle);
-		
-		coinRow.append(coinPart, sellBtn);
+    
+			
+			const livePart=document.createElement('div');
+			livePart.setAttribute('data-role','live-sell');
+			Object.assign(livePart.style,{ display:'none', alignItems:'center', gap:'4px' });
+			const liveImg=document.createElement('img');
+			liveImg.alt=''; liveImg.draggable=false; liveImg.decoding='async'; liveImg.loading='lazy';
+			liveImg.src = resolve('icons/farm/coin.png');
+			liveImg.onerror=function(){ this.src = resolve('icons/error.png'); };
+			Object.assign(liveImg.style,{ width:'16px', height:'16px' });
+			const liveText=document.createElement('span');
+			liveText.setAttribute('data-role','live-sell-text');
+			Object.assign(liveText.style,{ color:'#f3d266', fontWeight:'700' });
+			liveText.textContent='0';
+			livePart.append(liveImg, liveText);
+			
+			coinRow._liveContainer = livePart;
+			coinRow._liveText = liveText;
+
+			const rightGroup = document.createElement('div');
+			Object.assign(rightGroup.style, { display:'flex', alignItems:'center', gap:'8px' });
+			
+			rightGroup.append(livePart, sellBtn);
+
+			coinRow.append(coinPart, rightGroup);
 
 		const grid=document.createElement('div');
 		Object.assign(grid.style,{
@@ -316,7 +352,7 @@
 				
 				let imagePath;
 				if (slot.type === 'plant' || slot.type === 'food') {
-					imagePath = `icons/farm/food/${slot.item}.png`;
+					imagePath = slot.item === 'fertilizer' ? 'icons/farm/fertilizer.png' : `icons/farm/food/${slot.item}.png`;
 				} else if (slot.type === 'object') {
 					imagePath = `icons/farm/objects/${slot.item}.png`;
 				} else {
@@ -357,12 +393,27 @@
 				}
 				
 				
-				btn.addEventListener('mouseenter', () => showInventoryTooltip(slot, btn));
-				btn.addEventListener('mouseleave', hideInventoryTooltip);
+				if (btn._tooltipEnter) {
+					btn.removeEventListener('mouseenter', btn._tooltipEnter);
+				}
+				const enterHandler = () => showInventoryTooltip(slot, btn);
+				btn._tooltipEnter = enterHandler;
+				btn.addEventListener('mouseenter', enterHandler);
+
+				if (!btn._tooltipLeave) {
+					btn._tooltipLeave = hideInventoryTooltip;
+					btn.addEventListener('mouseleave', hideInventoryTooltip);
+				}
 			} else {
 				
-				btn.removeEventListener('mouseenter', btn._tooltipHandler);
-				btn.removeEventListener('mouseleave', hideInventoryTooltip);
+				if (btn._tooltipEnter) {
+					btn.removeEventListener('mouseenter', btn._tooltipEnter);
+					btn._tooltipEnter = null;
+				}
+				if (btn._tooltipLeave) {
+					btn.removeEventListener('mouseleave', btn._tooltipLeave);
+					btn._tooltipLeave = null;
+				}
 			}
 
 			
@@ -373,6 +424,7 @@
 				} else {
 					btn.style.boxShadow = 'inset 0 0 0 1px #0008';
 				}
+						updateLiveSellTotal();
 			} else {
 				btn.style.filter = '';
 				btn.style.boxShadow = 'inset 0 0 0 1px #0008';
@@ -465,12 +517,12 @@
 						count: pickedItem.count,
 						itemType: pickedItem.type,
 						originSlotIndex: slotIndex,
-						
+					
 						type: isObject ? 'object' : 'inventory-item',
 						isInventoryObject: isObject ? true : undefined,
 						icon: isObject ? 
 							`icons/farm/objects/${pickedItem.item}.png` : 
-							`icons/farm/food/${pickedItem.item}.png`
+							(pickedItem.item === 'fertilizer' ? 'icons/farm/fertilizer.png' : `icons/farm/food/${pickedItem.item}.png`)
 					};
 					interactModule.selectItem(selection, null);
 					
@@ -489,31 +541,32 @@
 	
 	const showInventoryTooltip = (slot, buttonEl) => {
 		try {
-			
-			const interactModule = window.fjTweakerModules?.farminteract;
-			if (interactModule?.hasSelection?.()) return;
-			
+			if (!slot) return;
 			let tooltipData = {};
+				
 			
 			if (slot.type === 'plant') {
 				const seedsModule = window.fjTweakerModules?.farmseeds;
 				let displayName = slot.item;
 				let desc = '';
+				let tags = [];
 				try {
 					const plantHarvest = seedsModule?.getPlantHarvest?.();
 					if (plantHarvest && plantHarvest[slot.item]) {
-						displayName = plantHarvest[slot.item].name || slot.item;
-						desc = plantHarvest[slot.item].desc || '';
+						const meta = plantHarvest[slot.item];
+						displayName = meta.name || slot.item;
+						desc = meta.desc || '';
+						tags = parseTags(meta.tag || meta.tags);
 					}
 				} catch(_) {}
 				const price = window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'plant') || 0;
 				tooltipData = {
 					imageSrc: resolve(`icons/farm/food/${slot.item}.png`),
 					name: displayName,
-					bodyTop: `Quantity: ${slot.count}`,
 					bodyTT: desc,
 					cost: String(price),
 					costIcon: 'icons/farm/coin.png',
+					tags,
 				};
 			} else if (slot.type === 'object') {
 				const shopModule = window.fjTweakerModules?.farmshop;
@@ -524,10 +577,10 @@
 						tooltipData = {
 							imageSrc: resolve(`icons/farm/objects/${slot.item}.png`),
 							name: objectInfo.name,
-							bodyTop: `Quantity: ${slot.count}`,
 							bodyTT: objectInfo.desc,
 							cost: String(objectInfo.prc || 0),
 							costIcon: 'icons/farm/coin.png',
+							tags: parseTags(objectInfo.tag),
 						};
 					}
 				}
@@ -543,10 +596,10 @@
 					tooltipData = {
 						imageSrc: resolve(`icons/farm/food/${norm}.png`),
 						name: ingEntry.name,
-						bodyTop: `Quantity: ${slot.count}`,
 						bodyTT: ingEntry.desc || '',
 						cost: String(price),
 						costIcon: 'icons/farm/coin.png',
+						tags: parseTags(ingEntry.tag),
 					};
 				} else {
 					const recEntry = recs.find(e => String(e.name||'').trim().toLowerCase().replace(/\s+/g,'_') === norm);
@@ -556,30 +609,53 @@
 						tooltipData = {
 							imageSrc: resolve(`icons/farm/food/${norm}.png`),
 							name: recEntry.name,
-							bodyTop: `Quantity: ${slot.count}`,
 							bodyTT: recEntry.desc || '',
 							cost: String(price),
 							costIcon: 'icons/farm/coin.png',
+							tags: parseTags(recEntry.tag),
 						};
 					}
+				}
+					if (Object.keys(tooltipData).length === 0 && slot.item === 'fertilizer') {
+						tooltipData = {
+							imageSrc: resolve('icons/farm/fertilizer.png'),
+							name: 'Fertilizer',
+							bodyTT: 'Apply to crops to double their harvest!',
+							cost: '32',
+							costIcon: 'icons/farm/coin.png',
+							tags: [FERTILIZER_TAG],
+						};
+					} else if (Object.keys(tooltipData).length === 0 && slot.item === 'water') {
+						tooltipData = {
+							imageSrc: resolve('icons/farm/food/water.png'),
+							name: 'Water',
+							bodyTT: "It's water.",
+							cost: '2',
+							costIcon: 'icons/farm/coin.png',
+							tags: ['Utility'],
+						};
+					} else if (Object.keys(tooltipData).length === 0 && slot.item === 'honey') {
+						tooltipData = {
+							imageSrc: resolve('icons/farm/food/honey.png'),
+							name: 'Honey',
+							bodyTT: 'Pure, sweet honey harvested from your bee boxes.',
+							cost: '14',
+							costIcon: 'icons/farm/coin.png',
+							tags: ['Ingredient'],
+						};
 				}
 			}
 			
 			if (Object.keys(tooltipData).length > 0) {
 				window.fjfeFarmTT?.show?.(tooltipData);
 			}
-		} catch (error) {
-			console.error('Inventory tooltip error:', error);
-		}
+		} catch (_) {}
 	};
 
 	
 	const hideInventoryTooltip = () => {
 		try {
-			const interactModule = window.fjTweakerModules?.farminteract;
-			if (!interactModule?.hasSelection?.()) {
-				window.fjfeFarmTT?.hide?.();
-			}
+			window.fjfeFarmTT?.hide?.();
 		} catch (_) {}
 	};
 
@@ -599,60 +675,22 @@
 			}, 60);
 		}, 100);
 		
-		if (!isSellMode) {
+			if (!isSellMode) {
 			
 			isSellMode = true;
 			applySellModeStyles(btn);
 			refreshInventoryUI();
+				updateLiveSellTotal();
 			return;
 		}
 		
 		
-		let totalValue = 0;
-		selectedForSale.forEach((idx) => {
-			const slot = inventorySlots[idx];
-			if (slot && slot.count > 0) {
-				let itemValue = 0;
-				if (slot.type === 'plant') {
-					const unit = window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'plant') || 0;
-					itemValue = unit * slot.count;
-				} else if (slot.type === 'object') {
-					const shopModule = window.fjTweakerModules?.farmshop;
-					if (shopModule && shopModule.getObjectTips) {
-						const objectTips = shopModule.getObjectTips();
-						const objectInfo = objectTips[slot.item];
-						itemValue = (objectInfo?.prc || 0) * slot.count;
-					}
-				} else if (slot.type === 'food') {
-					
-					const cook = window.fjTweakerModules?.farmcook;
-					const ings = cook?.INGREDIENTS?.() || [];
-					const recs = cook?.RECIPES?.() || [];
-					const norm = String(slot.item||'').trim().toLowerCase().replace(/\s+/g,'_');
-					const ingEntry = ings.find(e => String(e.name||'').trim().toLowerCase().replace(/\s+/g,'_') === norm);
-					const recEntry = recs.find(e => String(e.name||'').trim().toLowerCase().replace(/\s+/g,'_') === norm);
-					if (ingEntry) {
-						const toks = cook?.flattenTokens ? cook.flattenTokens(ingEntry.ing) : (ingEntry.ing || []);
-						const unit = window.fjFarm?.pricing?.getPriceForItem?.(ingEntry.name, 'ingredient', { tokens: toks }) || 0;
-						itemValue = unit * slot.count;
-					} else if (recEntry) {
-						const toks = cook?.flattenTokens ? cook.flattenTokens(recEntry.ing) : (recEntry.ing || []);
-						const unit = window.fjFarm?.pricing?.getPriceForItem?.(recEntry.name, 'recipe', { tokens: toks }) || 0;
-						itemValue = unit * slot.count;
-					} else {
-						
-						const unit = window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'plant') || 0;
-						itemValue = unit * slot.count;
-					}
-				}
-				totalValue += itemValue;
-				inventorySlots[idx] = null; 
-			}
-		});
+			const totalValue = computeSelectedSellValue(true);
+			
+			selectedForSale.forEach((idx) => { if (inventorySlots[idx]) inventorySlots[idx] = null; });
 		
 		if (totalValue > 0) {
 			window.fjFarm?.coins?.add?.(totalValue);
-			console.log(`Sold ${selectedForSale.size} selected slots for ${totalValue} coins`);
 			try { window.fjFarm?.audio?.play?.('sell'); } catch(_) {}
 		}
 		
@@ -660,6 +698,7 @@
 		isSellMode = false;
 		selectedForSale.clear();
 		applySellModeStyles(btn);
+		updateLiveSellTotal();
 		
 		pruneEmptyTrailingRows();
 		refreshInventoryUI();
@@ -670,21 +709,85 @@
 	const toggleSlotForSale = (slotIndex) => {
 		if (selectedForSale.has(slotIndex)) selectedForSale.delete(slotIndex);
 		else selectedForSale.add(slotIndex);
+			updateLiveSellTotal();
 	};
 
 	
-	const applySellModeStyles = (sellBtn) => {
+			const applySellModeStyles = (sellBtn) => {
 		if (!sellBtn) return;
 		if (isSellMode) {
 			sellBtn.style.background = '#fff';
 			sellBtn.style.color = '#c33';
 			sellBtn.style.border = '1px solid #c33';
+					try { if (root) { const live = root.querySelector('[data-role="live-sell"]'); if (live) live.style.display='flex'; } } catch(_) {}
 		} else {
 			sellBtn.style.background = '#c33';
 			sellBtn.style.color = '#fff';
 			sellBtn.style.border = '1px solid #c33';
+					try { if (root) { const live = root.querySelector('[data-role="live-sell"]'); if (live) live.style.display='none'; } } catch(_) {}
 		}
 	};
+
+		
+		const computeSelectedSellValue = (finalizeObjects75 = false) => {
+			let total = 0;
+			try {
+				selectedForSale.forEach((idx) => {
+					const slot = inventorySlots[idx];
+					if (!slot || slot.count <= 0) return;
+					if (slot.type === 'plant') {
+						const unit = window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'plant') || 0;
+						total += unit * slot.count;
+					} else if (slot.type === 'object') {
+						const shopModule = window.fjTweakerModules?.farmshop;
+						if (shopModule && shopModule.getObjectTips) {
+							const objectTips = shopModule.getObjectTips();
+							const objectInfo = objectTips[slot.item];
+							const base = objectInfo?.prc || 0;
+							if (finalizeObjects75) {
+								total += Math.ceil(base * 0.75) * slot.count;
+							} else {
+								total += Math.ceil(base * 0.75) * slot.count; 
+							}
+						}
+					} else if (slot.type === 'food') {
+						const cook = window.fjTweakerModules?.farmcook;
+						const ings = cook?.INGREDIENTS?.() || [];
+						const recs = cook?.RECIPES?.() || [];
+						const norm = String(slot.item||'').trim().toLowerCase().replace(/\s+/g,'_');
+						const ingEntry = ings.find(e => String(e.name||'').trim().toLowerCase().replace(/\s+/g,'_') === norm);
+						const recEntry = recs.find(e => String(e.name||'').trim().toLowerCase().replace(/\s+/g,'_') === norm);
+						if (ingEntry) {
+							const toks = cook?.flattenTokens ? cook.flattenTokens(ingEntry.ing) : (ingEntry.ing || []);
+							const unit = window.fjFarm?.pricing?.getPriceForItem?.(ingEntry.name, 'ingredient', { tokens: toks }) || 0;
+							total += unit * slot.count;
+						} else if (recEntry) {
+							const toks = cook?.flattenTokens ? cook.flattenTokens(recEntry.ing) : (recEntry.ing || []);
+							const unit = window.fjFarm?.pricing?.getPriceForItem?.(recEntry.name, 'recipe', { tokens: toks }) || 0;
+							total += unit * slot.count;
+						} else {
+							const unit = window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'food')
+								|| window.fjFarm?.pricing?.getPriceForItem?.(slot.item, 'plant')
+								|| 0;
+							total += unit * slot.count;
+						}
+					}
+				});
+			} catch(_) {}
+			return total;
+		};
+
+		const updateLiveSellTotal = () => {
+			try {
+				if (!root) return;
+				const live = root.querySelector('[data-role="live-sell-text"]');
+				const cont = root.querySelector('[data-role="live-sell"]');
+				if (!live || !cont) return;
+				const total = computeSelectedSellValue(false);
+				live.textContent = String(total);
+				cont.style.display = isSellMode ? 'flex' : 'none';
+			} catch(_) {}
+		};
 
 	const open=(host)=>{
 		if(isOpen||!host) return;
@@ -724,10 +827,8 @@
 				
 			}
 			
-			console.log('Inventory reset: cleared slots and persisted state');
 			return true;
-		} catch (error) {
-			console.error('Error resetting inventory:', error);
+		} catch (_) {
 			return false;
 		}
 	};

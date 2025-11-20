@@ -3,6 +3,9 @@
     container: null,
     toggleEl: null,
   };
+  
+  
+  let keySeqAttached = false;
 
   const DEBUG_FLAG_KEY = 'fjfeDebugEnabled';
 
@@ -198,6 +201,7 @@
   }
 
   function buildContainer() {
+    if (state.container) return state.container;
     const container = document.createElement('div');
     container.setAttribute('data-role', 'fjfe-debug-buttons');
     Object.assign(container.style, {
@@ -229,46 +233,13 @@
     document.body.appendChild(container);
     state.container = container;
     refreshDisplays();
+    return container;
   }
 
-  function ensureToggleHotzone() {
-    if (state.toggleEl) return;
-    const hot = document.createElement('div');
-    hot.setAttribute('data-role', 'fjfe-debug-toggle-hotzone');
-    Object.assign(hot.style, {
-      position: 'absolute',
-      left: '8px',
-      width: '28px',
-      height: '28px',
-      opacity: '0', 
-      zIndex: '2147483646',
-      cursor: 'pointer',
-      pointerEvents: 'auto',
-    });
-    
-    try {
-      const top = (window.scrollY || window.pageYOffset || 0) + (window.innerHeight || 0) - 36;
-      hot.style.top = Math.max(0, top) + 'px';
-    } catch(_) { hot.style.top = '2000px'; }
-    hot.title = '';
-    hot.addEventListener('click', () => {
-      try {
-        const enabled = localStorage.getItem(DEBUG_FLAG_KEY) === '1';
-        const next = !enabled;
-        localStorage.setItem(DEBUG_FLAG_KEY, next ? '1' : '0');
-        if (next) {
-          if (!state.container) buildContainer();
-        } else {
-          cleanup();
-        }
-      } catch (_) {}
-    });
-    document.body.appendChild(hot);
-    state.toggleEl = hot;
-  }
+  
 
   function init() {
-    ensureToggleHotzone();
+    setupKeySequenceToggle();
     
     try {
       const cur = localStorage.getItem(DEBUG_FLAG_KEY);
@@ -301,10 +272,7 @@
     const s = (e && e.detail) ? e.detail : window.fjTweakerSettings;
     if (s && typeof s.clicker2 !== 'undefined') {
       if (s.clicker2) {
-        
-        if (!state.toggleEl) {
-          init();
-        }
+        init();
       } else {
         
         cleanupAll();
@@ -334,4 +302,49 @@
     refreshRaw: refreshRawOnly,
     resetMoney,
   };
+
+  
+  function setupKeySequenceToggle() {
+    if (keySeqAttached) return;
+    const seq = ['ArrowUp','ArrowDown','\\',']','['];
+    let idx = 0; let timer = null;
+    const reset = () => { idx = 0; if (timer) { clearTimeout(timer); timer = null; } };
+    const isTyping = () => {
+      const ae = document.activeElement;
+      if (!ae) return false;
+      const tag = (ae.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return true;
+      if (ae.isContentEditable) return true;
+      return false;
+    };
+    document.addEventListener('keydown', (e) => {
+      try {
+        if (!isClickerEnabled()) return;
+        if (isTyping()) return;
+        const key = e.key;
+        const expected = seq[idx];
+        if (key === expected) {
+          idx++;
+          if (idx === seq.length) {
+            
+            const enabled = localStorage.getItem(DEBUG_FLAG_KEY) === '1';
+            const next = !enabled;
+            localStorage.setItem(DEBUG_FLAG_KEY, next ? '1' : '0');
+            if (next) {
+              if (!state.container) buildContainer();
+            } else {
+              cleanup();
+            }
+            reset();
+          } else {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(reset, 4000);
+          }
+        } else {
+          reset();
+        }
+      } catch(_) { reset(); }
+    });
+    keySeqAttached = true;
+  }
 })();

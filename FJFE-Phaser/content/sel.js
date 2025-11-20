@@ -3,20 +3,58 @@
   const MODULE_KEY = 'sel';
   const SETTINGS_KEY = 'fjTweakerSettings';
   const DEFAULT_SETTINGS = {
-  avoidNext: false,
-  removeTwilight: true,
-  customMessages: false,
-  hideRateShortcuts: true, 
-  hideShortcuts: false,
-  stopUsernamePopups: true,
-  trackRates: false,
-  modJSExtras: true,
-  walcorn: false,
-  checkText: false,
-  clicker2: false,
-  misrateWarning: false,
-  warnOnAll: false,
-  farm: false
+    avoidNext: false,
+    removeTwilight: false,
+    customMessages: false,
+    hideRateShortcuts: false,
+    hideShortcuts: false,
+    stopUsernamePopups: false,
+    trackRates: false,
+    modJSExtras: false,
+    walcorn: false,
+    checkText: false,
+    clicker2: false,
+    misrateWarning: false,
+    warnOnAll: false,
+    farm: false,
+    huntAssist: false
+  };
+  const ALLOWED_SETTINGS_TIER1 = new Set([
+    'stopUsernamePopups',
+    'trackRates',
+    'misrateWarning',
+    'modJSExtras',
+    'checkText',
+    'avoidNext'
+  ]);
+  const ALLOWED_SETTINGS_TIER2 = new Set([...ALLOWED_SETTINGS_TIER1, 'removeTwilight', 'customMessages']);
+  const ALLOWED_SETTINGS_TIER3 = new Set([...ALLOWED_SETTINGS_TIER2, 'hideRateShortcuts', 'hideShortcuts']);
+  const FORCED_HIDE_SHORTCUTS_KEY = 'fjTweakerForcedHideShortcuts';
+  const computeAccessTier = ({ authorized, level, excluded }) => {
+    if (!authorized) return 'unauthorized';
+    if (excluded) return 'full';
+    if (!Number.isFinite(level)) return 'full';
+    if (level >= 4) return 'full';
+    if (level >= 3) return 'tier3';
+    if (level >= 2) return 'tier2';
+    if (level >= 1) return 'tier1';
+    return 'tier1';
+  };
+  const readForcedHideShortcutsFlag = () => {
+    try {
+      return localStorage.getItem(FORCED_HIDE_SHORTCUTS_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+  const writeForcedHideShortcutsFlag = (value) => {
+    try {
+      if (value) {
+        localStorage.setItem(FORCED_HIDE_SHORTCUTS_KEY, '1');
+      } else {
+        localStorage.removeItem(FORCED_HIDE_SHORTCUTS_KEY);
+      }
+    } catch (_) {}
   };
   const MANAGE_ENTRY_SELECTOR = '#topME .sideEditButt[onclick*="manageAll()"]';
   let manageEntryObserver = null;
@@ -420,7 +458,7 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow) => {
+const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
@@ -436,7 +474,8 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     clicker2: clicker2Row.input.checked,
     misrateWarning: misrateWarningRow.input.checked,
     warnOnAll: warnOnAllRow.input.checked,
-    farm: farmRow ? Boolean(farmRow.input.checked) : false
+    farm: farmRow ? Boolean(farmRow.input.checked) : false,
+    huntAssist: huntAssistRow.input.checked
   };
 
   persistSettings(nextSettings);
@@ -470,6 +509,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
   const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
   const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
   const farmRow = createCheckboxRow('fj-sel-farm', 'Farm', settings.farm);
+  const huntAssistRow = createCheckboxRow('fj-sel-hunt-assist', 'Hunt Assist', settings.huntAssist);
 
   
   const rightClickInfoRow = createSmallButtonRow(
@@ -517,7 +557,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
       avoidNextRow.input.addEventListener('change', saveHandler);
       removeTwilightRow.input.addEventListener('change', saveHandler);
       customMessagesRow.input.addEventListener('change', saveHandler);
@@ -534,6 +574,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
       misrateWarningRow.input.addEventListener('change', saveHandler);
       warnOnAllRow.input.addEventListener('change', saveHandler);
       farmRow.input.addEventListener('change', saveHandler);
+      huntAssistRow.input.addEventListener('change', saveHandler);
     };
     addLiveChangeHandlers();
 
@@ -587,11 +628,19 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
     setInfoContent(farmRow.infoButton, 'A farm.');
   setInfoContent(rightClickInfoRow.infoButton, 'Opens relevant FJEdu entries on right-click.');
+    setInfoContent(huntAssistRow.infoButton, 'Easier hunting and list-making.');
 
     
-    const tabGroups = {
+    const cloneGroups = (source) => {
+      const next = {};
+      Object.entries(source).forEach(([key, list]) => {
+        next[key] = Array.isArray(list) ? list.slice() : [];
+      });
+      return next;
+    };
+
+    const baseTabGroups = {
       interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper],
-      
       tools: [
         misrateWarningRow.wrapper,
         warnOnAllRow.wrapper,
@@ -601,37 +650,171 @@ const setInfoContent = (button, message, imagePath) => {
         hideRateRow.wrapper,
         hideShortcutsRow.wrapper,
         trackRatesRow.wrapper,
+        huntAssistRow.wrapper,
       ],
-  extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
+      extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
+    };
+
+  let currentTabGroups = cloneGroups(baseTabGroups);
+  const tabOrder = ['interface', 'tools', 'extras'];
+
+    const checkboxRows = {
+      avoidNext: avoidNextRow,
+      removeTwilight: removeTwilightRow,
+      customMessages: customMessagesRow,
+      hideRateShortcuts: hideRateRow,
+      hideShortcuts: hideShortcutsRow,
+      stopUsernamePopups: stopUserPopupRow,
+      trackRates: trackRatesRow,
+      modJSExtras: modJSExtrasRow,
+      walcorn: walcornRow,
+      checkText: checkTextRow,
+      clicker2: clicker2Row,
+      misrateWarning: misrateWarningRow,
+      warnOnAll: warnOnAllRow,
+      farm: farmRow,
+      huntAssist: huntAssistRow
+    };
+
+    const resolveTabKey = (preferred) => {
+      if (preferred && currentTabGroups[preferred] && currentTabGroups[preferred].length) {
+        return preferred;
+      }
+      for (const key of tabOrder) {
+        if (currentTabGroups[key] && currentTabGroups[key].length) {
+          return key;
+        }
+      }
+      return preferred || 'interface';
+    };
+
+    const updateTabButtonsState = (activeKey) => {
+      tabOrder.forEach((key) => {
+        const btn = tabButtons[key];
+        if (!btn) return;
+        const visible = Boolean(currentTabGroups[key] && currentTabGroups[key].length);
+        btn.style.display = visible ? '' : 'none';
+        if (!visible) return;
+        btn.style.background = (key === activeKey) ? '#822ef6' : '#222';
+        btn.style.color = (key === activeKey) ? '#fff' : '#f8f8f8';
+      });
+      const visibleTabs = tabOrder.filter((key) => currentTabGroups[key] && currentTabGroups[key].length);
+      tabRow.style.display = visibleTabs.length > 0 ? 'flex' : 'none';
     };
 
     
     function renderTab(tabKey, animate = true) {
-      if (!tabGroups[tabKey]) tabKey = 'interface';
-      
+      const resolvedKey = resolveTabKey(tabKey);
+      const items = currentTabGroups[resolvedKey] || [];
       if (animate) {
         tabContent.style.opacity = '0';
         setTimeout(() => {
           tabContent.innerHTML = '';
-          tabGroups[tabKey].forEach(el => tabContent.appendChild(el));
+          items.forEach(el => tabContent.appendChild(el));
           tabContent.style.opacity = '1';
         }, 180);
       } else {
         tabContent.innerHTML = '';
-        tabGroups[tabKey].forEach(el => tabContent.appendChild(el));
+        items.forEach(el => tabContent.appendChild(el));
         tabContent.style.opacity = '1';
       }
-      Object.entries(tabButtons).forEach(([k, btn]) => {
-        btn.style.background = (k === tabKey) ? '#822ef6' : '#222';
-        btn.style.color = (k === tabKey) ? '#fff' : '#f8f8f8';
-      });
-      localStorage.setItem('fjTweakerLastTab', tabKey);
-      activeTab = tabKey;
+      updateTabButtonsState(resolvedKey);
+      localStorage.setItem('fjTweakerLastTab', resolvedKey);
+      activeTab = resolvedKey;
     }
+
+    const allowedSetsByTier = {
+      tier1: ALLOWED_SETTINGS_TIER1,
+      tier2: ALLOWED_SETTINGS_TIER2,
+      tier3: ALLOWED_SETTINGS_TIER3
+    };
+
+  let currentTier = null;
+  let forcedHideShortcuts = readForcedHideShortcutsFlag();
+
+    const applyLevelRestrictions = (tier) => {
+      const normalizedTier = tier === 'full' ? 'full' : (tier === 'tier3' ? 'tier3' : (tier === 'tier2' ? 'tier2' : 'tier1'));
+
+      if (rightClickInfoRow && rightClickInfoRow.wrapper) {
+        rightClickInfoRow.wrapper.style.display = '';
+      }
+
+      const allowedSet = normalizedTier === 'full' ? null : allowedSetsByTier[normalizedTier] || ALLOWED_SETTINGS_TIER1;
+      let changed = false;
+
+      Object.entries(checkboxRows).forEach(([key, row]) => {
+        if (!row || !row.input) return;
+        if (row.wrapper && row.wrapper.style.display === 'none') {
+          row.wrapper.style.display = '';
+        }
+        const allowed = !allowedSet || allowedSet.has(key);
+        row.input.disabled = !allowed;
+
+        if (!allowed) {
+          let desiredValue = false;
+          if (key === 'hideShortcuts') {
+            desiredValue = true;
+            forcedHideShortcuts = true;
+          }
+          if (row.input.checked !== desiredValue) {
+            row.input.checked = desiredValue;
+            changed = true;
+          }
+        }
+      });
+
+      if (normalizedTier === 'tier1' || normalizedTier === 'tier2') {
+        hideShortcutsRow.input.disabled = true;
+        if (!hideShortcutsRow.input.checked) {
+          hideShortcutsRow.input.checked = true;
+          changed = true;
+        }
+        forcedHideShortcuts = true;
+        writeForcedHideShortcutsFlag(true);
+      }
+
+      if (normalizedTier === 'tier3' || normalizedTier === 'full') {
+        if (forcedHideShortcuts) {
+          if (hideShortcutsRow.input.checked) {
+            hideShortcutsRow.input.checked = false;
+            changed = true;
+          }
+          forcedHideShortcuts = false;
+        }
+        writeForcedHideShortcutsFlag(false);
+        hideShortcutsRow.input.disabled = false;
+        hideRateRow.input.disabled = normalizedTier === 'full' ? false : hideRateRow.input.disabled;
+      }
+
+      if (normalizedTier === 'full') {
+        Object.values(checkboxRows).forEach((row) => {
+          if (row && row.input) {
+            row.input.disabled = false;
+          }
+        });
+      }
+
+      if (normalizedTier === 'tier1' || normalizedTier === 'tier2') {
+        if (hideRateRow.input.checked) {
+          hideRateRow.input.checked = false;
+          changed = true;
+        }
+        hideRateRow.input.disabled = true;
+      }
+
+      if (changed) {
+        saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+      }
+
+      currentTier = normalizedTier;
+    };
 
     
     Object.entries(tabButtons).forEach(([key, btn]) => {
       btn.addEventListener('click', () => {
+        if (!currentTabGroups[key] || !currentTabGroups[key].length) {
+          return;
+        }
         if (activeTab !== key) renderTab(key);
       });
     });
@@ -663,25 +846,52 @@ const setInfoContent = (button, message, imagePath) => {
       } catch (_) {}
     };
 
-    const updateAuthorizationUI = () => {
+    const updateAuthorizationUI = (event) => {
       try {
-        const authorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function'
-          ? window.fjApichk.isAuthorized()
-          : true;
+        const detail = event && event.detail ? event.detail : null;
+        const api = window.fjApichk || {};
+        const authorized = typeof (detail && detail.authorized) === 'boolean'
+          ? detail.authorized
+          : (typeof api.isAuthorized === 'function' ? api.isAuthorized() : true);
+
+        let level = null;
+        if (detail && typeof detail.level !== 'undefined' && detail.level !== null) {
+          level = typeof detail.level === 'number' ? detail.level : parseInt(detail.level, 10);
+          if (!Number.isFinite(level)) level = null;
+        } else if (typeof api.getLevel === 'function') {
+          const apiLevel = api.getLevel();
+          if (Number.isFinite(apiLevel)) level = apiLevel;
+        }
+
+        const excluded = typeof (detail && detail.excluded) === 'boolean'
+          ? detail.excluded
+          : (typeof api.isExcluded === 'function' ? api.isExcluded() : false);
+
         if (!authorized) {
           tabRow.style.display = 'none';
           tabContent.style.display = 'none';
           versionLabel.style.display = 'none';
           unauthorizedWrap.style.display = 'flex';
           setupUnauthorizedButtonState();
-        } else {
-          tabRow.style.display = 'flex';
-          tabContent.style.display = 'flex';
-          versionLabel.style.display = '';
-          unauthorizedWrap.style.display = 'none';
+          currentTier = null;
+          return;
         }
+
+        unauthorizedWrap.style.display = 'none';
+        tabRow.style.display = 'flex';
+        tabContent.style.display = 'flex';
+        versionLabel.style.display = '';
+
+        const tier = computeAccessTier({ authorized, level, excluded });
+        applyLevelRestrictions(tier);
       } catch (_) {}
     };
+
+    if (!__fjSelStatusBound) {
+      document.addEventListener('fjApichkStatus', updateAuthorizationUI, { passive: true });
+      __fjSelStatusBound = true;
+    }
+    updateAuthorizationUI();
 
     unauthorizedBtn.addEventListener('click', async () => {
       try {
@@ -734,10 +944,6 @@ const setInfoContent = (button, message, imagePath) => {
 
       
       updateAuthorizationUI();
-      if (!__fjSelStatusBound) {
-        document.addEventListener('fjApichkStatus', updateAuthorizationUI, { passive: true });
-        __fjSelStatusBound = true;
-      }
 
       try {
         const rect = toggleButton.getBoundingClientRect();

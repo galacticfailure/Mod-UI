@@ -44,13 +44,8 @@
 			try {
 				if (window.fjFarm?.debug?.resetFarm) {
 					window.fjFarm.debug.resetFarm();
-					console.log('Farm reset to default state!');
-				} else {
-					console.warn('Farm reset function not available');
 				}
-			} catch(e) {
-				console.error('Failed to reset farm:', e);
-			}
+			} catch(_) {}
 		});
 		const img=document.createElement('img');
 		img.alt='nuke'; img.draggable=false; img.decoding='async'; img.loading='lazy';

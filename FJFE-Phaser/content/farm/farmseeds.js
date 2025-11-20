@@ -5,35 +5,104 @@
 	let buttonsMeta = [];
 
 	const PLANTS = [
-		'Wheat','Potato','Tomato','Onion','Eggvine',
-		'Rice','Almond','Pepper','Meatbulb','Sugarcane',
-		'Strawberry','Watermelon','Pineapple','Cocoa','Pumpkin',
+		'Wheat','Potato','Tomato','Cocoa','Onion','Eggvine',
+		'Rice','Olive','Pepper','Meatbulb','Sugarcane','Avocado',
+		'Multiberry Bush','Watermelon','Pineapple','Nutleaf Tree','Pumpkin',
+		'Beanpod','Milkbud','Fruit'
 	];
 
 	
 	
 	const SEED_TIPS = {
-		wheat:      { name: 'Wheat',      desc: 'A basic crop, with one of the shortest growth times.', growtime: 1.5, prc: 12 },
-		potato:     { name: 'Potato',     desc: 'A tough, hardy crop.', growtime: 2.0, prc: 15 },
-		tomato:     { name: 'Tomato',     desc: 'Very juicy, quite good with salt.', growtime: 2.0, prc: 16 },
-		onion:      { name: 'Onion',      desc: 'Adds flavor to pretty much any dish.', growtime: 1.5, prc: 14 },
-		eggvine:    { name: 'Eggvine',    desc: 'The vine itself is more like an umbilical to the eggs, very small. This is...still a plant, right?', growtime: 2.0, prc: 30 },
-		rice:       { name: 'Rice',       desc: 'Normally this would be grown in water, but no pests here.', growtime: 3.0, prc: 22 },
-		almond:     { name: 'Almond',     desc: 'Normal almonds grow on trees. These...do not.', growtime: 4.0, prc: 55 },
-		pepper:     { name: 'Pepper',     desc: 'Bell, chili, ghost, cayenne, whatever.', growtime: 3.0, prc: 28 },
-		meatbulb:   { name: 'Meatbulb',   desc: "It's not really growing meat, but it's close enough. Not vegan, though.", growtime: 3.0, prc: 45 },
-		sugarcane:  { name: 'Sugarcane',  desc: 'Hard to grow, but less hard to process.', growtime: 3.0, prc: 26 },
-		strawberry: { name: 'Strawberry', desc: "This is the only type of berry you're getting. Make it count.", growtime: 4.0, prc: 35 },
-		watermelon: { name: 'Watermelon', desc: 'This is not a berry. This is a fruit. I will die on this hill.', growtime: 5.0, prc: 50 },
-		pineapple:  { name: 'Pineapple',  desc: 'Used to be a show of wealth. Now just Psychs people out.', growtime: 6.0, prc: 60 },
-		cocoa:      { name: 'Cocoa',      desc: 'Can be turned into chocolate. Now with less slavery! Also no trees.', growtime: 5.5, prc: 62 },
-		pumpkin:    { name: 'Pumpkin',    desc: 'The pumpkin spice must flow.', growtime: 5.0, prc: 48 },
+		wheat:   		 { name: 'Wheat',    	    desc: 'A basic crop, with one of the shortest growth times.', growtime: 1.5, prc: 12, tag: 'Crop' },
+		potato:  		 { name: 'Potato',   	    desc: 'A tough, hardy crop.', growtime: 2.5, prc: 15, tag: 'Crop' },
+		tomato:   		 { name: 'Tomato',   	    desc: 'Stick not included.', growtime: 2.0, prc: 16, tag: 'Crop' },
+		onion:     		 { name: 'Onion',    	    desc: 'Technically a root!', growtime: 2.0, prc: 14, tag: 'Crop' },
+		eggvine:   		 { name: 'Eggvine',   	    desc: 'The vine itself is more like an umbilical to the eggs, very small. This is...still a plant, right?', growtime: 2.0, prc: 30, tag: 'Crop' },
+		rice:     		 { name: 'Rice',     	    desc: 'Normally this would be grown in water, but no pests here.', growtime: 1.0, prc: 22, tag: 'Crop' },
+		milkbud:   		 { name: 'Milkbud',   	    desc: 'Plant milk. But...actual milk? Who knows.', growtime: 2.5, prc: 35, tag: 'Crop' },
+		pepper:    		 { name: 'Pepper',          desc: 'The great and terrible omnipepper plant. Or something.', growtime: 3.0, prc: 28, tag: 'Crop' },
+		meatbulb: 	     { name: 'Meatbulb',   	    desc: "It's not really growing meat, but it's close enough. Not vegan, though.", growtime: 4.0, prc: 45, tag: 'Crop' },
+		sugarcane:       { name: 'Sugarcane', 	    desc: 'Hard to grow, but less hard to process.', growtime: 2.5, prc: 26, tag: 'Crop' },
+		multiberry_bush: { name: 'Multiberry Bush', desc: "Grows all kinds of berries! Blue, rasp, straw, black, cran...", growtime: 4.5, prc: 35, tag: 'Crop' },
+		watermelon:      { name: 'Watermelon',	    desc: 'You get the round ones.', growtime: 6.0, prc: 50, tag: 'Crop' },
+		pineapple:       { name: 'Pineapple', 	    desc: 'Pineapple plants look stupid. It needed to be said.', growtime: 8.0, prc: 60, tag: 'Crop' },
+		pumpkin:         { name: 'Pumpkin',    	    desc: 'Super versatile for exactly one quarter of the year.', growtime: 5.5, prc: 48, tag: 'Crop' },
+		beanpod:         { name: 'Beanpod', 	    desc: 'Beans? Beans!', growtime: 5.5, prc: 48, tag: 'Crop' },
+		cocoa:     		 { name: 'Cocoa',      	    desc: 'Can be turned into chocolate. Now with less slavery!', growtime: 14.5, prc: 432, tag: 'Tree' },
+		olive:    	     { name: 'Olives',      	desc: "You're not allergic to these things, right?", growtime: 18, prc: 512, tag: 'Tree' },
+		avocado:    	 { name: 'Avocado',    		desc: 'Unlike real ones, yours will never rot!', growtime: 24, prc: 719, tag: 'Tree' },
+		nutleaf_tree:    { name: 'Nutleaf Tree',    desc: 'Grows every kind of nut. Except one. You know which one.', growtime: 13, prc: 311, tag: 'Tree' },
+		fruit:      	 { name: 'Fruit',      		desc: 'What kind? All kinds!', growtime: 15.5, prc: 481, tag: 'Tree' }
+	};
+
+	const HARVEST_ITEM_MAP = {
+		eggvine: 'egg',
+		meatbulb: 'meat',
+		milkbud: 'milk',
+		cocoa: 'cocoa',
+		avocado: 'avocado',
+		fruit: 'fruit',
+		nutleaf_tree: 'nuts',
+		olive: 'olives',
+		beanpod: 'beans',
+		multiberry_bush: 'berries'
+	};
+
+	const HARVEST_ITEM_MAP_REVERSE = (() => {
+		const rev = {};
+		Object.entries(HARVEST_ITEM_MAP).forEach(([seedKey, harvestKey]) => { rev[harvestKey] = seedKey; });
+		return rev;
+	})();
+
+	const TREE_TAG = 'tree';
+	const TREE_FOOTPRINT = Object.freeze({ width: 3, height: 3 });
+
+	const normalizeTags = (value) => parseTags(value).map(tag => tag.toLowerCase());
+
+	const isTreeSeed = (seedKeyOrName) => {
+		const key = toKey(seedKeyOrName);
+		const seedInfo = SEED_TIPS[key];
+		if (!seedInfo) return false;
+		return normalizeTags(seedInfo.tag).includes(TREE_TAG);
+	};
+
+	const getSeedFootprint = (seedKeyOrName) => {
+		return isTreeSeed(seedKeyOrName)
+			? { ...TREE_FOOTPRINT }
+			: { width: 1, height: 1 };
+	};
+
+	const getAnchorIndexForPlant = (tileIndex, plantData) => {
+		if (!plantData) return tileIndex;
+		if (plantData.isTree) {
+			if (plantData.isAnchor) return tileIndex;
+			if (typeof plantData.anchorIndex === 'number') return plantData.anchorIndex;
+		}
+		return tileIndex;
+	};
+
+	const getAnchorPlantEntry = (tileIndex) => {
+		const raw = window.fjFarm?.state?.getPlant?.(tileIndex);
+		if (!raw) return null;
+		const anchorIndex = getAnchorIndexForPlant(tileIndex, raw);
+		const anchorData = anchorIndex === tileIndex ? raw : window.fjFarm?.state?.getPlant?.(anchorIndex);
+		if (!anchorData) return null;
+		return { index: anchorIndex, data: anchorData };
 	};
 
 	const toKey = (name) => String(name).trim().toLowerCase().replace(/\s+/g, '_');
 	const iconFor = (name) => `icons/farm/plants/${toKey(name)}_seed.png`;
 	const resolveAssetUrl = (p) => {
 		try { return (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p; } catch (_) { return p; }
+	};
+	const parseTags = (value) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value.map(v => String(v || '').trim()).filter(Boolean);
+		return String(value || '')
+			.split(',')
+			.map(v => v.trim())
+			.filter(Boolean);
 	};
 
 		const buildUI = () => {
@@ -72,7 +141,7 @@
 			coinRow.append(coinImg, coinText);
 
 			const grid = document.createElement('div');
-			const COLS = 3, BTN = 60, GAP = 10, PAD = 10; 
+			const COLS = 4, BTN = 60, GAP = 10, PAD = 10; 
 			Object.assign(grid.style, {
 				display: 'grid',
 				gridTemplateColumns: `repeat(${COLS}, ${BTN}px)`,
@@ -120,6 +189,7 @@
 						bodyTT: meta.desc,
 						cost: String(meta.prc ?? ''),
 						costIcon: 'icons/farm/coin.png',
+						tags: parseTags(meta.tag),
 					});
 				} catch (_) {}
 			};
@@ -154,8 +224,8 @@
 		buttonsMeta = [];
 		PLANTS.forEach((name, idx) => {
 			const { btn, key } = makeBtn(name, idx);
-			const row = Math.floor(idx / 3) + 1;
-			const col = (idx % 3) + 1;
+			const row = Math.floor(idx / COLS) + 1;
+			const col = (idx % COLS) + 1;
 			grid.appendChild(btn);
 			const t = SEED_TIPS[key] || { name, desc: 'TBD', growtime: 1.0, prc: 0 };
 			
@@ -233,30 +303,30 @@
 		try {
 			const tileStrip = document.getElementById('fj-farm-tiles');
 			if (!tileStrip) return;
-            
+			
 			const tiles = Array.from(tileStrip.children);
 			const currentTime = Date.now();
-            
+			
 			tiles.forEach((tile, tileIndex) => {
-				const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
-				if (!plantData || !plantData.plantedAt || !plantData.seedName) return;
-                
+				const entry = getAnchorPlantEntry(tileIndex);
+				if (!entry) return;
+				const { index: anchorIndex, data: plantData } = entry;
+				if (anchorIndex !== tileIndex) return; 
+				if (!plantData.plantedAt || !plantData.seedName) return;
+				
 				const seedInfo = SEED_TIPS[plantData.seedName];
 				if (!seedInfo) return;
-                
-				const growthTimeMs = seedInfo.growtime * 60 * 60 * 1000;
-                
 				
+				const growthTimeMs = seedInfo.growtime * 60 * 60 * 1000;
 				let progressMs = typeof plantData.progressMs === 'number' ? plantData.progressMs : null;
 				let lastGrowCheck = plantData.lastGrowCheck || null;
-                
+				
 				const toolsModule = window.fjTweakerModules?.farmtools;
 				const speedModifier = (toolsModule && toolsModule.getGrowthSpeedModifier)
-				  ? toolsModule.getGrowthSpeedModifier(tileIndex)
+				  ? toolsModule.getGrowthSpeedModifier(anchorIndex)
 				  : 1.0;
-                
+				
 				if (progressMs === null) {
-					
 					const elapsedSincePlant = currentTime - plantData.plantedAt;
 					progressMs = Math.min(growthTimeMs, Math.max(0, Math.floor(elapsedSincePlant * speedModifier)));
 					lastGrowCheck = currentTime;
@@ -266,18 +336,16 @@
 					progressMs = Math.min(growthTimeMs, progressMs + Math.floor(delta * speedModifier));
 					lastGrowCheck = currentTime;
 				}
-                
-				const isFullyGrown = progressMs >= growthTimeMs;
-                
 				
+				const isFullyGrown = progressMs >= growthTimeMs;
 				const newData = {
 					...plantData,
 					progressMs,
 					lastGrowCheck,
 					isGrown: isFullyGrown
 				};
-				window.fjFarm?.state?.setPlant?.(tileIndex, newData);
-                
+				window.fjFarm?.state?.setPlant?.(anchorIndex, newData);
+				
 				const plantOverlay = tile.querySelector('.plant-overlay');
 				if (plantOverlay) {
 					const newSrc = isFullyGrown
@@ -292,18 +360,17 @@
 				}
 			});
 
-			
 			try { window.fjTweakerModules?.farmtile?.refreshTooltipForHoveredTile?.(); } catch(_) {}
-		} catch (error) {
-			console.error('Growth check error:', error);
-		}
+		} catch (_) {}
 	};
 
 	
 	const getPlantGrowthPercentage = (tileIndex) => {
 		try {
-			const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
-			if (!plantData || !plantData.plantedAt || !plantData.seedName) return 0;
+			const entry = getAnchorPlantEntry(tileIndex);
+			if (!entry) return 0;
+			const { index: anchorIndex, data: plantData } = entry;
+			if (!plantData.plantedAt || !plantData.seedName) return 0;
 			
 			const seedInfo = SEED_TIPS[plantData.seedName];
 			if (!seedInfo) return 0;
@@ -311,19 +378,17 @@
 			const growthTimeMs = seedInfo.growtime * 60 * 60 * 1000;
 			const toolsModule = window.fjTweakerModules?.farmtools;
 			const speedModifier = (toolsModule && toolsModule.getGrowthSpeedModifier)
-			  ? toolsModule.getGrowthSpeedModifier(tileIndex)
+			  ? toolsModule.getGrowthSpeedModifier(anchorIndex)
 			  : 1.0;
 			
 			if (typeof plantData.progressMs === 'number') {
-				
 				const last = plantData.lastGrowCheck || plantData.plantedAt || Date.now();
 				const delta = Math.max(0, Date.now() - last);
 				const extrapolated = Math.min(growthTimeMs, (plantData.progressMs || 0) + Math.floor(delta * speedModifier));
 				return Math.min(100, Math.max(0, Math.floor((extrapolated / growthTimeMs) * 100)));
 			}
 			
-			
-			let elapsedTime = Date.now() - plantData.plantedAt;
+			const elapsedTime = Date.now() - plantData.plantedAt;
 			const approx = Math.min(100, Math.floor(((elapsedTime * speedModifier) / growthTimeMs) * 100));
 			return Math.max(0, approx);
 		} catch (_) {
@@ -375,10 +440,7 @@
 				toolsModule.accelerateTimers(hours);
 			}
 			
-			console.log(`Accelerated ${plantsAccelerated} plants by ${hours} hour(s)`);
-		} catch (error) {
-			console.error('Plant acceleration error:', error);
-		}
+		} catch (_) {}
 	};
 
 	const init = () => {
@@ -399,24 +461,42 @@
 
 	
 	const PLANT_HARVEST = {
-		wheat:      { name: 'Wheat',      desc: 'A basic crop, with one of the shortest growth times.', value: 18 },
-		potato:     { name: 'Potato',     desc: 'A tough, hardy crop.', value: 23 },
-		tomato:     { name: 'Tomato',     desc: 'Very juicy, quite good with salt.', value: 24 },
-		onion:      { name: 'Onion',      desc: 'Adds flavor to pretty much any dish.', value: 21 },
-		eggvine:    { name: 'Egg',        desc: 'The vine itself is more like an umbilical to the eggs, very small. This is...still a plant, right?', value: 45 }, 
-		rice:       { name: 'Rice',       desc: 'Normally this would be grown in water, but no pests here.', value: 33 },
-		almond:     { name: 'Almond',     desc: 'Normal almonds grow on trees. These...do not.', value: 83 },
-		pepper:     { name: 'Pepper',     desc: 'Bell, chili, ghost, cayenne, whatever.', value: 42 },
-		meatbulb:   { name: 'Meat',       desc: "It's not really growing meat, but it's close enough. Not vegan, though.", value: 68 }, 
-		sugarcane:  { name: 'Sugarcane',  desc: 'Hard to grow, but less hard to process.', value: 39 },
-		strawberry: { name: 'Strawberry', desc: "This is the only type of berry you're getting. Make it count.", value: 53 },
-		watermelon: { name: 'Watermelon', desc: 'This is not a berry. This is a fruit. I will die on this hill.', value: 75 },
-		pineapple:  { name: 'Pineapple',  desc: 'Used to be a show of wealth. Now just Psychs people out.', value: 90 },
-		cocoa:      { name: 'Cocoa',      desc: 'Can be turned into chocolate. Now with less slavery! Also no trees.', value: 93 },
-		pumpkin:    { name: 'Pumpkin',    desc: 'The pumpkin spice must flow.', value: 72 },
-		
-		egg:        { name: 'Egg',        desc: 'Fresh from the eggvine. Organic and weird.', value: 45 },
-		meat:       { name: 'Meat',       desc: 'Grown meat. Still technically vegetarian?', value: 68 },
+		wheat:      { name: 'Wheat',      desc: 'Read to be made into flour!', sourceSeed: 'wheat' },
+		potato:     { name: 'Potato',     desc: 'Watching you.', sourceSeed: 'potato' },
+		tomato:     { name: 'Tomato',     desc: 'Very juicy, quite good with salt.', sourceSeed: 'tomato' },
+		onion:      { name: 'Onion',      desc: 'Adds flavor to pretty much any dish.', sourceSeed: 'onion' },
+		rice:       { name: 'Rice',       desc: 'One of the best side dishes out there!', sourceSeed: 'rice' },
+		pepper:     { name: 'Pepper',     desc: 'Bell, chili, ghost, cayenne, whatever.', sourceSeed: 'pepper' },
+		sugarcane:  { name: 'Sugarcane',  desc: 'Hard to grow, but less hard to process.', sourceSeed: 'sugarcane' },
+		watermelon: { name: 'Watermelon', desc: 'This is not a berry. This is a fruit. I will die on this hill.', sourceSeed: 'watermelon' },
+		pineapple:  { name: 'Pineapple',  desc: 'Used to be a show of wealth. Now just Psychs people out.', sourceSeed: 'pineapple' },
+		pumpkin:    { name: 'Pumpkin',    desc: 'The pumpkin spice must flow.', sourceSeed: 'pumpkin' },
+		avocado:    { name: 'Avocado',    desc: 'Comes with a toy! Always a wooden ball, though.', sourceSeed: 'avocado_tree' },
+		fruit:      { name: 'Fruit',      desc: 'Perfect painting material.', sourceSeed: 'fruit_tree' },
+		nuts:       { name: 'Nuts',       desc: 'What kind of nuts? All of them, obviously.', sourceSeed: 'nutleaf_tree' },
+		olives:     { name: 'Olives',     desc: 'You either love these or you hate them. Zero in-between.', sourceSeed: 'olive_tree' },
+		beans:      { name: 'Beans',      desc: 'Buncha beans.', sourceSeed: 'beanpod' },
+		cocoa:      { name: 'Cocoa',      desc: 'Real chocolate? Well, not yet, but soon.', sourceSeed: 'cocoa_tree' },
+		egg:        { name: 'Egg',        desc: 'Technically an egg.', sourceSeed: 'eggvine' },
+		meat:       { name: 'Meat',       desc: "It's not really growing meat, but it's close enough. Not vegan, though.", sourceSeed: 'meatbulb' },
+		milk:       { name: 'Milk',       desc: "Virtually indistinguishable from real milk! Of course, that's what they all say.", sourceSeed: 'milkbud' },
+		berries:    { name: 'Berries',    desc: "Berries. Lots of them.", sourceSeed: 'multiberry_bush' }
+	};
+
+	const resolveHarvestItem = (seedName) => {
+		const key = toKey(seedName);
+		return HARVEST_ITEM_MAP[key] || key;
+	};
+
+	const resolveSeedForHarvest = (itemName) => {
+		const key = toKey(itemName);
+		if (SEED_TIPS[key]) return key;
+		return HARVEST_ITEM_MAP_REVERSE[key] || null;
+	};
+
+	const resolvePlantAnchor = (tileIndex) => {
+		const entry = getAnchorPlantEntry(tileIndex);
+		return entry ? { ...entry } : null;
 	};
 
 	
@@ -427,32 +507,36 @@
 
 	
 	const getPlantGrowthInfo = (tileIndex) => {
-		const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
-		if (!plantData) return null;
-		
+		const entry = getAnchorPlantEntry(tileIndex);
+		if (!entry) return null;
+		const { index: anchorIndex, data: plantData } = entry;
 		const seedInfo = SEED_TIPS[plantData.seedName];
 		if (!seedInfo) return null;
 		
-	const growthPercentage = getPlantGrowthPercentage(tileIndex);
-	const isGrown = growthPercentage >= 100;
-		
+		const growthPercentage = getPlantGrowthPercentage(anchorIndex);
+		const isGrown = growthPercentage >= 100;
 		
 		let timerInfo = '';
 		try {
 			const toolsModule = window.fjTweakerModules?.farmtools;
-			if (toolsModule && toolsModule.getTimerDebugInfo) {
-				timerInfo = toolsModule.getTimerDebugInfo(tileIndex);
+			if (toolsModule && toolsModule.getTimerDebugInfo && !plantData.isTree) {
+				timerInfo = toolsModule.getTimerDebugInfo(anchorIndex);
 			}
 		} catch (_) {}
 		
 		return {
 			seedName: plantData.seedName,
-			seedInfo: seedInfo,
-			growthPercentage: growthPercentage,
-			isGrown: isGrown,
+			seedInfo,
+			growthPercentage,
+			isGrown,
 			plantedAt: plantData.plantedAt,
 			cost: plantData.cost || seedInfo.prc,
-			timerInfo: timerInfo
+			timerInfo,
+			isTree: !!plantData.isTree,
+			anchorIndex,
+			yieldCount: (plantData.isTree ? 9 : 1) * (plantData.isFertilized ? 2 : 1),
+			isFertilized: !!plantData.isFertilized,
+			footprint: plantData.isTree ? (plantData.size ? { ...plantData.size } : getSeedFootprint(plantData.seedName)) : { width: 1, height: 1 }
 		};
 	};
 
@@ -465,6 +549,11 @@
 		getButtons: () => buttonsMeta.slice(),
 		getSeedTips,
 		getPlantHarvest,
+		isTreeSeed,
+		getSeedFootprint,
+		resolveHarvestItem,
+		resolveSeedForHarvest,
+		resolvePlantAnchor,
 		getPlantGrowthInfo,
 		accelerateAllPlants,
 		checkAndUpdatePlantGrowth
