@@ -15,9 +15,6 @@
   const HEADER_ID = 'topUserbar';
   const OTHER_MEMES_SELECTOR = '#catControls span[data-id="6"], span.ctButton4[data-id="6"]';
   const CATEGORY_SELECTOR = '#catControls span[data-id], span.ctButton4[data-id]';
-  const NO_INDEX_BUTTON_SELECTOR = '#noIndexEasy';
-  const VIDEO_ANCHOR_SELECTOR = '.contentContainer a.cnt-video-cont[data-cachedvideosrc]';
-  const VIDEO_TAG_SELECTOR = '.contentContainer video';
   const STYLE_ID = 'fjfe-warning-style';
   const BADGE_OFFSET_PX = 12;
   const BADGE_SIZE_PX = 32;
@@ -39,9 +36,7 @@
   let audioSource = null;
   let audioGain = null;
   let marqueeState = null; 
-  let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, longVideo: false, metaNoIndex: false, any: false };
-  let hasLongVideoOver61 = false; 
-  const videoDurationCache = new Map(); 
+  let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, any: false };
   let badgeRepositionTimer = null;
   let badgeRepositionAttempts = 0;
 
@@ -108,102 +103,6 @@
     return isElementSelected(element);
   };
 
-  const isNoIndexPressed = () => {
-    const btn = document.querySelector(NO_INDEX_BUTTON_SELECTOR);
-    if (!btn) return false; 
-    const onclick = (btn.getAttribute('onclick') || '').toString();
-    const style = (btn.getAttribute('style') || '').toLowerCase();
-    const text = (btn.textContent || '').toLowerCase();
-    
-    const byOnclick = onclick.includes(', 0,') || onclick.includes('(contentid') && onclick.includes(',0,');
-    const byStyle = style.includes('background: purple');
-    const byText = text.includes('no indexed--');
-    return !!(byOnclick || byStyle || byText);
-  };
-
-  const updateLongVideoFlagAndEvaluate = () => {
-    const prev = hasLongVideoOver61;
-    
-    let anyLong = false;
-    try {
-      for (const val of videoDurationCache.values()) {
-        const dur = typeof val === 'number' ? val : (val === true ? 61 : 0);
-        if (dur >= 61) { anyLong = true; break; }
-      }
-      if (!anyLong) {
-        document.querySelectorAll(VIDEO_TAG_SELECTOR).forEach((v) => {
-          if (v && isFinite(v.duration) && v.duration >= 61) anyLong = true;
-        });
-      }
-    } catch (_) {}
-    hasLongVideoOver61 = anyLong;
-    if (prev !== hasLongVideoOver61) {
-      evaluateState();
-    }
-  };
-
-  const attachVideoMetadataListener = (videoEl, url, isTemp = false) => {
-    if (!videoEl) return;
-    const onMeta = () => {
-      if (isFinite(videoEl.duration)) {
-        videoDurationCache.set(url, videoEl.duration);
-        updateLongVideoFlagAndEvaluate();
-      }
-      cleanup();
-    };
-    const onErr = () => {
-      
-      if (!videoDurationCache.has(url)) videoDurationCache.set(url, 0);
-      updateLongVideoFlagAndEvaluate();
-      cleanup();
-    };
-    const cleanup = () => {
-      videoEl.removeEventListener('loadedmetadata', onMeta);
-      videoEl.removeEventListener('error', onErr);
-      if (isTemp) {
-        try {
-          if (videoEl.parentNode) videoEl.parentNode.removeChild(videoEl);
-        } catch (_) {}
-      }
-    };
-    videoEl.addEventListener('loadedmetadata', onMeta, { once: true });
-    videoEl.addEventListener('error', onErr, { once: true });
-  };
-
-  const scanVideosForDuration = () => {
-    
-    const anchors = document.querySelectorAll(VIDEO_ANCHOR_SELECTOR);
-    anchors.forEach((a) => {
-      const url = a.getAttribute('data-cachedvideosrc');
-      if (!url) return;
-      if (videoDurationCache.has(url)) return;
-      
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.src = url;
-      attachVideoMetadataListener(v, url, true);
-      
-      try {
-        v.style.position = 'fixed'; v.style.left = '-9999px'; v.style.top = '-9999px';
-        document.body && document.body.appendChild(v);
-        
-      } catch (_) {}
-    });
-
-    
-    document.querySelectorAll(VIDEO_TAG_SELECTOR).forEach((v) => {
-      const src = v.currentSrc || v.src || '';
-      if (src && !videoDurationCache.has(src)) {
-        if (isFinite(v.duration) && v.duration > 0) {
-          videoDurationCache.set(src, v.duration);
-        } else {
-          attachVideoMetadataListener(v, src, false);
-        }
-      }
-    });
-    updateLongVideoFlagAndEvaluate();
-  };
-
   const isOtherMemesSelected = () => {
     const element = document.querySelector(OTHER_MEMES_SELECTOR);
     return isElementSelected(element);
@@ -214,16 +113,12 @@
     const skin3WithoutSpicy = isSkinLevel3Selected() && !isSpicySelected();
     const otherWithSpicyOrMeta = isOtherMemesSelected() && (isSpicySelected() || isMetaSelected());
   const multiViolation = hasMultiCategoryViolation();
-  const longVideoViolation = hasLongVideoOver61 && !isNoIndexPressed();
-    const metaNeedsNoIndex = isMetaSelected() && !isNoIndexPressed();
     return {
       politics: politicsWithoutPcLevel,
       skin: skin3WithoutSpicy,
       spicyOther: otherWithSpicyOrMeta,
       multi: multiViolation,
-      longVideo: longVideoViolation,
-      metaNoIndex: metaNeedsNoIndex,
-      any: politicsWithoutPcLevel || skin3WithoutSpicy || otherWithSpicyOrMeta || multiViolation || longVideoViolation || metaNeedsNoIndex
+      any: politicsWithoutPcLevel || skin3WithoutSpicy || otherWithSpicyOrMeta || multiViolation
     };
   };
 
@@ -414,12 +309,6 @@
     }
     if (state.multi) {
       messages.push('Multi-Category only allowed for Spicy and Meta');
-    }
-    if (state.longVideo) {
-      messages.push('Video 61 seconds or longer.');
-    }
-    if (state.metaNoIndex) {
-      messages.push('No-Index required for Meta.');
     }
     return messages.join('\n');
   };
@@ -731,9 +620,6 @@
     if (element.id === PC_LEVEL_2_ID || element.id === PC_LEVEL_3_ID || element.id === SKIN_LEVEL_3_ID) {
       return true;
     }
-    if (element.matches?.(NO_INDEX_BUTTON_SELECTOR)) {
-      return true;
-    }
     if (element.matches?.(POLITICS_SELECTOR)) {
       return true;
     }
@@ -744,9 +630,6 @@
       return true;
     }
     if (element.matches?.(CATEGORY_SELECTOR)) {
-      return true;
-    }
-    if (element.matches?.(VIDEO_ANCHOR_SELECTOR) || element.matches?.(VIDEO_TAG_SELECTOR)) {
       return true;
     }
     return false;
@@ -767,9 +650,6 @@
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && matchesRelevantElement(mutation.target)) {
         
-        if ((mutation.target.matches?.(NO_INDEX_BUTTON_SELECTOR)) || (mutation.target.matches?.(VIDEO_ANCHOR_SELECTOR)) || (mutation.target.matches?.(VIDEO_TAG_SELECTOR))) {
-          scanVideosForDuration();
-        }
         evaluateState();
         positionWarningBadge();
         scheduleBadgeReposition();
@@ -777,10 +657,7 @@
       }
       if (mutation.type === 'childList') {
         for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement && (matchesRelevantElement(node) || matchesVoteOrRepost(node) || node.querySelector?.(POLITICS_SELECTOR) || node.querySelector?.(SPICY_SELECTOR) || node.querySelector?.(META_SELECTOR) || node.querySelector?.(CATEGORY_SELECTOR) || node.querySelector?.(`#${PC_LEVEL_2_ID}`) || node.querySelector?.(`#${PC_LEVEL_3_ID}`) || node.querySelector?.(`#${SKIN_LEVEL_3_ID}`) || node.querySelector?.(`#${HEADER_ID}`) || node.querySelector?.(NO_INDEX_BUTTON_SELECTOR) || node.querySelector?.(VIDEO_ANCHOR_SELECTOR) || node.querySelector?.(VIDEO_TAG_SELECTOR))) {
-            if (node.matches?.(NO_INDEX_BUTTON_SELECTOR) || node.querySelector?.(NO_INDEX_BUTTON_SELECTOR) || node.matches?.(VIDEO_ANCHOR_SELECTOR) || node.querySelector?.(VIDEO_ANCHOR_SELECTOR) || node.matches?.(VIDEO_TAG_SELECTOR) || node.querySelector?.(VIDEO_TAG_SELECTOR)) {
-              scanVideosForDuration();
-            }
+          if (node instanceof HTMLElement && (matchesRelevantElement(node) || matchesVoteOrRepost(node) || node.querySelector?.(POLITICS_SELECTOR) || node.querySelector?.(SPICY_SELECTOR) || node.querySelector?.(META_SELECTOR) || node.querySelector?.(CATEGORY_SELECTOR) || node.querySelector?.(`#${PC_LEVEL_2_ID}`) || node.querySelector?.(`#${PC_LEVEL_3_ID}`) || node.querySelector?.(`#${SKIN_LEVEL_3_ID}`) || node.querySelector?.(`#${HEADER_ID}`))) {
             evaluateState();
             positionWarningBadge();
             scheduleBadgeReposition();
@@ -788,7 +665,7 @@
           }
         }
         for (const node of mutation.removedNodes) {
-          if (node instanceof HTMLElement && (matchesRelevantElement(node) || matchesVoteOrRepost(node) || node.querySelector?.(POLITICS_SELECTOR) || node.querySelector?.(SPICY_SELECTOR) || node.querySelector?.(META_SELECTOR) || node.querySelector?.(CATEGORY_SELECTOR) || node.querySelector?.(`#${PC_LEVEL_2_ID}`) || node.querySelector?.(`#${PC_LEVEL_3_ID}`) || node.querySelector?.(`#${SKIN_LEVEL_3_ID}`) || node.querySelector?.(`#${HEADER_ID}`) || node.querySelector?.(NO_INDEX_BUTTON_SELECTOR) || node.querySelector?.(VIDEO_ANCHOR_SELECTOR) || node.querySelector?.(VIDEO_TAG_SELECTOR))) {
+          if (node instanceof HTMLElement && (matchesRelevantElement(node) || matchesVoteOrRepost(node) || node.querySelector?.(POLITICS_SELECTOR) || node.querySelector?.(SPICY_SELECTOR) || node.querySelector?.(META_SELECTOR) || node.querySelector?.(CATEGORY_SELECTOR) || node.querySelector?.(`#${PC_LEVEL_2_ID}`) || node.querySelector?.(`#${PC_LEVEL_3_ID}`) || node.querySelector?.(`#${SKIN_LEVEL_3_ID}`) || node.querySelector?.(`#${HEADER_ID}`))) {
             evaluateState();
             positionWarningBadge();
             scheduleBadgeReposition();
@@ -833,14 +710,9 @@
       target.closest?.(CATEGORY_SELECTOR) ||
       target.closest?.(`#${PC_LEVEL_2_ID}`) ||
       target.closest?.(`#${PC_LEVEL_3_ID}`) ||
-      target.closest?.(`#${SKIN_LEVEL_3_ID}`) ||
-      target.closest?.(NO_INDEX_BUTTON_SELECTOR) ||
-      target.closest?.(VIDEO_ANCHOR_SELECTOR) ||
-      target.closest?.(VIDEO_TAG_SELECTOR)
+      target.closest?.(`#${SKIN_LEVEL_3_ID}`)
     ) {
       setTimeout(() => {
-        
-        scanVideosForDuration();
         evaluateState();
         positionWarningBadge();
         scheduleBadgeReposition();
@@ -893,7 +765,6 @@
     }
     initialized = true;
     evaluateState();
-    scanVideosForDuration();
     startObserver();
     document.addEventListener('click', handleClick, true);
     document.addEventListener('fjTweakerSettingsChanged', () => {

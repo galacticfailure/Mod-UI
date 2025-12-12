@@ -2,10 +2,85 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'sel';
   const SETTINGS_KEY = 'fjTweakerSettings';
+  const MISRATE_CHEAT_STORAGE_KEY = 'fjTweakerMisrateCheatOverride';
+  const MISRATE_CHEAT_SEQUENCE = [',', '.', '/', '-', '='];
+  let misrateCheatOverride = null;
+  let misrateCheatSequenceAttached = false;
+  let misrateCheatSequenceCallback = null;
+
+  const readMisrateCheatOverride = () => {
+    try {
+      const raw = localStorage.getItem(MISRATE_CHEAT_STORAGE_KEY);
+      if (raw === '1') return true;
+      if (raw === '0') return false;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const persistMisrateCheatOverride = (value) => {
+    try {
+      if (value === null || typeof value === 'undefined') {
+        localStorage.removeItem(MISRATE_CHEAT_STORAGE_KEY);
+      } else {
+        localStorage.setItem(MISRATE_CHEAT_STORAGE_KEY, value ? '1' : '0');
+      }
+    } catch (_) {}
+  };
+
+  misrateCheatOverride = readMisrateCheatOverride();
+
+  const ensureMisrateCheatSequenceListener = () => {
+    if (misrateCheatSequenceAttached) return;
+    const seq = MISRATE_CHEAT_SEQUENCE.slice();
+    let idx = 0;
+    let timer = null;
+    const reset = () => {
+      idx = 0;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+    const isTyping = () => {
+      const ae = document.activeElement;
+      if (!ae) return false;
+      const tag = (ae.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return true;
+      return Boolean(ae.isContentEditable);
+    };
+    const handler = (event) => {
+      try {
+        if (isTyping()) return;
+        const expected = seq[idx];
+        if (event.key === expected) {
+          idx++;
+          if (idx === seq.length) {
+            if (typeof misrateCheatSequenceCallback === 'function') {
+              try { misrateCheatSequenceCallback(); } catch (_) {}
+            }
+            reset();
+          } else {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(reset, 4000);
+          }
+        } else {
+          reset();
+        }
+      } catch (_) {
+        reset();
+      }
+    };
+    document.addEventListener('keydown', handler, true);
+    misrateCheatSequenceAttached = true;
+  };
   const DEFAULT_SETTINGS = {
     avoidNext: false,
     removeTwilight: false,
     customMessages: false,
+    flagCheck: false,
+    banCalculator: false,
     hideRateShortcuts: false,
     hideShortcuts: false,
     stopUsernamePopups: false,
@@ -22,13 +97,25 @@
   const ALLOWED_SETTINGS_TIER1 = new Set([
     'stopUsernamePopups',
     'trackRates',
-    'misrateWarning',
     'modJSExtras',
     'checkText',
     'avoidNext'
   ]);
-  const ALLOWED_SETTINGS_TIER2 = new Set([...ALLOWED_SETTINGS_TIER1, 'removeTwilight', 'customMessages']);
-  const ALLOWED_SETTINGS_TIER3 = new Set([...ALLOWED_SETTINGS_TIER2, 'hideRateShortcuts', 'hideShortcuts']);
+  const ALLOWED_SETTINGS_TIER2 = new Set([
+    ...ALLOWED_SETTINGS_TIER1,
+    'misrateWarning',
+    'removeTwilight',
+    'customMessages',
+    'flagCheck',
+    'banCalculator'
+  ]);
+  const ALLOWED_SETTINGS_TIER3 = new Set([
+    ...ALLOWED_SETTINGS_TIER2,
+    'hideRateShortcuts',
+    'hideShortcuts',
+    'clicker2',
+    'farm'
+  ]);
   const FORCED_HIDE_SHORTCUTS_KEY = 'fjTweakerForcedHideShortcuts';
   const computeAccessTier = ({ authorized, level, excluded }) => {
     if (!authorized) return 'unauthorized';
@@ -350,6 +437,7 @@ const createCheckboxRow = (id, label, checked, onChange) => {
   row.style.display = 'flex';
   row.style.alignItems = 'center';
   row.style.gap = '8px';
+  row.style.flexWrap = 'nowrap';
   row.style.width = '100%';
   row.style.overflow = 'visible';
 
@@ -395,18 +483,22 @@ const createCheckboxRow = (id, label, checked, onChange) => {
 const createSmallButtonRow = (id, label, onClick) => {
   
   const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '8px';
+  row.style.setProperty('display', 'flex', 'important');
+  row.style.setProperty('align-items', 'center', 'important');
+  row.style.setProperty('gap', '8px', 'important');
+  row.style.setProperty('flex-wrap', 'nowrap', 'important');
   row.style.width = '100%';
+  row.style.position = 'relative';
+  row.style.paddingRight = '4px';
   row.style.overflow = 'visible';
 
   const innerLabel = document.createElement('label');
   innerLabel.htmlFor = id;
-  innerLabel.style.display = 'flex';
-  innerLabel.style.alignItems = 'center';
-  innerLabel.style.gap = '8px';
-  innerLabel.style.flex = '1 1 auto';
+  innerLabel.style.setProperty('display', 'flex', 'important');
+  innerLabel.style.setProperty('align-items', 'center', 'important');
+  innerLabel.style.setProperty('gap', '8px', 'important');
+  innerLabel.style.setProperty('flex', '1 1 auto', 'important');
+  innerLabel.style.setProperty('min-width', '0', 'important');
   innerLabel.style.cursor = 'pointer';
 
   
@@ -415,16 +507,16 @@ const createSmallButtonRow = (id, label, onClick) => {
   btn.id = id;
   btn.textContent = '?';
   Object.assign(btn.style, {
-    width: '18px',
-    height: '18px',
+    width: '14px',
+    height: '14px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    font: "700 13px 'Segoe UI', sans-serif",
+    font: "700 11px 'Segoe UI', sans-serif",
     color: '#ffffff',
     background: '#822ef6',
     border: '1px solid #822ef6',
-    borderRadius: '4px',
+    borderRadius: '3px',
     cursor: 'pointer',
     lineHeight: '1',
     padding: '0',
@@ -440,13 +532,17 @@ const createSmallButtonRow = (id, label, onClick) => {
   const span = document.createElement('span');
   span.textContent = label;
   span.style.flex = '1 1 auto';
+  span.style.minWidth = '0';
 
   innerLabel.append(btn, span);
 
   const infoButton = createInfoButtonElement(label);
-  infoButton.style.alignSelf = 'center';
-  infoButton.style.flexShrink = '0';
-  infoButton.style.marginLeft = '4px';
+  infoButton.style.setProperty('align-self', 'center', 'important');
+  infoButton.style.setProperty('flex-shrink', '0', 'important');
+  infoButton.style.setProperty('position', 'absolute', 'important');
+  infoButton.style.setProperty('right', '4px', 'important');
+  infoButton.style.setProperty('top', '50%', 'important');
+  infoButton.style.setProperty('transform', 'translateY(-50%)', 'important');
   infoButton.dataset.fjInfoTarget = id;
 
   infoButton.addEventListener('click', (event) => {
@@ -458,12 +554,14 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow) => {
+const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
     removeTwilight: removeTwilightRow.input.checked,
     customMessages: customMessagesRow.input.checked,
+    flagCheck: flagCheckRow.input.checked,
+    banCalculator: banCalculatorRow.input.checked,
     hideRateShortcuts: hideRateRow.input.checked,
     hideShortcuts: hideShortcutsRow.input.checked,
     stopUsernamePopups: stopUserPopupRow.input.checked,
@@ -492,6 +590,8 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     if (labelEl) labelEl.style.marginLeft = '22px';
   } catch (_) {}
   customMessagesRow.input.title = 'Enables custom hard-coded messages on mod profiles.';
+  const flagCheckRow = createCheckboxRow('fj-sel-flag-check', 'Flag Check', settings.flagCheck);
+  const banCalculatorRow = createCheckboxRow('fj-sel-ban-calculator', 'Ban Calculator', settings.banCalculator);
   const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Custom Shortcuts', settings.hideRateShortcuts);
   
   const hideShortcutsRow = createCheckboxRow('fj-sel-hide-shortcuts', 'Hide Shortcuts', settings.hideShortcuts);
@@ -557,10 +657,38 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+
+      const applyMisrateCheatOverrideState = (triggerSave = false) => {
+        if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
+        if (misrateWarningRow.input.checked !== misrateCheatOverride) {
+          misrateWarningRow.input.checked = misrateCheatOverride;
+          if (triggerSave) saveHandler();
+        } else if (triggerSave) {
+          saveHandler();
+        }
+      };
+
+      const toggleMisrateCheatOverrideState = () => {
+        const next = !(misrateCheatOverride === true);
+        misrateCheatOverride = next;
+        persistMisrateCheatOverride(next);
+        applyMisrateCheatOverrideState(true);
+        try {
+          console.info(`[FJFE] Misrate Warning forced ${next ? 'on' : 'off'}.`);
+        } catch (_) {}
+      };
+
+      const syncMisrateCheatOverrideFromInput = () => {
+        if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
+        misrateCheatOverride = Boolean(misrateWarningRow.input.checked);
+        persistMisrateCheatOverride(misrateCheatOverride);
+      };
       avoidNextRow.input.addEventListener('change', saveHandler);
       removeTwilightRow.input.addEventListener('change', saveHandler);
       customMessagesRow.input.addEventListener('change', saveHandler);
+      flagCheckRow.input.addEventListener('change', saveHandler);
+      banCalculatorRow.input.addEventListener('change', saveHandler);
       hideRateRow.input.addEventListener('change', (e) => { onToggleMutual('custom'); saveHandler(); });
       hideShortcutsRow.input.addEventListener('change', (e) => { onToggleMutual('hide'); saveHandler(); });
       stopUserPopupRow.input.addEventListener('change', saveHandler);
@@ -571,12 +699,31 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, hi
       clicker2Row.input.addEventListener('change', () => {
         saveHandler();
       });
-      misrateWarningRow.input.addEventListener('change', saveHandler);
+      misrateWarningRow.input.addEventListener('change', () => {
+        syncMisrateCheatOverrideFromInput();
+        saveHandler();
+      });
       warnOnAllRow.input.addEventListener('change', saveHandler);
       farmRow.input.addEventListener('change', saveHandler);
       huntAssistRow.input.addEventListener('change', saveHandler);
+      return {
+        applyMisrateCheatOverrideState,
+        toggleMisrateCheatOverrideState
+      };
     };
-    addLiveChangeHandlers();
+    const misrateCheatControls = addLiveChangeHandlers() || {};
+
+    misrateCheatSequenceCallback = () => {
+      try {
+        misrateCheatControls.toggleMisrateCheatOverrideState?.();
+      } catch (_) {}
+    };
+    ensureMisrateCheatSequenceListener();
+    if (misrateCheatOverride !== null) {
+      try {
+        misrateCheatControls.applyMisrateCheatOverrideState?.(false);
+      } catch (_) {}
+    }
 
 const resolveAssetUrl = (relativePath) => {
   if (!relativePath) {
@@ -616,6 +763,8 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
     setInfoContent(removeTwilightRow.infoButton, 'Removes the Twilight Zone lyrics from user profiles.');
     setInfoContent(customMessagesRow.infoButton, 'Enables custom hard-coded messages on mod profiles.');
+    setInfoContent(flagCheckRow.infoButton, 'Summarizes flags in Premium History.');
+    setInfoContent(banCalculatorRow.infoButton, 'Adds a button to help calculate ban time.');
     setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
     setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
     setInfoContent(stopUserPopupRow.infoButton, 'Stops the profile menu from popping up when mousing over a user. User must now be clicked to bring up menu.');
@@ -640,12 +789,12 @@ const setInfoContent = (button, message, imagePath) => {
     };
 
     const baseTabGroups = {
-      interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper],
+      interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper, flagCheckRow.wrapper],
       tools: [
         misrateWarningRow.wrapper,
         warnOnAllRow.wrapper,
-        rightClickInfoRow.wrapper,
         modJSExtrasRow.wrapper,
+        banCalculatorRow.wrapper,
         checkTextRow.wrapper,
         hideRateRow.wrapper,
         hideShortcutsRow.wrapper,
@@ -655,13 +804,40 @@ const setInfoContent = (button, message, imagePath) => {
       extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
     };
 
+  const stickyTabRows = {
+    tools: [rightClickInfoRow.wrapper].filter(Boolean)
+  };
+
   let currentTabGroups = cloneGroups(baseTabGroups);
   const tabOrder = ['interface', 'tools', 'extras'];
+
+  const getTabItemsWithStickyRows = (tabKey) => {
+    const baseItems = currentTabGroups[tabKey] || [];
+    const ordered = baseItems.slice();
+    const stickyItems = stickyTabRows[tabKey];
+    if (!stickyItems || !stickyItems.length) {
+      return ordered;
+    }
+    stickyItems.forEach((element) => {
+      if (!element) return;
+      const idx = ordered.indexOf(element);
+      if (idx !== -1) {
+        ordered.splice(idx, 1);
+      }
+    });
+    stickyItems.forEach((element) => {
+      if (!element) return;
+      ordered.push(element);
+    });
+    return ordered;
+  };
 
     const checkboxRows = {
       avoidNext: avoidNextRow,
       removeTwilight: removeTwilightRow,
       customMessages: customMessagesRow,
+      flagCheck: flagCheckRow,
+      banCalculator: banCalculatorRow,
       hideRateShortcuts: hideRateRow,
       hideShortcuts: hideShortcutsRow,
       stopUsernamePopups: stopUserPopupRow,
@@ -705,7 +881,7 @@ const setInfoContent = (button, message, imagePath) => {
     
     function renderTab(tabKey, animate = true) {
       const resolvedKey = resolveTabKey(tabKey);
-      const items = currentTabGroups[resolvedKey] || [];
+      const items = getTabItemsWithStickyRows(resolvedKey);
       if (animate) {
         tabContent.style.opacity = '0';
         setTimeout(() => {
@@ -751,6 +927,13 @@ const setInfoContent = (button, message, imagePath) => {
         row.input.disabled = !allowed;
 
         if (!allowed) {
+          if (key === 'misrateWarning' && misrateCheatOverride !== null) {
+            if (row.input.checked !== misrateCheatOverride) {
+              row.input.checked = misrateCheatOverride;
+              changed = true;
+            }
+            return;
+          }
           let desiredValue = false;
           if (key === 'hideShortcuts') {
             desiredValue = true;
@@ -758,6 +941,14 @@ const setInfoContent = (button, message, imagePath) => {
           }
           if (row.input.checked !== desiredValue) {
             row.input.checked = desiredValue;
+            changed = true;
+          }
+          return;
+        }
+
+        if (key === 'misrateWarning' && misrateCheatOverride !== null) {
+          if (row.input.checked !== misrateCheatOverride) {
+            row.input.checked = misrateCheatOverride;
             changed = true;
           }
         }
@@ -803,7 +994,7 @@ const setInfoContent = (button, message, imagePath) => {
       }
 
       if (changed) {
-        saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+        saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
       }
 
       currentTier = normalizedTier;
@@ -896,6 +1087,9 @@ const setInfoContent = (button, message, imagePath) => {
     unauthorizedBtn.addEventListener('click', async () => {
       try {
         if (!window.fjApichk || !window.fjApichk.canUseManualRefresh) return;
+        try {
+          window.fjApichk.clearLevelOverride?.();
+        } catch (_) {}
         const st = window.fjApichk.canUseManualRefresh();
         if (!st.allowed) {
           const now = Date.now();

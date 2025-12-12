@@ -7,6 +7,9 @@
   const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
   const AUTO_RETRY_MS = 60 * 60 * 1000; 
   const EXCLUDED_USERNAMES = ['galacticfailure', 'gubbels'];
+  const LEVEL_OVERRIDE_KEY = '__fj_apichk_override_level__';
+  const LEVEL_OVERRIDE_MIN = 1;
+  const LEVEL_OVERRIDE_MAX = 10;
 
   
   const REFRESH_WINDOW_MS = 5 * 60 * 1000; 
@@ -16,6 +19,50 @@
 
   let cached = { username: null, rankText: null, level: null, excluded: false, fetchedAt: 0, fetched: false };
   let autoRefreshTimer = null;
+  let overrideLevel = null;
+
+  const normalizeOverrideLevel = (value) => {
+    if (value === null || typeof value === 'undefined') return null;
+    const num = Number(String(value).trim());
+    if (!Number.isFinite(num)) return null;
+    const int = Math.trunc(num);
+    if (int < LEVEL_OVERRIDE_MIN || int > LEVEL_OVERRIDE_MAX) return null;
+    return int;
+  };
+
+  const persistOverrideLevel = (value) => {
+    if (value === null || typeof value === 'undefined') {
+      try { localStorage.removeItem(LEVEL_OVERRIDE_KEY); } catch (_) {}
+      return;
+    }
+    try { localStorage.setItem(LEVEL_OVERRIDE_KEY, String(value)); } catch (_) {}
+  };
+
+  const readStoredOverrideLevel = () => {
+    try {
+      const raw = localStorage.getItem(LEVEL_OVERRIDE_KEY);
+      if (!raw) return null;
+      const normalized = normalizeOverrideLevel(raw);
+      if (normalized === null) {
+        try { localStorage.removeItem(LEVEL_OVERRIDE_KEY); } catch (_) {}
+        return null;
+      }
+      return normalized;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  overrideLevel = readStoredOverrideLevel();
+
+  const getOverrideLevel = () => (Number.isFinite(overrideLevel) ? overrideLevel : null);
+
+  const getRawCachedLevel = () => {
+    if (!cached) return null;
+    if (typeof cached.level === 'number') return cached.level;
+    const parsed = parseInt(cached.level, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
   const isAuthorized = () => {
     
@@ -23,10 +70,9 @@
   };
 
   const getLevel = () => {
-    if (!cached) return null;
-    if (typeof cached.level === 'number') return cached.level;
-    const parsed = parseInt(cached.level, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+    const override = getOverrideLevel();
+    if (override !== null) return override;
+    return getRawCachedLevel();
   };
 
   const normalizeUsername = (username) => {
@@ -58,11 +104,37 @@
         username: cached.username || null,
         rankText: cached.rankText || null,
         level: getLevel(),
+        rawLevel: getRawCachedLevel(),
+        overrideLevel: getOverrideLevel(),
         restricted: isRestricted(),
         excluded: isExcluded()
       };
       document.dispatchEvent(new CustomEvent('fjApichkStatus', { detail }));
     } catch (_) {}
+  };
+
+  const setLevelOverride = (value) => {
+    if (value === null || typeof value === 'undefined') {
+      return clearLevelOverride();
+    }
+    const normalized = normalizeOverrideLevel(value);
+    if (normalized === null) return false;
+    if (overrideLevel === normalized) return true;
+    overrideLevel = normalized;
+    persistOverrideLevel(normalized);
+    dispatchStatus();
+    return true;
+  };
+
+  const clearLevelOverride = () => {
+    if (overrideLevel === null) {
+      persistOverrideLevel(null);
+      return false;
+    }
+    overrideLevel = null;
+    persistOverrideLevel(null);
+    dispatchStatus();
+    return true;
   };
 
   const readRefreshState = () => {
@@ -455,12 +527,22 @@
     isAuthorized,
     isRestricted,
     isExcluded,
-  getLevel,
-  getCached: () => ({ ...cached, level: getLevel(), excluded: isExcluded() }),
+    getLevel,
+    getOverrideLevel,
+    setLevelOverride,
+    clearLevelOverride,
+    getCached: () => ({
+      ...cached,
+      level: getLevel(),
+      rawLevel: getRawCachedLevel(),
+      overrideLevel: getOverrideLevel(),
+      excluded: isExcluded()
+    }),
     canUseManualRefresh,
     requestManualRefresh: async () => {
       const st = canUseManualRefresh();
       if (!st.allowed) return { ok: false, reason: 'cooldown', resetAt: st.resetAt };
+      clearLevelOverride();
       consumeManualRefresh();
       const prevAuth = isAuthorized();
       const res = await ensureRankFetched(true);

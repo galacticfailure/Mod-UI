@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "0.5.9",
+  "version": "1.0.0",
   "permissions": [
     "storage",
     "contextMenus"
@@ -40,6 +40,7 @@
         "content/remtz.js",
         "content/rclick.js",
         "content/textcheck.js",
+        "content/flagchk.js",
         "content/walcorn.js",
         "content/warn.js",
         "content/funnyjunkModifier.js",

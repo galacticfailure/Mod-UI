@@ -1,5 +1,11 @@
+1.0.0
+- Added flag check and ban calculator features
+- Final bug cleanup for 1.0
+
 0.5.9
-- Killed Sushi branch
+- Removed Sushi branch
+- Bugfixing
+- Fixed options formatting
 
 0.5.8
 - Farm rain barrel now works, new recipes added
