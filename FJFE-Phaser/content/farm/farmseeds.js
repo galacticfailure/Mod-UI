@@ -1,4 +1,5 @@
 (() => {
+	// Seed shop + growth tracker for every plantable crop/tree in the farm
 	const MODULE_KEY = 'farmseeds';
 	let root = null;
 	let isOpen = false;
@@ -13,6 +14,7 @@
 
 	
 	
+	// Source of truth for tooltip data, pricing, and growth durations
 	const SEED_TIPS = {
 		wheat:   		 { name: 'Wheat',    	    desc: 'A basic crop, with one of the shortest growth times.', growtime: 1.5, prc: 12, tag: 'Crop' },
 		potato:  		 { name: 'Potato',   	    desc: 'A tough, hardy crop.', growtime: 2.5, prc: 15, tag: 'Crop' },
@@ -36,6 +38,7 @@
 		fruit:      	 { name: 'Fruit',      		desc: 'What kind? All kinds!', growtime: 15.5, prc: 481, tag: 'Tree' }
 	};
 
+	// Some plants drop differently named harvest items (eggvine -> egg)
 	const HARVEST_ITEM_MAP = {
 		eggvine: 'egg',
 		meatbulb: 'meat',
@@ -60,6 +63,7 @@
 
 	const normalizeTags = (value) => parseTags(value).map(tag => tag.toLowerCase());
 
+	// Trees share a footprint + behavior so we check the tag once
 	const isTreeSeed = (seedKeyOrName) => {
 		const key = toKey(seedKeyOrName);
 		const seedInfo = SEED_TIPS[key];
@@ -105,6 +109,7 @@
 			.filter(Boolean);
 	};
 
+		// Render the seed catalog grid and wire each button into farminteract
 		const buildUI = () => {
 		root.textContent = '';
 
@@ -279,6 +284,7 @@
 	const GROWTH_CHECK_INTERVAL = 5000; 
 
 	
+	// Poll growth every few seconds so crops visually advance without reloads
 	const startGrowthMonitoring = () => {
 		if (growthCheckInterval) return; 
 		
@@ -299,6 +305,7 @@
 	};
 
 	
+	// Core growth loop: update plant progress, swap sprites, ping tooltips
 	const checkAndUpdatePlantGrowth = () => {
 		try {
 			const tileStrip = document.getElementById('fj-farm-tiles');
@@ -397,6 +404,7 @@
 	};
 
 	
+	// Debug/cheat hook used by sprinklers and rain barrels to jump progress
 	const accelerateAllPlants = (hours = 1) => {
 		try {
 			const tileStrip = document.getElementById('fj-farm-tiles');
@@ -483,6 +491,7 @@
 		berries:    { name: 'Berries',    desc: "Berries. Lots of them.", sourceSeed: 'multiberry_bush' }
 	};
 
+	// Normalize anchor keys (tree variants etc.) to their harvested item id
 	const resolveHarvestItem = (seedName) => {
 		const key = toKey(seedName);
 		return HARVEST_ITEM_MAP[key] || key;
@@ -506,6 +515,7 @@
 	const getPlantHarvest = () => PLANT_HARVEST;
 
 	
+	// Summarize a plant for tooltips: growth %, fertilization, timers, etc.
 	const getPlantGrowthInfo = (tileIndex) => {
 		const entry = getAnchorPlantEntry(tileIndex);
 		if (!entry) return null;

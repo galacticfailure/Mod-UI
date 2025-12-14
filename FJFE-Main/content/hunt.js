@@ -1,4 +1,10 @@
 (() => {
+  /*
+   * Hunt assistant overlay.
+   * Lets mods capture comment links with a ctrl-activated crosshair,
+   * track them in a draggable panel, and export a !hunt report.
+   * Crosshair art/size and panel lock state persist via localStorage.
+   */
   const MODULE_KEY = 'hunt';
   const SETTING_KEY = 'huntAssist';
   const PANEL_POSITION_KEY = 'fjTweakerHuntPanelPosition';
@@ -10,6 +16,7 @@
   const DEFAULT_CROSSHAIR_SIZE = 40;
 
   
+  // Keep hunt-specific tooltip text from overflowing by forcing pre-line.
   const tooltipStyle = document.createElement('style');
   tooltipStyle.textContent = `
     .fj-hunt-tooltip-constrained {
@@ -22,6 +29,7 @@
     
   };
 
+  // Utility: normalize scroll offsets for both fixed/absolute math.
   const getScrollOffsets = () => ({
     left: window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0,
     top: window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
@@ -62,11 +70,13 @@
     event.stopPropagation();
   };
 
+  // Always know where the mouse is so ctrl toggles can immediately highlight.
   const trackMousePosition = (e) => {
     lastMousePos.x = e.clientX;
     lastMousePos.y = e.clientY;
   };
 
+  // Persisted hunt entries survive reloads; pull them in at startup.
   const loadHuntedLinks = () => {
     try {
       const raw = localStorage.getItem(HUNTED_LINKS_KEY);
@@ -89,6 +99,7 @@
     }
   };
 
+  // Remember the custom crosshair data URL and preferred size.
   const loadCustomCrosshair = () => {
     try {
       const savedSrc = localStorage.getItem(CUSTOM_CROSSHAIR_KEY);
@@ -120,6 +131,7 @@
     }
   };
 
+  // Re-apply the latest uploaded crosshair art and size.
   const updateCrosshairImage = () => {
     if (crosshairEl) {
       const src = customCrosshairSrc || resolve('icons/crosshair.png');
@@ -129,6 +141,7 @@
     }
   };
 
+  // Remove the temporary outline + overlay injected during aim mode.
   const clearHighlight = () => {
     if (currentHighlightedElement) {
       currentHighlightedElement.style.outline = '';
@@ -197,6 +210,7 @@
     }
   };
 
+  // When ctrl is active we hijack comment clicks to collect the permalink instead.
   const preventCommentClick = (e) => {
     if (!featureEnabled || !ctrlPressed) return;
     
@@ -254,6 +268,7 @@
     }
   };
 
+  // Generate the !hunt message the mods post in chat + copy it to the clipboard.
   const copyMenuContent = () => {
     let text = '!hunt\n';
     huntedLinks.forEach((item, index) => {
@@ -279,6 +294,7 @@
     });
   };
 
+  // Rebuild the panel list whenever links or notes change.
   const updateMenuContent = () => {
     if (!menuContentEl) return;
     
@@ -404,6 +420,7 @@
     });
   };
 
+  // Hide the native cursor while aim mode is active so only the crosshair is visible.
   const createCursorStyle = () => {
     if (cursorStyleEl) return cursorStyleEl;
     
@@ -426,6 +443,7 @@
     }
   };
 
+  // Build the floating crosshair IMG once and reuse it between toggles.
   const createCrosshair = () => {
     if (crosshairEl) return crosshairEl;
     
@@ -479,6 +497,7 @@
     document.removeEventListener('mousemove', updateCrosshairPosition);
   };
 
+  // ctrl press toggles the aiming mode; double-tap locks it on.
   const handleKeyDown = (e) => {
     if (!featureEnabled) return;
     if (e.key === 'Control') {
@@ -531,6 +550,7 @@
     }
   };
 
+  // Clean up the redundant pagination bar on comments pages so the panel has room.
   const removeTopPaginationElement = () => {
     
     const element = document.querySelector('div.f_New.selectedPeriod');
@@ -551,6 +571,7 @@
     log('Top pagination element will restore on next page load');
   };
 
+  // Let moderators pin the hunt panel anywhere and remember that location.
   const loadPanelPosition = () => {
     try {
       const raw = localStorage.getItem(PANEL_POSITION_KEY);
@@ -599,6 +620,7 @@
     } catch (_) {}
   };
 
+  // Prevent the panel from drifting off screen when dragging or scrolling.
   const clampPanelPosition = (left, top) => {
     if (!panel) {
       return { left, top };
@@ -814,6 +836,7 @@
     }
   };
 
+  // Tiny popover for uploading a crosshair or tweaking its size.
   const createCustomSubmenu = (headerEl) => {
     if (customSubmenuEl) return;
     
@@ -1045,6 +1068,8 @@
     headerEl.appendChild(customSubmenuEl);
   };
 
+  // Build the draggable hunt panel lazily the first time it is needed.
+  // Lazy-create the panel DOM so we do not pay the cost until the setting is on.
   const ensurePanel = () => {
     if (panel) {
       return;
@@ -1397,6 +1422,7 @@
     applySetting(Boolean(detail[SETTING_KEY]));
   };
 
+  // Sync panel contents + crosshair prefs across tabs via the storage event.
   const handleStorageChange = (e) => {
     if (e.key === HUNTED_LINKS_KEY) {
       

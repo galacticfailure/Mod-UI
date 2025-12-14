@@ -1,5 +1,11 @@
 
 (function () {
+  /*
+   * Global bootstrap for every content script module.
+   * It decides which modules to initialize based on credential level,
+   * then exposes a hidden debug menu so admins can override access
+   * while testing. Everything here should run as early as possible.
+   */
   const targetHost = 'funnyjunk.com';
   if (window.location.hostname !== targetHost) {
     return;
@@ -7,119 +13,10 @@
   
   
 
-  const HEHE_KEY = 'fjfe_hehe_overlay_shown';
-  const heheImg = 'icons/hehe.png';
-  const hiddenImg = 'icons/hidden.png';
-  const vanishAudio = 'icons/vanish.mp3';
-
-  function getResourceUrl(relPath) {
-    return chrome.runtime.getURL(relPath);
-  }
-
-  function showHeheOverlay() {
-    const img = document.createElement('img');
-    img.src = getResourceUrl(heheImg);
-    img.alt = 'hehe';
-    img.style.position = 'fixed';
-    img.style.right = '2vw';
-    img.style.bottom = '2vh';
-    img.style.zIndex = '2147483647';
-    img.style.width = 'auto';
-    img.style.height = 'auto';
-    img.style.maxWidth = '50vw';
-    img.style.maxHeight = '50vh';
-    img.style.transform = 'scale(0.5)';
-    img.style.transition = 'opacity 1s linear';
-    img.style.cursor = 'pointer';
-    img.style.pointerEvents = 'auto';
-    img.id = 'fjfe-hehe-overlay';
-
-
-    let audioUnlocked = false;
-    function unlockAudio() {
-      if (audioUnlocked) return;
-      try {
-        const ctx = window.AudioContext || window.webkitAudioContext;
-        if (ctx) {
-          const audioCtx = new ctx();
-          const buffer = audioCtx.createBuffer(1, 1, 22050);
-          const source = audioCtx.createBufferSource();
-          source.buffer = buffer;
-          source.connect(audioCtx.destination);
-          source.start(0);
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-          }
-        }
-      } catch (e) {}
-      audioUnlocked = true;
-      window.removeEventListener('pointerdown', unlockAudio, true);
-      window.removeEventListener('keydown', unlockAudio, true);
-    }
-    window.addEventListener('pointerdown', unlockAudio, true);
-    window.addEventListener('keydown', unlockAudio, true);
-
-    function playVanishAudio() {
-      try {
-        const ctx = window.AudioContext || window.webkitAudioContext;
-        if (ctx) {
-          const audioCtx = new ctx();
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-          }
-        }
-      } catch (e) {}
-      const audio = document.createElement('audio');
-      audio.src = getResourceUrl(vanishAudio);
-      audio.preload = 'auto';
-      audio.volume = 0.5;
-      audio.style.position = 'fixed';
-      audio.style.left = '-9999px';
-      document.body.appendChild(audio);
-      audio.play().catch(() => {});
-      audio.addEventListener('ended', () => {
-        audio.remove();
-      });
-    }
-
-    img.addEventListener('mouseenter', function handleMouseEnter() {
-      img.removeEventListener('mouseenter', handleMouseEnter);
-      img.src = getResourceUrl(hiddenImg);
-      playVanishAudio();
-      img.style.opacity = '0';
-      setTimeout(() => {
-        img.remove();
-      }, 1000);
-      if (chrome && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.set({ [HEHE_KEY]: true });
-      }
-    });
-
-    document.body.appendChild(img);
-  }
-
-
-  function checkAndShowHehe() {
-    function onFirstInteraction() {
-      if (chrome && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get([HEHE_KEY], (result) => {
-          if (!result[HEHE_KEY]) {
-            showHeheOverlay();
-          }
-        });
-      } else {
-        showHeheOverlay();
-      }
-      window.removeEventListener('pointerdown', onFirstInteraction, true);
-      window.removeEventListener('keydown', onFirstInteraction, true);
-    }
-    window.addEventListener('pointerdown', onFirstInteraction, true);
-    window.addEventListener('keydown', onFirstInteraction, true);
-  }
-
   let __fjfe_baselineInit = false;
   let __fjfe_limitedModulesInit = false;
   let __fjfe_proModulesInit = false;
+  // Modules are grouped by privilege; initialize them lazily once credentials resolve.
   const initModules = () => {
     if (!window.fjTweakerModules) {
       return;
@@ -132,6 +29,7 @@
       __fjfe_baselineInit = true;
     }
     
+    // Limited modules are safe for restricted accounts.
     const initLimitedModules = () => {
       if (__fjfe_limitedModulesInit) return;
       if (modjs && typeof modjs.init === 'function') modjs.init();
@@ -141,6 +39,7 @@
       __fjfe_limitedModulesInit = true;
     };
 
+    // Pro modules stay locked unless the user is unrestricted.
     const initProModules = () => {
       if (__fjfe_proModulesInit) return;
       if (hunt && typeof hunt.init === 'function') hunt.init();
@@ -164,6 +63,7 @@
     initProModules();
   };
 
+  // Typing this key chord opens the admin-only debug menu.
   const ACCESS_DEBUG_SEQUENCE = [';', '\'', '[', ']', '\\'];
   const ACCESS_DEBUG_OVERRIDE_MIN = 1;
   const ACCESS_DEBUG_OVERRIDE_MAX = 10;
@@ -175,6 +75,7 @@
     lastDeniedNotice: 0
   };
 
+  // Mirrors fjApichk.getLevel but guards against missing APIs.
   const getEffectiveAccessLevel = () => {
     try {
       if (!window.fjApichk || typeof window.fjApichk.getLevel !== 'function') return null;
@@ -221,6 +122,7 @@
 
   const hasAccessDebugPermission = () => isExcludedAdmin();
 
+  // Tooltip text on the debug badge reflects current user + override state.
   const updateAccessDebugLabelMeta = ({ level, overrideLevel, isAdmin, username }) => {
     if (!accessDebugState.labelEl) return;
     if (isAdmin) {
@@ -266,6 +168,8 @@
     }
   };
 
+  // Small floating panel that lets admins override their level.
+  // Small floating panel that exposes the credential override prompt.
   const buildAccessDebugMenu = () => {
     if (accessDebugState.container) return accessDebugState.container;
     if (!document.body) return null;
@@ -358,6 +262,7 @@
     }
   };
 
+  // Key chord gate so the menu does not show up accidentally.
   const attachAccessDebugSequence = () => {
     if (accessDebugState.seqAttached) return;
     const seq = ACCESS_DEBUG_SEQUENCE;
@@ -419,8 +324,6 @@
   };
 
   const run = () => {
-    
-    checkAndShowHehe();
     
     
     try {

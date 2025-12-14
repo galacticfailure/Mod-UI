@@ -1,4 +1,9 @@
 (() => {
+  /*
+   * "Remove Twilight" helper.
+   * Either strips the Dear Mod banner completely or swaps it with
+   * custom per-mod messages so alpha testers can personalize it.
+   */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'remtz';
   const REMOVE_KEY = 'removeTwilight';
@@ -31,17 +36,20 @@
   
   const CUSTOM_MESSAGES_STORAGE_KEY = 'fjTweakerCustomMessages';
 
+  // Normalize usernames so lookups are case/whitespace/zero-width agnostic
   const normalizeUsername = (s) => String(s || '')
       .replace(/[\u200B-\u200D\uFEFF]/g, '') 
       .replace(/\u00A0/g, ' ') 
       .trim()
       .toLowerCase();
 
+  // Whitelist certain mods for the "alpha tester" footer
   const isAlphaTester = (username) => {
     const normalizedUsername = normalizeUsername(username);
     return ALPHA_TESTERS.some(tester => normalizeUsername(tester) === normalizedUsername);
   };
 
+  // Cleans any persisted custom message map to use normalized keys only
   const normalizeMap = (obj) => {
     const out = {};
     if (!obj || typeof obj !== 'object') return out;
@@ -76,6 +84,7 @@
     }
   };
 
+  // Default scripts + user overrides combined (user wins)
   const getCustomMessageMap = () => {
     const userMap = loadCustomMessagesFromStorage();
     const defaults = normalizeMap(CUSTOM_MESSAGES);
@@ -87,6 +96,7 @@
   let removeEnabled = true;
   let customEnabled = false;
 
+  // Read current toggles; remove defaults to true for backwards compatibility
   const getFlags = () => {
     const settings = window.fjTweakerSettings || {};
     
@@ -95,6 +105,7 @@
     return { remove, custom };
   };
 
+  // Heuristic for the Twilight letter: relies on inline style signatures
   const matchesTarget = (element) => {
     if (!(element instanceof HTMLElement)) {
       return false;
@@ -111,6 +122,7 @@
     return text.includes('dear mod:');
   };
 
+  // Pull the mod name from the content title header
   const getUsername = () => {
     try {
       const h2 = document.querySelector('h2.contentTitle');
@@ -130,6 +142,7 @@
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+  // Hard-remove the banner regardless of content
   const removeTargets = () => {
     const candidates = document.querySelectorAll('div[style*="color: red"][style*="background: #232323"]');
     candidates.forEach((candidate) => {
@@ -139,6 +152,7 @@
     });
   };
 
+  // Swap in personalized copy or the alpha badge markup
   const replaceCandidateContent = (candidate, message, username) => {
     try {
       const safe = escapeHtml(message);
@@ -164,6 +178,7 @@
   };
 
   
+  // Main decision tree for remove/custom combos
   const processTargets = () => {
     if (!removeEnabled && !customEnabled) return; 
 
@@ -196,6 +211,7 @@
     });
   };
 
+  // Mutation observer re-runs matching as the page injects new content
   const startObserver = () => {
     if (observer || !document.body || (!removeEnabled && !customEnabled)) {
       return;
@@ -215,6 +231,7 @@
     }
   };
 
+  // Keeps cached flags in sync and either processes or tears down logic
   const applyFlags = (flags) => {
     removeEnabled = Boolean(flags.remove);
     customEnabled = Boolean(flags.custom);
@@ -237,6 +254,7 @@
     applyFlags(getFlags());
   };
 
+  // Boot entry—runs only on funnyjunk
   const init = () => {
     if (window.location.hostname !== targetHost) {
       return;
@@ -251,6 +269,7 @@
   }
 
   
+  // Public API so other modules/console can update stored phrases
   const setCustomMessage = (username, message) => {
       const u = normalizeUsername(username);
     if (!u) return false;

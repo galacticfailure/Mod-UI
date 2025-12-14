@@ -8,6 +8,7 @@
   
   const dlog = () => {};
 
+  // Palette definition used by the sidebar grid; order determines grouping visually.
   const TOOL_ICONS = [
     
     { key: 'hoebasic',   icon: 'icons/farm/tools/hoebasic.png' },
@@ -56,6 +57,7 @@
 	const getSeedsModule = () => window.fjTweakerModules?.farmseeds;
 
   
+  // Maintenance timers live here so watering/weeding decay keeps running off-screen.
   const tileTimers = new Map(); 
   let timersDirty = false;
   let lastPersistAt = 0;
@@ -74,6 +76,7 @@
   let timerCheckInterval = null;
 
   
+  // Loads persisted timer info, skipping trees and resuming paused tiles intelligently.
   const bootstrapTimersFromFarm = () => {
     try {
       const now = Date.now();
@@ -131,6 +134,7 @@
   };
 
   
+  // Writes current countdowns back into fjFarm state so reloads and tab switches are lossless.
   const persistTimersToState = (force = false) => {
     try {
       const now = Date.now();
@@ -159,6 +163,7 @@
   };
 
   
+  // Ensures a timer entry exists for a newly tilled tile, respecting debug time scaling.
   const initializeTileTimer = (tileIndex) => {
     const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
     if (plantData && getSeedsModule()?.isTreeSeed?.(plantData.seedName)) {
@@ -185,6 +190,7 @@
   };
 
   
+  // Removes timer + overlays once a plant disappears (bulldozer, harvest, move, etc.).
   const removeTileTimer = (tileIndex) => {
     tileTimers.delete(tileIndex);
     dlog('removeTileTimer', { tileIndex, timers: tileTimers.size });
@@ -194,6 +200,7 @@
   };
 
   
+  // Dedicated helpers invoked by watering/weeding tools so overlays + persistence stay in sync.
   const resetWateringTimer = (tileIndex) => {
     const timer = tileTimers.get(tileIndex);
     if (timer) {
@@ -216,6 +223,7 @@
   };
 
   
+  // Paints the little watering/weed badges that float over needy crops.
   const updateTileOverlays = (tileIndex) => {
     try {
       
@@ -310,6 +318,7 @@
   };
 
   
+  // Heartbeat fired every TIMER_CHECK_INTERVAL ms to decay watering/weed timers + apply boosts.
   const checkAndUpdateTimers = () => {
     try {
       const currentTime = Date.now();
@@ -440,6 +449,7 @@
   };
 
   
+  // Tiles grow slower when maintenance lapses; farmseeds consults this modifier.
   const getGrowthSpeedModifier = (tileIndex) => {
     const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
     if (plantData && getSeedsModule()?.isTreeSeed?.(plantData.seedName)) return 1.0;
@@ -460,6 +470,7 @@
   };
 
   
+  // Tool activations fan out into single tile, 5x5, or "all" behavior depending on tier.
   const handleWateringTool = (toolKey, tileIndex, opts = {}) => {
     let tilesToWater = [];
 
@@ -564,6 +575,7 @@
   };
 
   
+  // Surfaces timer state in the debug tooltip so QA can sanity check countdown math.
   const getTimerDebugInfo = (tileIndex) => {
     
     const plantData = window.fjFarm?.state?.getPlant?.(tileIndex);
@@ -584,6 +596,7 @@
   };
 
   
+  // Shared accelerator used by the debug panel's "+1h" button.
   const accelerateTimers = (hours = 1) => {
     const accelerationMs = hours * 60 * 60 * 1000;
     
@@ -642,6 +655,7 @@
     }
   };
 
+  // Renders the tool palette (with lock overlays + upgrade buttons) inside the shared overlay rail.
   const buildUI = (host) => {
     
     root.textContent = '';
@@ -881,6 +895,7 @@
   };
 
   
+  // Bulldozer entry point figures out whether the target is an object or plant before selling it.
   const handleBulldozer = (tileElement, tileIndex) => {
     
     const objectData = window.fjFarm?.state?.getObject?.(tileIndex);
@@ -900,6 +915,7 @@
   };
 
   
+  // Handles multi-tile props (fountains, sheds, etc.) and awards 75% of the purchase price.
   const handleBulldozerObject = (tileElement, tileIndex, objectData) => {
     
     
@@ -955,6 +971,7 @@
   };
 
   
+  // Similar payout logic for crops/trees plus timer cleanup + tile art reset.
   const handleBulldozerPlant = (tileElement, tileIndex, plantData) => {
     const seedsModule = getSeedsModule();
     const anchorEntry = seedsModule?.resolvePlantAnchor?.(tileIndex);
@@ -1039,6 +1056,7 @@
   };
 
   
+  // Little floating coin animation after selling something so the player notices the refund.
   const showSaleFloat = (tileElement, amount) => {
     try {
       if (!tileElement) return;
@@ -1076,6 +1094,7 @@
   };
 
   let initialized = false;
+  // Initializes timer tracking ASAP (even before the overlay opens) so crops never pause.
   const init = () => {
     if (initialized) return;
     initialized = true;

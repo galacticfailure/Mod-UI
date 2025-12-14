@@ -1,4 +1,8 @@
 (() => {
+  /*
+   * Prank module that makes the "Next" button dodge the cursor.
+   * Used mostly as a sanity check that pro modules loaded.
+   */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'nextMove';
   const SETTING_KEY = 'avoidNext';
@@ -8,6 +12,7 @@
   let pointerHandler = null;
   let featureEnabled = true;
 
+  // Defaults to on unless fjTweaker toggles it explicitly
   const getSettings = () => {
     const settings = window.fjTweakerSettings || {};
     if (typeof settings[SETTING_KEY] === 'undefined') {
@@ -16,6 +21,7 @@
     return Boolean(settings[SETTING_KEY]);
   };
 
+  // Slide the button to a random viewport position while remembering its original CSS.
   const relocateRandomly = (element) => {
     if (!element) {
       return;
@@ -57,6 +63,7 @@
     }
   };
 
+  // Returns the button to its prior inline style once the prank ends
   const restoreStyle = (element) => {
     if (!element) {
       return;
@@ -74,6 +81,7 @@
     }
   };
 
+  // Stops listening to the current Next button and restores its CSS
   const detachButton = () => {
     if (currentButton && pointerHandler) {
       currentButton.removeEventListener('pointerenter', pointerHandler);
@@ -83,6 +91,7 @@
     pointerHandler = null;
   };
 
+  // Reacquires the Next button (DOM churn happens often) and wires hover logic
   const bindButton = () => {
     if (!featureEnabled) {
       return;
@@ -109,6 +118,7 @@
     currentButton.addEventListener('pointerenter', pointerHandler, { passive: true });
   };
 
+  // MutationObserver keeps the prank alive as the site hot-swaps markup
   const startObserver = () => {
     if (observer || !document.body) {
       return;
@@ -128,6 +138,7 @@
     }
   };
 
+  // Toggling from settings either arms the prank or cleans up instantly
   const applySetting = (enabled) => {
     featureEnabled = enabled;
 
@@ -148,6 +159,7 @@
     applySetting(Boolean(detail[SETTING_KEY]));
   };
 
+  // Runs once per page on funnyjunk to kick things off
   const init = () => {
     if (window.location.hostname !== targetHost) {
       return;

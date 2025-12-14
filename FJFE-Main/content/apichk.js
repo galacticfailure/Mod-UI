@@ -1,4 +1,11 @@
 (() => {
+  /*
+   * Credentials/authorization bootstrapper.
+   * Pulls rank data from FunnyJunk endpoints, caches it, exposes helpers
+   * over window.fjApichk, and wires the SEL footer button used to force
+   * a refresh. Also drives the daily auto-refresh timer that reloads the
+   * page if access level changes.
+   */
   const MODULE_KEY = 'apichk';
   const TARGET_HOST = 'funnyjunk.com';
   const CACHE_KEY = '__fj_apichk_cache__';
@@ -6,7 +13,7 @@
   const AUTO_REFRESH_KEY = '__fj_apichk_last_auto_refresh__';
   const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
   const AUTO_RETRY_MS = 60 * 60 * 1000; 
-  const EXCLUDED_USERNAMES = ['galacticfailure', 'gubbels'];
+  const EXCLUDED_USERNAMES = ['galacticfailure', 'gubbels','Shisui'];
   const LEVEL_OVERRIDE_KEY = '__fj_apichk_override_level__';
   const LEVEL_OVERRIDE_MIN = 1;
   const LEVEL_OVERRIDE_MAX = 10;
@@ -21,6 +28,8 @@
   let autoRefreshTimer = null;
   let overrideLevel = null;
 
+  // Allow power users to temporarily spoof a level for testing restricted UIs.
+  // Sanitize user-entered override levels before persisting them.
   const normalizeOverrideLevel = (value) => {
     if (value === null || typeof value === 'undefined') return null;
     const num = Number(String(value).trim());
@@ -64,6 +73,7 @@
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  // True when the cache contains a rank entry from the mod ranks endpoint.
   const isAuthorized = () => {
     
     return Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined'));
@@ -97,6 +107,7 @@
     return level === 1;
   };
 
+  // Broadcast current credential info so other modules can react instantly.
   const dispatchStatus = () => {
     try {
       const detail = {
@@ -137,6 +148,8 @@
     return true;
   };
 
+  // Manual refresh button is rate-limited so it cannot spam the API endpoints.
+  // Manual refresh button has a rolling window; read/validate the window + remaining uses.
   const readRefreshState = () => {
     let windowStart = 0; let usesLeft = REFRESH_MAX_USES;
     try { windowStart = parseInt(localStorage.getItem(REFRESH_WINDOW_START_KEY), 10); if (!Number.isFinite(windowStart)) windowStart = 0; } catch(_) { windowStart = 0; }
@@ -176,6 +189,7 @@
     return { windowStart, usesLeft };
   };
 
+  // Fetch helper that inherits FunnyJunk cookies (needed for auth-only endpoints).
   const sameOriginFetch = async (path) => {
     const url = path.startsWith('http') ? path : (location.origin + (path.startsWith('/') ? '' : '/') + path);
     const res = await fetch(url, { credentials: 'include' });
@@ -214,6 +228,7 @@
     return m ? parseInt(m[1], 10) : null;
   };
 
+  // Keep network usage low by caching the last rank response for 10 minutes.
   const loadCache = () => {
     try {
       const raw = localStorage.getItem(CACHE_KEY);
@@ -237,6 +252,7 @@
     } catch (_) {}
   };
 
+  // Main fetch pipeline: username -> rank list -> cache + status broadcast.
   const ensureRankFetched = async (force = false) => {
     if (!force) {
       const fromStore = loadCache();
@@ -273,6 +289,7 @@
     }
   };
 
+  // The SEL module renders a footer line with the local version; piggyback on it for UI.
   const findVersionLabel = () => {
     try {
       const menu = document.getElementById('fj-sel-menu');
@@ -287,6 +304,7 @@
     return null;
   };
 
+  // Inject/update the "Update Credentials" button under the SEL footer once authorized.
   const ensureFooterUI = () => {
     try {
       const menu = document.getElementById('fj-sel-menu');
@@ -365,7 +383,7 @@
       btn.addEventListener('click', async () => {
         const st = canUseManualRefresh();
         if (!st.allowed) {
-          
+          // Cooldown message mirrors the restriction logic so users know when to retry.
           try {
             const now = Date.now();
             const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
@@ -408,6 +426,8 @@
     return Boolean(ensureFooterUI());
   };
 
+  // SEL footer renders asynchronously, so keep watching the DOM until the label exists.
+  // Wait for SEL to finish rendering before trying to append the credential button.
   const observeMenuAndApply = async () => {
     await ensureRankFetched();
     
@@ -455,6 +475,7 @@
  catch (_) {}
   };
 
+  // Keep credential state fresh by forcing a fetch every 24h (with 1h retry on failure).
   const scheduleDailyAutoRefresh = () => {
     try { if (autoRefreshTimer) { clearTimeout(autoRefreshTimer); autoRefreshTimer = null; } } catch (_) {}
     const now = Date.now();
@@ -483,6 +504,7 @@
  catch (_) {}
   };
 
+  // Compare authorization before/after – if it changes, reload so SEL can re-tier modules.
   const runDailyAutoRefresh = async () => {
     try {
       const prevAuth = isAuthorized();

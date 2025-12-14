@@ -1,4 +1,5 @@
 (() => {
+	// Object shop for decorative + functional placements (sprinklers, bins, etc.)
 	const MODULE_KEY='farmshop';
 	let root=null,isOpen=false;
 	let buttonsMeta=[];
@@ -13,6 +14,7 @@
 
 	
 	
+	// Tooltip + pricing metadata for the grid; drives farminteract + tooltips
 	const SHOP_TIPS = {
 		fountain:     { name: 'Fountain',     desc: 'A large fountain, for large decoration.', prc: 10000, tag: 'Object' },
 		sprinkler:    { name: 'Sprinkler',    desc: 'Keeps crops watered in a 5x5 area.', prc: 500, tag: 'Object,Functional' },
@@ -69,6 +71,7 @@
 	const resolve=(p)=> (typeof chrome!=='undefined' && chrome.runtime?.getURL)? chrome.runtime.getURL(p):p;
 	const iconFor=(file)=>`icons/farm/objects/${file}`;
 
+	// Render object catalog grid and hook each card into farminteract
 	const buildUI=()=>{
 		root.textContent='';
 		const box=document.createElement('div');
@@ -212,6 +215,7 @@
 	};
 
 	
+	// Ensure the footprint fits, avoids water, and doesn't overlap plants/objects
 	const canPlaceObject = (tileIndex, objectName) => {
 		const tileStrip = document.getElementById('fj-farm-tiles');
 		if (!tileStrip) return false;
@@ -251,6 +255,7 @@
 	};
 
 	
+	// Handles payment, persistence, and sprite updates when dropping an object
 	const placeObject = (tileElement, tileIndex, objectName, objectCost, extraData) => {
 		if (!tileElement || !objectName) return false;
 		
@@ -407,6 +412,7 @@
 	};
 
 	
+	// Show a translucent overlay mirroring the object's footprint while dragging
 	const highlightObjectArea = (tileIndex, objectName, validity) => {
 		const tileStrip = document.getElementById('fj-farm-tiles');
 		if (!tileStrip) return;
@@ -455,6 +461,7 @@
 	};
 
 	
+	// Remove any footprint overlays leftover from hover previews
 	const clearObjectHighlights = () => {
 		const highlightedTiles = document.querySelectorAll('.object-highlight');
 		highlightedTiles.forEach(tile => {

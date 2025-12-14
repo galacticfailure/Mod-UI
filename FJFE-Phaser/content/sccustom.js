@@ -1,5 +1,9 @@
-  
-  
+  /*
+   * Shortcut customization system.
+   * Rebuilds the SFW mod quick-rate buttons so mods can assign skins,
+   * PCs, categories, no-index toggles, and even alternate hotkeys.
+   * Also injects the customization dialog and keyboard handler glue.
+   */
 
   const originalButtonState = window.fjCustomShortcutOriginals || {};
   window.fjCustomShortcutOriginals = originalButtonState;
@@ -8,6 +12,7 @@
   const buttonHandlers = window.fjCustomShortcutHandlers || new WeakMap();
   window.fjCustomShortcutHandlers = buttonHandlers;
 
+  // Broadcasts a single event so downstream modules can react to shortcut activation
   const dispatchCustomShortcutEvent = (button, slot, source = 'custom-button') => {
     if (!button) {
       return;
@@ -20,6 +25,7 @@
   };
 
   
+  // Collapse verbose KeyboardEvent codes into concise label text
   function formatHotkeyDisplay(label) {
     try {
       if (!label || typeof label !== 'string') {
@@ -38,6 +44,7 @@
   }
 
   
+  // Returns either the stored custom label or the legacy Numpad fallback
   function getEffectiveHotkeyLabelForRow(customSettings, i) {
     const row = customSettings && customSettings[i];
     const result = (row && row.hotkeyLabel) ? row.hotkeyLabel : ('Numpad' + i);
@@ -45,6 +52,7 @@
   }
 
   
+  // Prevent duplicate bindings across rows (and optionally the Next button)
   function hotkeyConflicts(customSettings, label, excludeRowIdx, excludeNext) {
     if (!label) {
       return false;
@@ -69,6 +77,7 @@
   }
 
   
+  // Keeps the "Next unrated" button's badge in sync with the stored label
   function updateNextUnratedShortKeyUI() {
     try {
       let customSettings = {};
@@ -95,6 +104,7 @@
   }
 
   
+  // If custom shortcuts are disabled we restore the DOM we captured earlier
   function restoreOriginalButtons() {
     try {
       const buttons = getCustomShortcutButtons ? getCustomShortcutButtons() : [];
@@ -114,6 +124,7 @@
   }
 
   
+  // Replaces the /skin/pc/n text while stripping old copies
   function updateShortcutSuffix(el, skin, pc, noIndex) {
     try {
       const suffixClass = 'sccustom-suffix';
@@ -141,6 +152,8 @@
     }
   }
 
+  // Core hook that rewires each quick-rate button to honor the saved profile.
+  // Core hook that rewires each quick-rate button to honor the saved profile
   function applyCustomShortcutsHijack() {
     
     try {
@@ -544,6 +557,7 @@
   }
   document.addEventListener('fjTweakerSettingsChanged', updateNextUnratedShortKeyUI);
   
+  // Canonical list of button references (desktop first, mobile fallback)
   function getCustomShortcutButtons() {
   let buttons = [];
   const markSlot = (btn, slot) => {
@@ -603,6 +617,8 @@
   return buttons;
   }
   
+  // Builds the modal UI so mods can edit shortcut metadata without leaving the page.
+  // Builds the customization modal and wires all its controls back to storage
   function createCustomShortcutsMenu() {
     if (document.getElementById('fj-sccustom-menu-host')) {
       return;
@@ -1132,6 +1148,7 @@
   
 
   
+  // Injects a "Customize" button next to the quick-rate controls
   function addCustomizeButton() {
     
     const desktopRateButtons = Array.from(document.querySelectorAll('.ctButton4.desktopRate'));
@@ -1180,6 +1197,7 @@
     addCustomizeButton();
   }
   
+  // Ensures the mystery 7/8 buttons display badges like the first six
   function addShortKeyDivs() {
     
     const allDesktopBtns = Array.from(document.querySelectorAll('.ctButton4.desktopRate'));
@@ -1203,6 +1221,7 @@
   }
 
   
+  // Clears injected UI before rebuilding or when feature disabled
   function removeCustomMods() {
     
     document.querySelectorAll('.fj-customize-btn').forEach(btn => btn.remove());
@@ -1218,12 +1237,14 @@
   }
 
   
+  // Convenience wrapper around the two hide settings
   function isCustomShortcutsEnabled() {
     const settings = window.fjTweakerSettings || {};
     if (settings.hideShortcuts === true) return false;
     return settings.hideRateShortcuts !== false;
   }
 
+  // Global CSS toggle to hide the entire quick-rate UI when requested
   function setShortcutUIHidden(hidden) {
     const id = 'fj-hide-shortcuts-style';
     let style = document.getElementById(id);
@@ -1254,6 +1275,7 @@
   }
 
   
+  // Reads settings and either shows or removes the customization affordances
   function updateCustomMods() {
     removeCustomMods();
     const st = window.fjTweakerSettings || {};
@@ -1269,6 +1291,7 @@
   
   if (!window.fjCustomShortcutsNumpadBound) {
     try {
+      // Captures numpad input before the site to honor remapped shortcuts
       const onNumpadKeyDown = (e) => {
         try {
           // Ignore typing contexts

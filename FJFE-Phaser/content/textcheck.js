@@ -6,7 +6,8 @@
     return;
   }
 
-  
+  // TextCheck scans titles/descriptions for policy keywords (PC2/meta) and
+  // tags the rate box with a floating notice when risky phrases are present.
 
 
   const PC_LIST = [
@@ -177,7 +178,7 @@
     const rateBoxButtons = document.getElementById('rateBoxButtons');
     const modRa = document.getElementById('modRa');
     if (!rateBoxButtons || !modRa) return;
-    
+    // Each identifier gets its own positioned label so multiple watchers do not conflict.
 
     let labelContainer = document.getElementById(`textcheck-labels-${identifier}`);
     if (!labelContainer) {

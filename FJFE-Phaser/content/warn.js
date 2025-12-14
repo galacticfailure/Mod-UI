@@ -40,6 +40,7 @@
   let badgeRepositionTimer = null;
   let badgeRepositionAttempts = 0;
 
+  // Resolves extension-relative asset paths when running inside Chrome
   const getResourceUrl = (resourcePath) => {
     if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
       return chrome.runtime.getURL(resourcePath);
@@ -48,6 +49,7 @@
   };
 
   
+  // Module is disabled on explicit /nsfw/ sections so check first
   const isNsfwPath = () => {
     try {
       const p = (window.location?.pathname || '').toLowerCase();
@@ -58,6 +60,7 @@
     }
   };
 
+  // Handles both new and legacy category buttons when determining selection
   const isElementSelected = (element, selectedClass) => {
     if (!element) {
       return false;
@@ -108,6 +111,7 @@
     return isElementSelected(element);
   };
 
+  // Collapses all misrate heuristics so overlay/badge logic can react uniformly
   const computeConditionState = () => {
     const politicsWithoutPcLevel = isPoliticsSelected() && !isPcLevel2Selected() && !isPcLevel3Selected();
     const skin3WithoutSpicy = isSkinLevel3Selected() && !isSpicySelected();
@@ -123,10 +127,12 @@
   };
 
   
+  // If someone is currently rating we suppress the nag until they are done
   const hasRecentVoteElement = () => {
     return !!document.getElementById('whoIsRating');
   };
 
+  // Searches for the REPOST banner text which still allows warnings during votes
   const hasRepostBanner = () => {
     
     try {
@@ -140,6 +146,7 @@
     return false;
   };
 
+  // Checks active violations plus settings and voting state before screaming
   const canShowOverlayNow = () => {
     const settings = window.fjTweakerSettings || {};
     
@@ -150,6 +157,7 @@
     return true;
   };
 
+  // Flags category combos outside the spicy/meta whitelist
   const hasMultiCategoryViolation = () => {
     const selected = Array.from(document.querySelectorAll('span.ctButton4.selected[data-id]'))
       .map((element) => element.getAttribute('data-id'))
@@ -162,6 +170,7 @@
     return uniqueDisallowed.size > 1;
   };
 
+  // Builds the big yellow marquee overlay that covers the header when active
   const createOverlay = () => {
     let overlay = document.getElementById(OVERLAY_ID);
     if (overlay) {
@@ -191,6 +200,7 @@
       textTransform: 'uppercase'
     });
 
+    // Wrapper keeps the scrolling text clipped within the overlay bounds
     const wrapper = document.createElement('div');
     wrapper.className = 'fjfe-warning-marquee-wrapper';
     Object.assign(wrapper.style, {
@@ -201,6 +211,7 @@
       overflow: 'hidden'
     });
 
+    // Double up the text so the marquee can wrap seamlessly
     const scroller = document.createElement('div');
     scroller.className = 'fjfe-warning-text';
     scroller.textContent = MESSAGE_TEXT + MESSAGE_GAP + MESSAGE_TEXT; 
@@ -229,6 +240,7 @@
     return overlay;
   };
 
+  // Creates/reuses the floating warning badge next to category controls
   const ensureWarningBadge = () => {
     if (warningBadge) {
       return warningBadge;
@@ -278,6 +290,7 @@
     return badge;
   };
 
+  // Synchronizes tooltip/title text with the current violation summary
   const setBadgeTooltip = (badge, text) => {
     if (!badge) {
       return;
@@ -293,6 +306,7 @@
     badge.title = resolved;
   };
 
+  // Human-friendly strings describing each violation type
   const getBadgeMessage = (state) => {
     if (!state?.any) {
       return '';
@@ -313,6 +327,7 @@
     return messages.join('\n');
   };
 
+  // Attempts to dock the badge right after the currently visible category chip
   const positionWarningBadge = () => {
     if (!warningBadge || warningBadge.style.display === 'none') {
       return;
@@ -379,6 +394,7 @@
     warningBadge.style.display = 'inline-block';
   };
 
+  // DOM thrash is common, so we schedule several reflows to keep placement sane
   const scheduleBadgeReposition = () => {
     if (!warningBadge || warningBadge.style.display === 'none') return;
     if (badgeRepositionTimer) {
@@ -399,6 +415,7 @@
     tick();
   };
 
+  // Enables/disables the badge based on settings + violation state
   const updateWarningBadge = (state) => {
     
     const settings = window.fjTweakerSettings || {};
@@ -428,6 +445,7 @@
     positionWarningBadge();
   };
 
+  // Lazily wires up the looping warning audio via AudioContext when possible
   const ensureAudio = () => {
     let audio = document.getElementById(AUDIO_ID);
     if (!audio) {
@@ -472,6 +490,7 @@
     return audio;
   };
 
+  // Injects resilient marquee CSS so site themes cannot break visibility
   const ensureStyles = () => {
     if (document.getElementById(STYLE_ID)) {
       return;
@@ -482,11 +501,13 @@
     document.head.append(style);
   };
 
+  // Currently we only track the top user bar, but abstraction keeps options open
   const getRelevantElements = () => {
     const header = document.getElementById(HEADER_ID);
     return header ? [header] : [];
   };
 
+  // Recomputes overlay bounds to hug the header regardless of scroll position
   const updateOverlayPosition = () => {
     if (!overlayActive || !overlayElement) {
       return;
@@ -535,6 +556,7 @@
     overlayElement.style.height = `${height}px`;
   };
 
+  // Kicks off overlay/audio/marquee when a violation is active
   const showWarning = () => {
     if (overlayActive) {
       updateOverlayPosition();
@@ -560,6 +582,7 @@
     }
   };
 
+  // Tears down overlay/audio/marquee to avoid leaks when violations clear
   const hideWarning = () => {
     const overlay = document.getElementById(OVERLAY_ID);
     if (overlay) {
@@ -594,6 +617,7 @@
     
   };
 
+  // Central control loop: calculate violations, toggle overlay, refresh badge
   const evaluateState = () => {
     
     if (isNsfwPath()) {
@@ -610,6 +634,7 @@
     updateWarningBadge(currentConditionState);
   };
 
+  // Scopes MutationObserver work to only the DOM nodes we care about
   const matchesRelevantElement = (element) => {
     if (!(element instanceof HTMLElement)) {
       return false;
@@ -635,6 +660,7 @@
     return false;
   };
 
+  // Mutation helper that spots voting widgets and REPOST labels
   const matchesVoteOrRepost = (element) => {
     if (!(element instanceof HTMLElement)) return false;
     if (element.id === 'whoIsRating') return true;
@@ -646,6 +672,7 @@
     return false;
   };
 
+  // MutationObserver callback: single detection triggers full evaluation
   const handleMutations = (mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && matchesRelevantElement(mutation.target)) {
@@ -676,6 +703,7 @@
     }
   };
 
+  // Arms the observer so SPA updates still trigger warnings
   const startObserver = () => {
     if (observer || !document.body) {
       return;
@@ -689,6 +717,7 @@
     });
   };
 
+  // Cleanly disconnects observer hooks during teardown
   const stopObserver = () => {
     if (!observer) {
       return;
@@ -697,6 +726,7 @@
     observer = null;
   };
 
+  // Delays evaluation slightly so category DOM has time to update post-click
   const handleClick = (event) => {
     const target = event.target;
     if (!(target instanceof Element)) {
@@ -720,6 +750,7 @@
     }
   };
 
+  // Scroll/resize can move the header, so recompute overlay + badge anchors
   const handleViewportChange = () => {
     if (overlayActive) {
       updateOverlayPosition();
@@ -728,6 +759,7 @@
   };
 
   
+  // Simple requestAnimationFrame loop for the marquee text
   const tickMarquee = (ts) => {
     if (!marqueeState || !overlayActive || !overlayElement) {
       return;
@@ -752,6 +784,7 @@
     requestAnimationFrame(tickMarquee);
   };
 
+  // Bootstraps the module once per page load on the main funnyjunk domain
   const init = () => {
     if (initialized) {
       return;

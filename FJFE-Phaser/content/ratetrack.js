@@ -1,4 +1,9 @@
 (() => {
+  /*
+   * Rate counter widget.
+   * Tracks how many pieces of content you've rated, keeps a draggable
+   * floating panel, and syncs edits with chrome.storage/localStorage.
+   */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'ratetrack';
   const SETTING_KEY = 'trackRates';
@@ -11,11 +16,13 @@
   const QUICK_MENU_ID = 'quickM';
   const QUICK_BUTTON_SELECTOR = '.ctButton4';
 
+  // Normalized scroll offsets so dragging works in every browser quirk mode
   const getScrollOffsets = () => ({
     left: window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0,
     top: window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
   });
 
+  // Converts pointer positions into absolute page coordinates
   const getPagePosition = (event) => {
     const { left, top } = getScrollOffsets();
     return {
@@ -48,6 +55,7 @@
   const DEDUP_WINDOW_MS = 600;
   let lastRateCountAt = 0;
 
+  // chrome.storage helpers keep counter synced across tabs while falling back gracefully
   const storageAvailable = () => !!(typeof chrome !== 'undefined' && chrome && chrome.storage && chrome.storage.local);
   const storageGet = (keys) => new Promise((resolve) => {
     try {
@@ -72,6 +80,8 @@
     }
   });
 
+  // Prevent accidental double counts when shortcut + click fire together.
+  // Avoid double increments when quick rate + keyboard fire within a heartbeat
   const tryCountRate = () => {
     const now = Date.now();
     if (lastRateCountAt && now - lastRateCountAt < DEDUP_WINDOW_MS) {
@@ -81,6 +91,7 @@
     adjustCounter(1);
   };
 
+  // Default to enabled unless the settings object explicitly disables us
   const getSettingValue = () => {
     const settings = window.fjTweakerSettings || {};
     if (typeof settings[SETTING_KEY] === 'undefined') {
@@ -89,6 +100,7 @@
     return Boolean(settings[SETTING_KEY]);
   };
 
+  // Pull persisted counter from chrome.storage, migrating old localStorage values once
   const loadCounter = async () => {
     try {
       const items = await storageGet([COUNT_KEY]);
@@ -118,6 +130,7 @@
     return 0;
   };
 
+  // Store the latest value asynchronously; failure is non-fatal
   const persistCounter = async () => {
     try {
       await storageSet({ [COUNT_KEY]: String(counterValue) });
@@ -125,12 +138,14 @@
     }
   };
 
+  // Syncs the large number in the panel with the tracked value
   const updateDisplay = () => {
     if (countDisplay) {
       countDisplay.textContent = String(counterValue);
     }
   };
 
+  // Helper for applying new values, optionally skipping persistence during init
   const setCounter = (value, shouldPersist = true) => {
     counterValue = value;
     updateDisplay();
@@ -149,6 +164,7 @@
 
   let isEditingCounter = false;
 
+  // Sanitizes manual text entry to keep the counter numeric
   const parseManualCountInput = (raw) => {
     if (typeof raw !== 'string') {
       return null;
@@ -164,6 +180,7 @@
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  // Visual feedback for invalid manual entries
   const setCounterInputInvalid = (invalid) => {
     if (!countInput) {
       return;
@@ -181,6 +198,7 @@
     });
   };
 
+  // Applies manual edits, refusing to commit invalid strings
   const applyCounterInput = () => {
     if (!countInput) {
       return false;
@@ -196,6 +214,7 @@
     return true;
   };
 
+  // Leaves edit mode either committing or reverting the current field value
   const exitCounterEditMode = (shouldApply) => {
     if (!countInput || !isEditingCounter) {
       return;
@@ -215,6 +234,7 @@
     }
   };
 
+  // Swap display text for an input so mods can type the exact count
   const enterCounterEditMode = () => {
     if (!countInput || isEditingCounter) {
       return;
@@ -233,6 +253,7 @@
     event.stopPropagation();
   };
 
+  // Remembers whether edit-rate clicks should count toward totals
   const loadCountEditsPreference = () => {
     try {
       const raw = localStorage.getItem(COUNT_EDITS_KEY);
@@ -252,6 +273,7 @@
     }
   };
 
+  // Keeps checkbox, state, and storage aligned for the edit-counting option
   const setCountEditsEnabled = (value, shouldPersist = true) => {
     countEditsEnabled = Boolean(value);
     if (countEditsCheckbox) {
@@ -262,6 +284,7 @@
     }
   };
 
+  // Restores last drag position so the widget stays where the mod left it
   const loadPanelPosition = () => {
     try {
       const raw = localStorage.getItem(PANEL_POSITION_KEY);
@@ -294,6 +317,7 @@
     }
   };
 
+  // Locked panels stay fixed to the viewport while unlocked ones scroll
   const loadPanelLocked = () => {
     try {
       const raw = localStorage.getItem(PANEL_LOCK_KEY);
@@ -310,6 +334,7 @@
     } catch (_) {}
   };
 
+  // Ensures we never drag the panel entirely off-screen regardless of mode
   const clampPanelPosition = (left, top) => {
     if (!panel) {
       return { left, top };
@@ -337,6 +362,7 @@
     };
   };
 
+  // Applies either the saved location or a smart default depending on lock state
   const applyPanelPosition = () => {
     if (!panel) {
       return;
@@ -387,6 +413,7 @@
     window.removeEventListener('pointercancel', finishDrag);
   };
 
+  // Moves the panel with pointer events, respecting absolute vs fixed logic
   const handleDragMove = (event) => {
     if (!dragState || event.pointerId !== dragState.pointerId) {
       return;
@@ -416,6 +443,7 @@
     panel.style.right = '';
   };
 
+  // Finalizes drag, releases captures, and persists the resulting position
   const finishDrag = (event) => {
     if (!dragState || (event.pointerId !== undefined && event.pointerId !== dragState.pointerId)) {
       return;
@@ -434,6 +462,7 @@
     persistPanelPosition();
   };
 
+  // Begins pointer-based dragging from the header grip area
   const startDrag = (event) => {
     if (!panel) {
       return;
@@ -487,6 +516,7 @@
     window.addEventListener('pointercancel', finishDrag);
   };
 
+  // Lazily constructs the floating panel UI plus its controls
   const ensurePanel = () => {
     if (panel) {
       return;
@@ -755,6 +785,7 @@
     applyPanelPosition();
   };
 
+  // Delegates to slick animations when available, otherwise toggles display
   const updatePanelVisibility = () => {
     if (!panel) {
       return;
@@ -778,6 +809,7 @@
     }
   };
 
+  // Walks DOM around the clicked button to find the "rated by" username link
   const getRatedByAnchor = (originButton) => {
     let scope = null;
     if (originButton && typeof originButton.closest === 'function') {
@@ -812,6 +844,7 @@
     return normalized || null;
   };
 
+  // Edit-count setting lets mods skip increments when it was their own rate
   const shouldCountForClick = (originButton) => {
     const ratedByUsername = getRatedByUsername(originButton);
       if (!countEditsEnabled) {
@@ -827,6 +860,7 @@
       return ratedByUsername.toLowerCase() !== currentUser.toLowerCase();
   };
 
+  // Avoid double counting NSFW rates when the selector already lit up
   const isSkinSelectionActive = (originButton) => {
     if (originButton && typeof originButton.closest === 'function') {
       const rateBox = originButton.closest('#rateBoxButtons');
@@ -840,6 +874,7 @@
     });
   };
 
+  // Central handler for the three skin buttons feeding the counter
   const handleSkinButtonClick = (button) => {
     if (!featureEnabled) {
       return;
@@ -853,6 +888,7 @@
     tryCountRate();
   };
 
+  // All three NSFW buttons feed into the same counter logic.
   const ensureSkinButtonsBound = () => {
     SKIN_BUTTON_IDS.forEach((id) => {
       const button = document.getElementById(id);
@@ -893,6 +929,7 @@
     skinButtonHandlers.clear();
   };
 
+  // Matches quick-menu hotkeys to the rendered buttons for keyboard support
   const findQuickButtonForDigit = (digit) => {
     try {
       const quickMenu = document.getElementById(QUICK_MENU_ID);
@@ -909,6 +946,7 @@
     return null;
   };
 
+  // Captures quick-menu clicks before site handlers so we can count them
   const handleQuickMenuClick = (event) => {
     if (!featureEnabled) return;
     if (!event || event.isTrusted === false) return;
@@ -923,6 +961,7 @@
     tryCountRate();
   };
 
+  // Allows 1-9 keys (desktop or numpad) to count if shortcuts are visible
   const handleQuickKeydown = (event) => {
     if (!featureEnabled) return;
     if (!event || event.isTrusted === false) return;
@@ -952,6 +991,7 @@
     tryCountRate();
   };
 
+  // MutationObserver keeps button bindings alive while the site reloads markup
   const observeContent = () => {
     if (observer || !document.body) {
       return;
@@ -971,6 +1011,7 @@
     }
   };
 
+  // Turns the whole feature on/off and hooks all relevant event sources
   const applySetting = (enabled) => {
     featureEnabled = enabled;
 
@@ -1057,6 +1098,7 @@
     applySetting(Boolean(detail[SETTING_KEY]));
   };
 
+  // Bootstraps: load counts, honor prefs, and listen for setting toggles
   const init = () => {
     if (window.location.hostname !== targetHost) {
       return;

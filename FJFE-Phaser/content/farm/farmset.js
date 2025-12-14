@@ -1,9 +1,11 @@
 (() => {
+	// Tiny settings drawer for destructive/reset actions and global audio mute
 	const MODULE_KEY='farmset';
 	let root=null,isOpen=false;
 
 	const resolve=(p)=> (typeof chrome!=='undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
 
+	// Build the reset button + mute toggle UI
 	const buildUI=()=>{
 		root.textContent='';
 		const box=document.createElement('div');
@@ -82,6 +84,7 @@
 		root.appendChild(box);
 	};
 
+	// Lock the submenu to the overlay so the short panel hugs the farm
 	const open=(host)=>{
 		if(isOpen||!host) return;
 		root=document.createElement('div'); root.id='fj-farmset';
@@ -96,6 +99,7 @@
 		isOpen=true;
 	};
 
+	// Release overlay lock once settings drawer exits
 	const close=()=>{
 		if(!isOpen||!root) return;
 		try{

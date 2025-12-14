@@ -4,6 +4,9 @@
   const SETTINGS_KEY = 'fjTweakerSettings';
   const MISRATE_CHEAT_STORAGE_KEY = 'fjTweakerMisrateCheatOverride';
   const MISRATE_CHEAT_SEQUENCE = [',', '.', '/', '-', '='];
+  // The SEL module renders the floating Mod UI toggle plus the settings menu that
+  // powers every other content script. It also enforces access tiers and hidden
+  // overrides (misrate cheat, forced hide shortcuts, etc.).
   let misrateCheatOverride = null;
   let misrateCheatSequenceAttached = false;
   let misrateCheatSequenceCallback = null;
@@ -927,6 +930,7 @@ const setInfoContent = (button, message, imagePath) => {
         row.input.disabled = !allowed;
 
         if (!allowed) {
+          // When a feature is above the viewer's tier, it silently resets to safe defaults.
           if (key === 'misrateWarning' && misrateCheatOverride !== null) {
             if (row.input.checked !== misrateCheatOverride) {
               row.input.checked = misrateCheatOverride;

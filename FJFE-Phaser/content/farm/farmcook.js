@@ -53,6 +53,7 @@
 
 	
 	
+	// Ingredient blueprints that drive shop cards and pricing math
 	const INGREDIENTS = [
 		{ name: 'Flour', desc: 'Did you know this stuff can explode?', ing: ['wheat2'], cook: 'mb' },
 		{ name: 'Sugar', desc: 'The most addictive substance on the planet, in your kitchen!', ing: ['sugarcane2'], cook: 'mb' },
@@ -74,6 +75,7 @@
 		{ name: 'Bread', desc: "Best thing since sliced dough. I'm funny, shut up.", ing: ['dough1,butter1'], cook: 'ov' }
 	];
 
+	// Higher-tier recipes unlocked in the book, ordered roughly by complexity
 	const RECIPES = [
 		{ name: 'Pancakes', desc: 'Easy to make and easy to enjoy!', ing: ['flour2,milk1,egg1,sugar1'], cook: 'st' },
 		{ name: 'Waffles', desc: 'Bumpy pancake. Or is a pancake just a flat waffle?', ing: ['dough2,egg1,butter1,sugar1'], cook: 'ov' },
@@ -144,6 +146,7 @@
 	};
 
 	
+	// Normalize comma-delimited ingredient tokens into a flat array
 	const flattenTokens = (arr) => {
 		const out = [];
 		if (!Array.isArray(arr)) return out;
@@ -157,6 +160,7 @@
 		return out;
 	};
 
+	// Pull the saved slot contents so reopening the UI is seamless
 	const loadCookSlots = () => {
 		try {
 			const map = window.fjFarm?.state?.getCookSlots?.();
@@ -168,6 +172,7 @@
 		try { window.fjFarm?.state?.setCookSlots?.(cookSlotsCache); } catch(_) {}
 	};
 
+	// Slots show either an item stack or the placement crosshair
 	const renderCookButton = (meta) => {
 		if (!meta || !meta.el) return;
 		const btn = meta.el;
@@ -208,6 +213,7 @@
 		}
 	};
 
+	// Handles left/right click behavior for moving stacks into and out of slots
 	const handleCookSlotClick = (e, meta, isRightClick) => {
 		e.preventDefault(); e.stopPropagation();
 		
@@ -651,6 +657,7 @@
 	};
 
 	
+	// Evaluate all craftable entries for the given station and choose the highest priority option
 	const findCraftCandidate = (sectionName) => {
 		const ck = sectionCookKey(sectionName);
 		if (!ck) return null;
@@ -722,6 +729,7 @@
 	};
 
 	
+	// Remove the exact stacks used in the last craft so the UI stays in sync
 	const consumeIngredientsFor = (sectionName, req) => {
 		const need = {};
 		req.forEach(r => { need[r.key] = (need[r.key]||0) + (r.count||1); });
@@ -780,6 +788,7 @@
 		interact.selectItem?.(selection, null);
 	};
 
+	// Render one ingredient/recipe row inside the recipe book modal
 	const buildListEntry = (entry, isRecipeEntry = false) => {
 		const wrap = document.createElement('div');
 		Object.assign(wrap.style, { padding:'2px 0', position:'relative' });
@@ -898,6 +907,7 @@
 		return wrap;
 	};
 
+	// Swap between ingredient and recipe tabs without rebuilding the book wrapper
 	const renderRecipeList = (type, contentEl) => {
 		contentEl.textContent = '';
 		const list = type === 'recipes' ? RECIPES : INGREDIENTS;
@@ -906,6 +916,7 @@
 		list.forEach(entry => { contentEl.appendChild(buildListEntry(entry, isRecipe)); });
 	};
 
+	// Build the floating recipe book panel and keep scroll/tab state between opens
 	const openRecipePanel = (buttonToReplace, pos) => {
 		if (recipePanelEl) return;
 		dumpRecipeDebugSnapshot('openRecipePanel');

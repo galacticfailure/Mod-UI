@@ -1,4 +1,9 @@
 (() => {
+  /*
+   * Shared tooltip/info button helper used throughout the suite.
+   * Exposes fjTweakerInfo.createInfoButton/updateTooltip so every
+   * module can surface inline help with consistent styling.
+   */
   const STYLE_ID = 'fj-info-button-style';
   const DEFAULT_TOOLTIP = 'PLACEHOLDER: default tooltip';
 
@@ -16,6 +21,7 @@
   const GAP_PX = 12;
   const VIEWPORT_MARGIN_PX = 6;
 
+  // Inject button + tooltip CSS once per page.
   const ensureStyles = () => {
     if (document.getElementById(STYLE_ID)) {
       return;
@@ -100,6 +106,7 @@
     document.head?.append(style);
   };
 
+  // Each button spawns its own tooltip node to avoid layout thrash.
   const createTooltipElement = () => {
     const tooltip = document.createElement('div');
     tooltip.className = 'fj-info-tooltip';
@@ -109,6 +116,7 @@
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+  // Keep the tooltip on-screen regardless of viewport/placement.
   const positionTooltip = (button, tooltip) => {
     if (!button || !tooltip) {
       return;
@@ -241,6 +249,7 @@
     button.classList.remove('fj-info-open');
   };
 
+  // Primary factory used by every other module to spawn its info buttons.
   const createInfoButton = ({ text = DEFAULT_TOOLTIP, size = 20, placement = 'right' } = {}) => {
     ensureStyles();
 

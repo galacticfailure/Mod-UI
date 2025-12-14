@@ -2,6 +2,8 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'schide';
   const SETTING_KEY = 'hideRateShortcuts';
+  // This module suppresses the standard rate shortcut overlay and numpad bindings
+  // so users only see the Mod UI shortcuts when the "Hide Shortcuts" toggle is set.
 
   let observer = null;
   let featureEnabled = true;
@@ -94,6 +96,7 @@
 
     if ((html1 || replaceModCC) && html2) {
       markOriginalStyles(html2);
+      // Pull the control bar up so the missing quick menu does not leave a gap.
       html2.style.setProperty('margin-top', '-60px', 'important');
     }
   };
@@ -152,6 +155,7 @@
     const isNumpadLocation = (e.location === (KeyboardEvent && KeyboardEvent.DOM_KEY_LOCATION_NUMPAD ? KeyboardEvent.DOM_KEY_LOCATION_NUMPAD : 3)) && /^[1-9]$/.test(e.key);
 
     if (isNumpadCode || isNumpadLocation) {
+      // Cancel FunnyJunk's built-in quick rate bindings so hidden shortcuts stay hidden.
       e.preventDefault();
       e.stopImmediatePropagation();
       return;

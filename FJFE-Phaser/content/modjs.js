@@ -1,4 +1,10 @@
 (() => {
+  /*
+   * Legacy mod.js enhancer.
+   * Adds inline info buttons, blocks known-broken toggles, suppresses
+   * useless popups, and lets mods export/import their favorite combos.
+   * All storage is mirrored through chrome.storage so it survives reloads.
+   */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'modjs';
   const SETTING_KEY = 'modJSExtras';
@@ -83,6 +89,8 @@
 
   const storageArea = typeof chrome !== 'undefined' && chrome?.storage?.local ? chrome.storage.local : null;
 
+  // Kill noisy arrive warnings that mod.js likes to spawn.
+  // Scan the page for known spammy dialog DOM nodes and rip them out.
   const suppressHtmlDialogs = () => {
     if (typeof document === 'undefined') {
       return;
@@ -123,6 +131,7 @@
     }
   };
 
+  // Monkey patch window.alert/confirm/prompt so insulting mod.js popups never appear.
   const interceptDialogMethod = (method) => {
     if (typeof window === 'undefined') {
       return;
@@ -230,6 +239,7 @@
     return createFallbackInfoButton(text, size);
   };
 
+  // Inject info buttons next to every mod.js checkbox line so newcomers know what it does.
   const attachInfoButtonsToPanel = (root) => {
     if (!root) {
       return;
@@ -310,6 +320,7 @@
 
   
   
+  // Hide or auto-untick known broken/banned toggles so they are never resubmitted.
   const removeBrokenRows = (root) => {
     
     if (!root) return;
@@ -421,6 +432,7 @@
     root._fjModJsInfoRows = [];
   };
 
+  // Pull the last "Submit" payload from chrome.storage (if available).
   const loadStoredState = () => {
     if (!storageArea) {
       lastSavedState = null;
@@ -455,6 +467,7 @@
     return storageLoadPromise;
   };
 
+  // Mirror every submission into chrome.storage so Recall/Export share the same data.
   const saveStoredState = (state) => {
     if (!storageArea) {
       lastSavedState = state;
@@ -480,6 +493,7 @@
     }
   };
 
+  // Lightweight modal used for the import/export workflows.
   const showOverlay = (options) => {
     closeOverlay();
 
@@ -697,6 +711,9 @@
     return ids.sort((a, b) => Number(a) - Number(b));
   };
 
+  // Attach recall/import/export controls once the mod.js panel appears.
+  // Inject recall/import/export buttons once the mod.js panel exists.
+  // Wire recall/import/export controls and info buttons after mod.js injects its list.
   const ensurePanelEnhancements = async (root) => {
     if (!featureEnabled || !root) {
       return;
@@ -850,6 +867,7 @@
     await loadStoredState();
   };
 
+  // Tear down event handlers if the user disables the feature mid-session.
   const cleanupPanel = () => {
     const root = document.getElementById('pollzlistJS');
     if (root && typeof root._fjModJsCleanup === 'function') {
@@ -857,6 +875,7 @@
     }
   };
 
+  // Watch for the mod.js UI being inserted so enhancements can reapply.
   const startObserver = () => {
     if (observer || !document.body) {
       return;
@@ -876,6 +895,7 @@
     observer.observe(document.body, { childList: true, subtree: true });
   };
 
+  // Disconnect the MutationObserver when the extras are disabled to avoid leaks.
   const stopObserver = () => {
     if (observer) {
       observer.disconnect();
@@ -883,6 +903,7 @@
     }
   };
 
+  // Master toggle from the SEL menu.
   const applySetting = (enabled) => {
     featureEnabled = enabled;
 
@@ -902,6 +923,7 @@
     }
   };
 
+  // SEL dispatches fjTweakerSettingsChanged; respond only when our flag changes.
   const handleSettingsChanged = (event) => {
     const detail = event.detail || {};
     const next = resolveSettingFlag(detail);
@@ -911,6 +933,7 @@
     applySetting(Boolean(next));
   };
 
+  // Entry point: respect host guard, hydrate storage cache, and register listeners.
   const init = () => {
     if (window.location.hostname !== targetHost) {
       return;

@@ -1,4 +1,5 @@
 (() => {
+  // Centralized cursor/selection manager for every farm submenu (tools, seeds, tiles, etc.)
   const MODULE_KEY = 'farminteract';
   const FERTILIZER_ITEM_KEY = 'fertilizer';
   const FERTILIZED_TAG_LABEL = 'Fertilized';
@@ -13,6 +14,7 @@
   const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
   
   
+  // Lazy-create the floating cursor image + badge so selections feel native to the page
   const createCursor = () => {
     if (cursorEl) return cursorEl;
     
@@ -71,6 +73,7 @@
   };
   
   
+  // Remember which UI button launched the selection and mirror it with the custom cursor
   const selectItem = (itemData, buttonElement) => {
     if (selectedButton) {
       
@@ -127,6 +130,7 @@
   };
   
   
+  // Tear down the current selection and gracefully return stacks/objects back to inventory
   const deselectItem = () => {
     
     if (selectedItem && selectedItem.type === 'moved-object') {
@@ -208,6 +212,7 @@
   };
 
   
+  // These "best" presets proxy straight into farmtile helpers for batch actions
   const executeBestTool = (toolKey) => {
     try {
       const tileModule = window.fjTweakerModules?.farmtile;
@@ -235,6 +240,7 @@
   };
 
   
+  // Unified button handler so every module gets selection, sounds, and toggle logic for free
   const handleButtonClick = (e, itemData, buttonElement) => {
     e.preventDefault();
     e.stopPropagation();
@@ -267,6 +273,7 @@
   };
   
   
+  // Attach the shared click handler while allowing modules to rewire buttons as data changes
   const wireButton = (buttonElement, itemData) => {
     if (!buttonElement || !itemData) return buttonElement;
     
@@ -288,6 +295,7 @@
   };
   
   
+  // Global listeners keep cursor position fresh and reset selections on context/Escape clicks
   const init = () => {
     
     document.addEventListener('mousemove', (e) => {
@@ -330,6 +338,7 @@
   };
   
   
+  // Mirror the hovered selection inside the shared tooltip widget using module metadata
   const updateTooltipForSelection = (itemData) => {
     if (!itemData || !window.fjfeFarmTT) return;
     

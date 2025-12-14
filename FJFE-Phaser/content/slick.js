@@ -1,6 +1,8 @@
 (() => {
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'slick';
+  // Slick centralizes all the little animation helpers so other modules can
+  // bounce UI in/out without duplicating the transition boilerplate.
 
   
   window.fjfeSlickAnimateIn = function(host) {
@@ -265,7 +267,8 @@
         const currentRect = element.getBoundingClientRect();
         const currentLeft = currentRect.left;
         const currentTop = currentRect.top;
-        
+        // Compute the screen-space delta so we can animate to the new position
+        // before committing the final fixed coordinates.
 
         const deltaX = targetLeft - currentLeft;
         const deltaY = targetTop - currentTop;

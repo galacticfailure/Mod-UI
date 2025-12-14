@@ -1,4 +1,5 @@
 (() => {
+  // Master controller for the farm overlay: persistence, focus locking, UI orchestration
   const MODULE_KEY = 'farm';
 
   
@@ -41,6 +42,7 @@
     }
   };
 
+  // Build a lightweight summary for logging/debug comparisons instead of diffing giant blobs
   const summarizeFarmDataSnapshot = (data) => {
     if (!data || typeof data !== 'object') return null;
     const tileArray = Array.isArray(data.tileTypes) ? data.tileTypes : [];
@@ -76,6 +78,7 @@
     };
   };
 
+  // Create the canonical payload we persist to storage/chrome sync
   const captureFarmDataForSerialization = () => {
     return {
       coins,
@@ -100,6 +103,7 @@
     return { added, removed };
   };
 
+  // Quick diff used for logging/debug instrumentation when saves happen close together
   const diffFarmDataSnapshots = (prev, next) => {
     if (!prev) return { previous: null, nextSummary: summarizeFarmDataSnapshot(next) };
     const prevTiles = Array.isArray(prev.tileTypes) ? prev.tileTypes : [];
@@ -318,6 +322,7 @@
       } catch (_) {}
     }
   };
+  // Focus lock prevents multiple tabs from mutating shared storage at once
   const lockUI = () => {
     isFocusLocked = true;
     try { ensureFocusOverlay(); } catch(_) {}
@@ -462,6 +467,7 @@
     return fallback;
   };
 
+  // Serialize farm state, guard against unfocused tabs, and mirror data into local + chrome storage
   const saveFarmData = (reasonInput = 'unspecified') => {
     const reason = reasonInput === 'unspecified' ? captureCallSiteReason(reasonInput) : reasonInput;
     const stamp = new Date().toISOString();
@@ -559,6 +565,7 @@
     } catch(_) {}
   };
 
+  // Hydrate in-memory state from localStorage (or chrome.storage fallback) and notify modules
   const loadFarmData = () => {
     try {
       const primaryRaw = localStorage.getItem('fjFarmData');
@@ -833,6 +840,7 @@
     return '#111';
   };
 
+  // Build the draggable overlay plus menu host the first time we need to render the farm
   const ensureOverlay = () => {
     if (overlayEl && panelEl && document.body.contains(overlayEl)) return;
     overlayEl = document.getElementById('fj-farm-overlay');
@@ -1307,6 +1315,7 @@
   let lockMode = null;
   let menuLockedPos = { left: 0, top: 0 };
 
+  // Snap the overlay to the uploads container and keep tooltips/menus aligned to it
   const positionOverlay = () => {
     if (!overlayEl) return;
     const rect = getUnionRect();
@@ -1411,6 +1420,7 @@
     }
   };
 
+  // Animate the panel into view and bind scroll/resize listeners for menu positioning
   const showOverlay = () => {
     ensureOverlay();
     positionOverlay();
@@ -1534,6 +1544,7 @@
   const hideDebugButtons = () => { cleanupLegacyFarmDebug(); };
 
   
+  // Recreate plant sprites/footprints from saved anchor data so the field matches state
   const restorePlants = () => {
     if (!tileStripEl) return;
 
@@ -1613,6 +1624,7 @@
   };
 
   
+  // Rebuild placed objects (bee box, rain barrel, compost, etc.) including special states
   const restoreObjects = () => {
     if (!tileStripEl) return;
     
@@ -1732,6 +1744,7 @@
   };
 
 
+  // Entry point: wire settings listener, init submodules, load save data, watch layout
   const init = () => {
     try {
       if (initialized) return;
@@ -1819,6 +1832,7 @@
   window.fjFarm.getObjectSize = getObjectSize;
   
   (function(){
+  // Pricing cache keeps UI responsive by memoizing derived coin values for plants/recipes
   const CACHE_VERSION = 6;
     const CACHE_KEY = `fjFarmPriceCacheV${CACHE_VERSION}`;
     const PRICE_STEP_MULTIPLIER = 1.1; 
@@ -2010,6 +2024,7 @@
   window.fjFarm.ui.getSubmenuLockMode = function() { return lockMode; };
   
   const resetFarm = () => {
+    // Nukes both state and caches so QA/debug can start fresh without reinstalling the extension
     try {
       
       coins = 100;

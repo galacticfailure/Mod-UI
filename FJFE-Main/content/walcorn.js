@@ -3,6 +3,7 @@
   const SETTINGS_KEY = 'fjTweakerSettings';
   const DEFER_KEY = '__fj_walcorn_defer__';
 
+  // Resolves extension-relative assets when running inside Chrome
   const resolveAssetUrl = (relativePath) => {
     try {
       if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
@@ -19,6 +20,7 @@
   let runescapePrimaryUrl = null;
   const activeOverlays = [];
 
+  // Adds cache-busting query params so prank images refresh every run
   const buildBustedUrl = (relativePath) => {
     const base = resolveAssetUrl(relativePath);
     let ver = '';
@@ -34,6 +36,7 @@
   const getFallbackGnome = () => resolveAssetUrl('icons/hehe.png');
   const getFallbackRunescape = () => resolveAssetUrl('icons/funnyjunk_2.png');
 
+  // Lazily instantiates the global Audio element for the prank sound
   const ensureAudio = () => {
     if (audio) return audio;
     try {
@@ -48,6 +51,7 @@
     return audio;
   };
 
+  // User-gesture hook so browsers allow autoplay later
   const primeAudioOnGesture = () => {
     if (audioPrimed) return;
     const onFirst = () => {
@@ -69,6 +73,7 @@
     document.addEventListener('keydown', onFirst, true);
   };
 
+  // Creates a high-z-index <img> overlay with fallback detection; returns node
   const makeOverlay = (imgUrl, styles = {}, fallbackUrl) => {
     const el = document.createElement('img');
     el.src = imgUrl;
@@ -105,6 +110,7 @@
     return el;
   };
 
+  // Quick fade-in/fade-out prank centered on screen
   const showGnome = () => {
     const primary = gnomePrimaryUrl || buildBustedUrl('icons/gnome.png');
     const el = makeOverlay(primary, { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }, getFallbackGnome());
@@ -116,6 +122,7 @@
  catch (e) {} }, 650);
   };
 
+  // Launches the bouncing Runescape guy for a few seconds
   const showRunescape = () => {
     const primary = runescapePrimaryUrl || buildBustedUrl('icons/runescape.png');
     const el = makeOverlay(primary, { left: '0', top: '0', height: '400px', transform: 'translate3d(0,0,0)', willChange: 'transform' }, getFallbackRunescape());
@@ -205,6 +212,7 @@
   };
 
   
+  // Plays the prank audio, retrying with fresh Audio objects if needed
   const playSound = () => {
     const a = ensureAudio();
     if (a) {
@@ -247,6 +255,7 @@
     } catch (_) {}
   };
 
+  // Detects navigation clicks so we can defer the prank until next page
   const isSameTabNavigationClick = (e) => {
     try {
       if (!e || typeof e !== 'object') return false;
@@ -267,6 +276,7 @@
 
   };
 
+  // Randomly triggers either overlay (1% runescape, next 10% gnome)
   const handleAction = (e) => {
     if (!enabled) return;
     const r = Math.random();
@@ -289,6 +299,7 @@
     } catch (_) {}
   };
 
+  // Toggles listeners based on fjTweaker setting events
   const handleSettingsChanged = (e) => {
     const s = (e && e.detail) ? e.detail : (window[SETTINGS_KEY] || {});
     const wants = Boolean(s && s.walcorn);
@@ -309,6 +320,7 @@
     }
   };
 
+  // Bootstraps asset preload, deferred pranks, and event listeners
   const init = () => {
     try {
       const s = window[SETTINGS_KEY] || {};

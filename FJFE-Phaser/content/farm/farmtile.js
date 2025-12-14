@@ -50,6 +50,7 @@
       .filter(Boolean);
   };
 
+  // Builds the tile selector palette (coin counter + tile buttons) and wires hover tooltips.
   const buildUI = () => {
     root.textContent = '';
 
@@ -187,6 +188,7 @@
   };
 
   
+  // Developer-only helper panel surfaced through a secret key combo for rapid testing.
   const buildFarmDebugPanel = () => {
     try {
       if (farmDebug.container) return farmDebug.container;
@@ -237,6 +239,7 @@
     } catch(_) { return null; }
   };
 
+  // Shows/Hides the floating debug widget without touching the rest of the overlay layout.
   const toggleFarmDebug = (force) => {
     try {
       const want = (typeof force === 'boolean') ? force : !farmDebug.container;
@@ -276,6 +279,7 @@
   };
 
   
+  // Attaches a Konami-style key chord for revealing the debug controls outside of UI menus.
   const setupFarmDebugKeySequence = () => {
     if (farmKeySeqAttached) return;
     const seq = ['ArrowUp','ArrowDown','\\',']','['];
@@ -313,11 +317,13 @@
   };
 
   
+  // Central module lookups used repeatedly throughout this file.
   const getSeedsModule = () => window.fjTweakerModules?.farmseeds;
 
   const TREE_ALLOWED_TILES = new Set(['tilled', 'dirt', 'soil', 'grass']);
   const buildOffsetKey = (row, col) => `${row}:${col}`;
   const isNonWaterTile = (tileType) => tileType !== 'water';
+  // Object placement uses compatibility specs so that large props only inspect the tiles that matter.
   const buildTreeCompatibilityOffsets = (footprint) => {
     const width = Math.max(1, Number(footprint?.width) || 1);
     const height = Math.max(1, Number(footprint?.height) || 1);
@@ -373,6 +379,7 @@
         return { offsets: new Set(), requireOnListedOnly: false, allowed: (tileType) => isNonWaterTile(tileType) };
     }
   };
+  // Meta describing special interactive props and consumables.
   const COMPOST_BIN_KEY = 'compost_bin';
   const COMPOST_BIN_FULL_THRESHOLD = 300;
   const BEE_BOX_KEY = 'beebox';
@@ -403,6 +410,7 @@
     if (!raw) return false;
     return normalizeItemKey(raw) === FERTILIZER_ITEM_KEY;
   };
+  // --- Compost Bin helpers -------------------------------------------------
   const resolveCompostValue = (objectData) => toPositiveInteger(objectData?.compostValue);
   const resolveCompostBinIconKey = (value) => (value >= COMPOST_BIN_FULL_THRESHOLD ? 'compost_bin_full' : 'compost_bin_empty');
   const isCompostableSelection = (selection) => {
@@ -511,6 +519,7 @@
     return sanitized;
   };
 
+  // --- Bee Box lifecycle ---------------------------------------------------
   const resolveBeeBoxIconKey = (objectData, progressInfo) => {
     const ready = progressInfo ? Boolean(progressInfo.ready) : Boolean(objectData?.honeyReady);
     return ready ? BEE_BOX_ICON_FULL : BEE_BOX_ICON_EMPTY;
@@ -673,6 +682,7 @@
     }
   };
 
+  // --- Rain barrel lifecycle ----------------------------------------------
   const resolveRainBarrelIconKey = (objectData) => {
     const stored = Math.max(0, Math.round(Number(objectData?.rainWaterStored) || 0));
     return stored > 0 ? RAIN_BARREL_ICON_FULL : RAIN_BARREL_ICON_EMPTY;
@@ -866,6 +876,7 @@
     try { rainBarrelMonitorHandle.unref?.(); } catch (_) {}
   };
 
+  // Interaction entry points for special props so the generic tile click handler can stay readable.
   const handleBeeBoxInteraction = (tileElement, tileIndex, objectData, selected, interactModule) => {
     try {
       if (!objectData || String(objectData.objectName || '').toLowerCase() !== BEE_BOX_KEY) {
@@ -967,6 +978,7 @@
     }
   };
 
+  // Debug accelerators used both by the cheat panel and farmtools timers.
   const accelerateBeeBoxes = (hours = 1) => {
     const numericHours = Number(hours);
     if (!Number.isFinite(numericHours) || numericHours === 0) return 0;
@@ -1046,6 +1058,7 @@
 
     return advancedCount;
   };
+  // Drag-to-paint placement state (unlocked by the tool shed object).
   const dragState = {
     active: false,
     pointerId: null,
@@ -1112,6 +1125,7 @@
     } catch (_) {}
   };
 
+  // Placement validators return both a boolean and per-tile diagnostics for highlighting.
   const evaluateSeedPlacementAt = (tileIndex, seedKey) => {
     const seedsModule = getSeedsModule();
     const fallback = {
@@ -1218,6 +1232,7 @@
   const HIGHLIGHT_OVERLAY_CLASS = 'tile-highlight-overlay';
   const HIGHLIGHTED_TILE_CLASS = 'tile-highlighted';
 
+  // Small DOM helpers for glowing the footprint when hovering with tools or seeds.
   const clearPlacementHighlights = () => {
     document.querySelectorAll(`.${HIGHLIGHT_OVERLAY_CLASS}`).forEach(node => node.remove());
     document.querySelectorAll(`.${HIGHLIGHTED_TILE_CLASS}`).forEach(tile => tile.classList.remove(HIGHLIGHTED_TILE_CLASS));
@@ -1261,6 +1276,7 @@
     });
   };
 
+  // --- Compost Bin interaction flow ---------------------------------------
   const handleCompostBinInteraction = (tileElement, tileIndex, objectData, selected, interactModule) => {
     try {
       if (!objectData || String(objectData.objectName || '').toLowerCase() !== COMPOST_BIN_KEY) {
@@ -1328,6 +1344,7 @@
     }
   };
 
+  // Consumes Fertilizer inventory items and tags the anchor plant for bonus yields.
   const applyFertilizerToPlant = (tileIndex, selected, interactModule) => {
     try {
       if (!isFertilizerSelection(selected)) return false;
@@ -1730,6 +1747,7 @@
     return plantOverlay;
   };
 
+  // Master click handler that branches into tools, seeds, objects, tile changes, etc.
   const handleTileClick = (tileElement, tileIndex) => {
     try {
       const interactModule = window.fjTweakerModules?.farminteract;
@@ -1866,6 +1884,7 @@
   };
 
   
+  // Cross-module pricing lookups (delegated to farmseeds/farmtile datasets).
   const getSeedCost = (seedKey) => {
     try {
       
@@ -1937,6 +1956,7 @@
   };
 
   
+  // Attempts a tile purchase, respecting placement rules, coin balance, and tile timers.
   const buyTile = (tileElement, tileIndex, tileKey, tileCost) => {
     if (!tileElement || !tileKey) return false;
     
@@ -1968,6 +1988,7 @@
   };
 
   
+  // Tooltip plumbing that smartly reuses the shared farm tooltip widget for plants + props.
   const showTileTooltip = (tileElement, tileIndex) => {
     try {
       
@@ -2099,6 +2120,7 @@
   };
 
   
+  // Glove tool converts the targeted object's footprint back into free tiles and gives user a carryable copy.
   const handleGlove = (tileElement, tileIndex) => {
     
     const objectData = window.fjFarm?.state?.getObject?.(tileIndex);
@@ -2212,6 +2234,7 @@
   };
   
   
+  // Lightweight preview resolver so hover-highlights know whether an action would do anything.
   const applyToolPreview = (toolKey, currentTileType) => {
     switch (toolKey) {
       case 'hoebasic':
@@ -2237,6 +2260,7 @@
   };
   
   
+  // Routes the currently equipped tool into watering/harvest/hoe/weeding logic.
   const applyTool = (toolKey, currentTileType, tileIndex) => {
     switch (toolKey) {
       case 'hoebasic':
@@ -2281,6 +2305,7 @@
   };
   
   
+  // Harvest tools have three radiuses; this consolidates the shared payout + state reset logic.
   const handleHarvestTool = (toolKey, tileIndex) => {
     
     let tilesToHarvest = [];
@@ -2459,6 +2484,7 @@
   };
 
 
+  // Handles coin deduction, state writes, overlays, and timer wiring for a planted seed/tree.
   const plantSeed = (tileElement, seedKey, seedCost, precomputedPlacement) => {
     if (!tileElement || !seedKey) return false;
 
@@ -2563,6 +2589,7 @@
 
   
   
+  // Swaps the base tile art, updates persistent state, and toggles timer tracking when appropriate.
   const changeTile = (tileElement, newTileType) => {
     if (!tileElement || !newTileType) return;
     
@@ -2610,6 +2637,7 @@
 
   
   
+  // Wires click + pointer drag handlers on every tile plus hover highlighting + tooltip behavior.
   const initTileClickHandlers = () => {
     const tileStrip = document.getElementById('fj-farm-tiles');
     if (!tileStrip) return;
@@ -2771,9 +2799,11 @@
     });
   };
 
+  // Public accessor so other modules (shop cursor) can reuse the tile metadata.
   const getTileTips = () => TILE_TIPS;
 
   
+  // Debug helpers triggered via panel buttons to batch-manipulate the farm.
   const tillAllSoil = () => {
     try {
       const tileStrip = document.getElementById('fj-farm-tiles');
@@ -2840,6 +2870,7 @@
   };
 
   
+  // Utility enumerators leveraged by the batch helpers and other modules.
   const getAllPlantTiles = () => {
     const tiles = [];
     const tileStrip = document.getElementById('fj-farm-tiles');
@@ -2853,6 +2884,7 @@
     return tiles;
   };
 
+  // Entry point invoked by farmmain once the overlay is mounted.
   const init = () => {
     
     setTimeout(initTileClickHandlers, 100); 

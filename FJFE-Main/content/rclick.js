@@ -1,7 +1,12 @@
 (function() {
+    /*
+     * Lightweight gate that keeps the right-click addon disabled unless
+     * the user is both authorized and has the setting enabled.
+     */
     if (!/^(?:www\.)?funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
 
     let authorized = true;
+    // Mirrors apichk so the right-click helper never runs for unauthorized accounts
     const computeAuthorized = () => {
         try {
             return !(window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') || window.fjApichk.isAuthorized();
@@ -15,6 +20,7 @@
         return Boolean(window.fjTweakerSettings && window.fjTweakerSettings.rclick);
     }
 
+    // Re-run whenever settings or apichk status changes
     function updateState() {
         authorized = computeAuthorized();
         if (isEnabled()) {
@@ -31,8 +37,14 @@
 
 
 (function() {
+    /*
+     * Right-click helper. Sends context-menu selections back to the
+     * background script so the EDU article that matches the element can
+     * open instantly. Works for categories, skin buttons, flag radios, etc.
+     */
     if (!/funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
 
+    // Background pings this before letting us open EDU links
     const isAuthorizedNow = () => {
         try {
             return !(window.fjApichk && typeof window.fjApichk.isAuthorized === 'function') || window.fjApichk.isAuthorized();
@@ -59,6 +71,7 @@
         copyrighted_content: 'https://edu.fjme.me/books/flagging-guide/page/other-flags-and-flag-accessories#bkmrk-copyright-issue%3A',
         gore: 'https://edu.fjme.me/books/flagging-guide/page/gore',
     };
+    // Static DOM signatures for the controls we support
     const matchers = [
         { id: 'skinTitle', classList: ['skinBox'], text: 'Skin:', url: RATING_GUIDE_URL },
         { id: 'skinLevel1', classList: ['skinB', 'ctButton4'], url: RATING_GUIDE_URL },
@@ -85,6 +98,8 @@
 
     let lastRightClicked = null;
 
+    // Map DOM nodes (skin buttons, flag radios, etc.) to the matching wiki URL.
+    // Given any element in the click chain, decide which guide URL applies
     function matchesTarget(el) {
         if (!(el instanceof Element)) return false;
         if (el.tagName === 'INPUT' && el.type === 'radio' && el.name === 'flag' && FLAG_RADIO_URLS[el.value]) {
@@ -135,6 +150,7 @@
         return !!menu;
     }
 
+    // Track the last right-clicked element so the background page can react later
     document.addEventListener('contextmenu', (e) => {
         if (!isAuthorizedNow()) { lastRightClicked = null; return; }
         lastRightClicked = null;
@@ -157,6 +173,7 @@
         }
     }, true);
 
+    // Background script requests the stored URL when the custom menu item fires
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg && msg.type === 'fjfe-context-info') {
             if (!isAuthorizedNow()) {

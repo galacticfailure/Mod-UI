@@ -1,11 +1,13 @@
 (() => {
   const MODULE_KEY = 'farmaudio';
 
+  // Resolve extension-relative paths so sounds work in dev and prod
   const resolve = (p) => (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
 
   const DEFAULT_VOLUME = 0.25; 
   const STORAGE_KEY = 'fjFarmMuted';
 
+  // Central registry of effect keys mapped to audio metadata + asset path
   const SOUND_MAP = {
     harvest: 'icons/farm/sounds/harvest.mp3',
     place: 'icons/farm/sounds/place.mp3',
@@ -32,12 +34,14 @@
     click: 0.35, 
   };
 
+  // Module-level mute cache so repeated toggles skip IO
   let isMuted = false;
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v != null) isMuted = v === '1';
   } catch (_) {}
 
+  // Lightweight wrapper around HTMLAudioElement with per-sound gain tweaks
   const play = (key) => {
     try {
       if (isMuted) return;
@@ -50,6 +54,7 @@
     } catch (_) {}
   };
 
+  // Persist mute flag so panel + audio hooks stay in sync
   const setMuted = (muted) => {
     try { isMuted = !!muted; localStorage.setItem(STORAGE_KEY, isMuted ? '1' : '0'); } catch (_) {}
   };

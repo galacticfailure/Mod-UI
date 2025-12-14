@@ -1,10 +1,12 @@
 (function() {
+  // Minimal singleton tooltip controller shared across every farm mini-panel.
   const state = {
     anchorMenuEl: null,
     tipEl: null,
     data: null,
   };
 
+  // Lightweight word-wrapper so long descriptions don't produce horizontal scrollbars.
   function wrapTooltipText(text, maxWidth) {
     if (!text) return '';
     const words = String(text).trim().split(/\s+/);
@@ -42,6 +44,7 @@
     state.data = null;
   }
 
+  // Lazily builds the DOM node (image, name, tags, cost, descriptive copy) the first time it's needed.
   function ensureEl() {
     if (state.tipEl) return state.tipEl;
     const el = document.createElement('div');
@@ -196,6 +199,7 @@
     return el;
   }
 
+  // Pins the tooltip to the currently open menu so it feels anchored to the sidebar instead of the cursor.
   function positionTip() {
     const tip = state.tipEl;
     const menu = state.anchorMenuEl;
@@ -215,6 +219,7 @@
   tip.style.left = (rect.left) + 'px';
   }
 
+  // Applies incoming data payloads to the DOM, handling fallbacks and optional sections.
   function setContent(data) {
     const tip = ensureEl();
     const img = tip.querySelector('[data-role="img"]');

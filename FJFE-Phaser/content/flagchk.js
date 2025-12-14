@@ -1,4 +1,10 @@
 (() => {
+  /*
+   * Flag history helper + ban checklist overlay.
+   * Adds a summary row to the mod history table and ships an interactive
+   * decision tree that mirrors the community flowchart. All UI toggles
+   * are driven by fjTweakerSettings so lower levels can disable them.
+   */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'flagchk';
   const FLAG_SUMMARY_SETTING_KEY = 'flagCheck';
@@ -29,6 +35,7 @@
   const CATEGORY_OTHER_LABEL = 'Other';
   const FLAG_FORM_SELECTOR = '#contentFlag, form.formModFlag';
   const NOTE_INPUT_SELECTOR = 'input[name="modeNote"]';
+  // Settings are persisted as strings/ints, so normalize everything to booleans here.
   const coerceSettingEnabled = (value) => {
     if (value === true) {
       return true;
@@ -65,8 +72,10 @@
   let moderatorLevel = null;
   let moderatorLevelRequestPending = false;
 
+  // Skip DOM work entirely if neither the summary nor checklist are enabled.
   const hasActiveFeatures = () => summaryEnabled || checklistEnabled;
 
+  // Guard against running inside iframes or other hostnames.
   const isTargetHost = () => {
     try {
       const hostname = window.location?.hostname || '';
@@ -76,6 +85,7 @@
     }
   };
 
+  // History dates are returned as "YYYY-MM-DD HH:mm:ss"; convert to UTC Date objects.
   const parseDateTime = (value) => {
     if (!value) {
       return null;
@@ -88,6 +98,7 @@
     return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds)));
   };
 
+  // Summary rows span the full width, so determine how many columns the table currently has.
   const getColumnCount = (table) => {
     if (!table) {
       return 1;
@@ -101,6 +112,7 @@
     return fallbackRow && fallbackRow.cells ? Math.max(1, fallbackRow.cells.length) : 1;
   };
 
+  // Scrape the history table and normalize each row so the summary logic is simple.
   const collectEntries = (table) => {
     if (!table) {
       return [];
@@ -151,6 +163,8 @@
     return entries;
   };
 
+  // Apply heuristics so the summary ignores ancient or low-signal entries.
+  // Ignore roll logs and back-to-back spam flags so the summary focuses on actionable items.
   const applyIgnoreRules = (entries) => {
     if (!Array.isArray(entries) || entries.length === 0) {
       return;
@@ -183,11 +197,13 @@
     });
   };
 
+  // Simple substring matcher for the category heuristics.
   const matchesCategoryRule = (descLower, rule) =>
     rule.keywords.some((keyword) => descLower.includes(keyword));
 
   const findCategoryRule = (descLower, rules) => rules.find((rule) => matchesCategoryRule(descLower, rule));
 
+  // Each category keeps a tally plus a list of the specific reasons encountered.
   const createCategoryTracker = () => ({ count: 0, reasons: [] });
 
   const addCategoryReason = (tracker, label) => {
@@ -198,6 +214,7 @@
     tracker.reasons.push(label);
   };
 
+  // Crunch the scraped rows into totals used by the injected summary row.
   const summarizeEntries = (table) => {
     const entries = collectEntries(table);
     if (!entries.length) {
@@ -252,6 +269,7 @@
     };
   };
 
+  // Group ignored reasons by label so the summary can show counts.
   const formatIgnoredReasons = (reasons) => {
     if (!Array.isArray(reasons) || !reasons.length) {
       return '';
@@ -266,6 +284,7 @@
       .join(', ');
   };
 
+  // Insert a summary <tr> above the real rows (if it does not already exist).
   const ensureSummaryRow = (table) => {
     if (!table) {
       return null;
@@ -285,6 +304,7 @@
     return row;
   };
 
+  // Rebuild the summary row contents to reflect the latest scan.
   const updateSummaryRow = (row, table, summary) => {
     if (!row) {
       return;
@@ -348,6 +368,7 @@
     return input.style.width || '90%';
   };
 
+  // Lazily add the keyframe animations used by the draggable checklist UI.
   const ensureChecklistStyles = () => {
     if (document.getElementById(CHECKLIST_STYLE_ID)) {
       return;
@@ -423,6 +444,7 @@
     checklistContentEl.classList.add('fjfe-flag-checklist-step');
   };
 
+  // Cache the level reported by fjApichk so the flow can gate long bans.
   const cacheModeratorLevel = (value) => {
     if (Number.isFinite(value)) {
       moderatorLevel = value;
@@ -433,6 +455,7 @@
     cacheModeratorLevel(event?.detail?.level);
   };
 
+  // If the level is unknown, ask fjApichk to refresh its data.
   const requestModeratorLevelUpdate = () => {
     if (moderatorLevelRequestPending) {
       return;
@@ -471,6 +494,7 @@
     return null;
   };
 
+  // visualViewport yields correct coordinates even when the on-screen keyboard is open.
   const getViewportSize = () => {
     const viewport = window.visualViewport;
     const width = viewport?.width || window.innerWidth || document.documentElement?.clientWidth || 0;
@@ -598,6 +622,7 @@
     window.addEventListener('pointercancel', finishChecklistDrag);
   };
 
+  // Close the checklist if the page is unloading or history navigation occurs.
   const handleChecklistNavigation = () => {
     destroyChecklistPanel({ resetPosition: true });
   };
@@ -624,6 +649,7 @@
     checklistNavHandlersAttached = false;
   };
 
+  // Tear down DOM listeners + drag state; optionally animate before removal.
   const destroyChecklistPanel = (options = {}) => {
     const finalize = () => {
       if (checklistPanel) {
@@ -656,6 +682,8 @@
     finalize();
   };
 
+  // Lazy-build the draggable checklist UI the first time it is requested.
+  // Build the floating draggable panel only when requested to save DOM churn.
   const ensureChecklistPanel = () => {
     if (checklistPanel) {
       return checklistPanel;
@@ -885,6 +913,7 @@
 
   const LONG_BAN_WARNING_TEXT = 'For a ban of this length, you must get approval from 2 Highish mods, or 1 HC mod.';
 
+  // Format the ban recommendation and append any warnings required for long durations.
   const buildBanAction = (hours, extraNotes = []) => {
     const notes = [...extraNotes];
     if (!Number.isFinite(hours) || hours <= 0) {
@@ -903,9 +932,9 @@
   const buildBoogAction = () => {
     const level = getModeratorLevel();
     if (Number.isFinite(level) && level >= 8) {
-      return createChecklistAction('Bring it to admin on mod-social.');
+      return createChecklistAction('Flag for 100x hour minimum.');
     }
-    return createChecklistAction('Get approval from two Highish mods, or one HC mod, then bring it to admin on mod-social.');
+    return createChecklistAction('Receive verification from 4 Highish mods or 2 HC to flag. Use the ban time they recommend; baseline 200x hours.');
   };
 
   const buildSevereContentAction = () => {
@@ -1007,6 +1036,7 @@
   const evaluateQb1 = (counts) => evaluateCombinedFlagCounts(counts, getQb1Last30Result);
   const evaluateQb2 = (counts) => evaluateCombinedFlagCounts(counts, getQb2Last30Result);
 
+  // Declarative flow definition for the ban calculator. Each node describes its own UI.
   const CHECKLIST_FLOW = {
     Q1: {
       type: 'boolean',
@@ -1050,11 +1080,11 @@
     },
     Q4: {
       type: 'choice',
-      prompt: 'What kind of image is it?',
+      prompt: "What's it being flagged for?",
       options: [
-        { label: 'Boog', getOutcome: () => buildBoogAction() },
-        { label: 'Spam, Harassment, or Illegal', next: 'QB1' },
+        { label: 'Spam, Harassment, or Illegal', next: 'QBoogCheck' },
         { label: 'NSFW or Gore', next: 'QA2' },
+        { label: 'Borderline NSFW', next: 'QB2' },
         { label: 'Loli', next: 'QL' }
       ]
     },
@@ -1078,6 +1108,12 @@
       prompt: 'Did they say "Fuck the mods"?',
       onYes: buildBanAction(1000),
       onNo: buildBanAction(200)
+    },
+    QBoogCheck: {
+      type: 'boolean',
+      prompt: 'Is it Boog content?',
+      onYes: () => buildBoogAction(),
+      onNo: 'QB1'
     },
     QB1: {
       type: 'dualNumeric',
@@ -1106,6 +1142,7 @@
     }
   };
 
+  // All checklist validation errors feed into the red line under the controls.
   const setChecklistError = (message) => {
     if (checklistErrorEl) {
       checklistErrorEl.textContent = message || '';
@@ -1145,6 +1182,7 @@
 
   const resolveOutcomeValue = (value) => (typeof value === 'function' ? value() : value);
 
+  // Central router for the state machine; outcomes can be node ids or final actions.
   const advanceChecklistFlow = (outcome) => {
     if (!checklistState) {
       resetChecklistState();
@@ -1485,6 +1523,7 @@
     checklistActionEl.textContent = actionText;
   };
 
+  // Synchronize the panel UI with the current node or final recommendation.
   const renderChecklistState = () => {
     if (!checklistPanel || !checklistContentEl || !checklistState) {
       return;
@@ -1537,6 +1576,7 @@
     triggerChecklistStepAnimation();
   };
 
+  // Inject the "Calculate Ban Time" button beneath the flag notes field.
   const ensureChecklistButton = (form) => {
     if (!form || form.querySelector(`#${CHECKLIST_BUTTON_ID}`)) {
       return;
@@ -1578,11 +1618,13 @@
     noteLabel.insertAdjacentElement('afterend', wrapper);
   };
 
+  // Iterate every open flag form and attach the calculator button.
   const enhanceFlagMenus = () => {
     const forms = document.querySelectorAll(FLAG_FORM_SELECTOR);
     forms.forEach((form) => ensureChecklistButton(form));
   };
 
+  // Collect totals then hydrate/inject the summary row into a single table instance.
   const renderSummary = (table) => {
     if (!table) {
       return;
@@ -1592,6 +1634,7 @@
     updateSummaryRow(row, table, summary);
   };
 
+  // Multiple history dialogs can exist; rescan each during DOM mutations.
   const scanHistoryDialogs = () => {
     const dialogs = document.querySelectorAll('#PT_HistoryDialog');
     dialogs.forEach((dialog) => {
@@ -1602,6 +1645,7 @@
     });
   };
 
+  // Summary + checklist both depend on DOM availability, so scan conditionally.
   const scanActiveUIs = () => {
     if (!hasActiveFeatures()) {
       return;
@@ -1614,6 +1658,7 @@
     }
   };
 
+  // Debounce scans so bursty mutations do not thrash the UI.
   const scheduleUiScan = () => {
     if (!hasActiveFeatures()) {
       return;
@@ -1627,6 +1672,7 @@
     }, SCAN_DEBOUNCE_MS);
   };
 
+  // MutationObserver callback – just note whether any nodes were added and rescan.
   const handleMutations = (mutations) => {
     if (!mutations || !hasActiveFeatures()) {
       return;
@@ -1646,6 +1692,7 @@
     }
   };
 
+  // Attach MutationObserver lazily so idle pages do not pay the cost.
   const startObserver = () => {
     if (observer || !document.body) {
       scanActiveUIs();
@@ -1656,6 +1703,7 @@
     scanActiveUIs();
   };
 
+  // Disconnect MutationObserver + timers so background tabs stay quiet.
   const stopObserver = () => {
     if (observer) {
       observer.disconnect();
@@ -1667,6 +1715,7 @@
     }
   };
 
+  // When a user disables the summary, strip all injected rows immediately.
   const removeSummaryRows = () => {
     document.querySelectorAll(`#${SUMMARY_ROW_ID}`).forEach((row) => {
       try {
@@ -1675,6 +1724,7 @@
     });
   };
 
+  // Ditto for the calculator buttons/panel.
   const removeChecklistButtons = () => {
     document.querySelectorAll(`#${CHECKLIST_BUTTON_ID}`).forEach((button) => {
       const wrapper = button.parentElement;
@@ -1691,6 +1741,8 @@
     destroyChecklistPanel({ resetPosition: true });
   };
 
+  // Settings toggles allow either feature to be switched off without reloading the page.
+  // Apply user toggles at runtime and start/stop observers as needed.
   const applySettings = (settings = {}) => {
     const nextSummaryEnabled = coerceSettingEnabled(settings[FLAG_SUMMARY_SETTING_KEY]);
     const nextChecklistEnabled = coerceSettingEnabled(settings[BAN_CALCULATOR_SETTING_KEY]);
@@ -1715,10 +1767,12 @@
     }
   };
 
+  // fjTweakerSettingsChanged fires whenever SEL toggles change; mirror them here.
   const handleSettingsChanged = (event) => {
     applySettings(event?.detail || window.fjTweakerSettings || {});
   };
 
+  // Entry point: wire listeners + seed state once the host is correct.
   const init = () => {
     if (initialized || !isTargetHost()) {
       return;

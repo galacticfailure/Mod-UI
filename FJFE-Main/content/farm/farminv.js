@@ -1,4 +1,5 @@
 (() => {
+	// Inventory grid for plants/objects/food plus the sell-mode workflow
 	const MODULE_KEY='farminv';
 	let root=null,isOpen=false;
 	let buttonsMeta=[];
@@ -30,6 +31,7 @@
 	};
 	
 	
+	// Auto-grow the grid when the bottom row fills up so players never run out of slots
 	const checkAndExpandInventory = () => {
 		const currentRows = getCurrentRows();
 		const lastRowStart = (currentRows - 1) * COLS;
@@ -75,6 +77,7 @@
 	const FERTILIZER_TAG = 'Fertilized';
 
 	
+	// Drop new items into existing stacks, fall back to empty slots, and expand if needed
 	const addToInventory = (itemName, count = 1, itemType = 'plant') => {
 		
 		for (let i = 0; i < inventorySlots.length; i++) {
@@ -134,6 +137,7 @@
 	
 	let suppressPrune = false; 
 
+	// Return the removed stack so callers can hand it to farminteract for cursor selection
 	const removeFromSlot = (slotIndex, count = 1) => {
 		if (slotIndex < 0 || slotIndex >= inventorySlots.length || !inventorySlots[slotIndex]) return null;
 		
@@ -158,6 +162,7 @@
 	};
 
 	
+	// Collapse empty rows from the bottom to keep the UI compact once items are moved out
 	const pruneEmptyTrailingRows = () => {
 		try {
 			
@@ -433,6 +438,7 @@
 	};
 
 	
+	// Single handler covers sell mode toggling, deposit, and pickup with half-stack right-click support
 	const handleSlotClick = (e, slotIndex, isRightClick) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -660,6 +666,7 @@
 	};
 
 	
+	// First click enters selection mode, second performs the sale and pays out coins
 	const handleSellToggle = (e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -729,6 +736,7 @@
 	};
 
 		
+		// Sum the current selection using pricing helpers so the live total stays accurate
 		const computeSelectedSellValue = (finalizeObjects75 = false) => {
 			let total = 0;
 			try {
@@ -777,6 +785,7 @@
 			return total;
 		};
 
+		// Mirror the running coin value inside the Sell badge so players know the payout
 		const updateLiveSellTotal = () => {
 			try {
 				if (!root) return;
@@ -789,6 +798,7 @@
 			} catch(_) {}
 		};
 
+	// Slide the panel next to the calling menu and animate it in
 	const open=(host)=>{
 		if(isOpen||!host) return;
 		root=document.createElement('div'); root.id='fj-farminv';
@@ -833,6 +843,7 @@
 		}
 	};
 
+	// Reload saved state once farm data finishes booting
 	const init=()=>{
 		
 		setTimeout(() => {
