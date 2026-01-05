@@ -39,6 +39,8 @@
   let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, any: false };
   let badgeRepositionTimer = null;
   let badgeRepositionAttempts = 0;
+  const USER_ACTIVATION_EVENTS = ['pointerdown', 'keydown', 'touchstart'];
+  let audioUnlockHandler = null;
 
   // Resolves extension-relative asset paths when running inside Chrome
   const getResourceUrl = (resourcePath) => {
@@ -445,6 +447,52 @@
     positionWarningBadge();
   };
 
+  function cleanupAudioUnlock() {
+    if (!audioUnlockHandler || !document?.removeEventListener) {
+      return;
+    }
+    USER_ACTIVATION_EVENTS.forEach((evt) => {
+      try { document.removeEventListener(evt, audioUnlockHandler, true); } catch (_) {}
+    });
+    audioUnlockHandler = null;
+  }
+
+  function resumeAudioPlayback() {
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume().catch(handleAudioStartError);
+    }
+    const audio = document.getElementById(AUDIO_ID);
+    if (audio && audio.paused) {
+      const attempt = audio.play();
+      if (attempt && typeof attempt.catch === 'function') {
+        attempt.catch(handleAudioStartError);
+      }
+    }
+  }
+
+  function scheduleAudioUnlock() {
+    if (audioUnlockHandler || !document?.addEventListener) {
+      return;
+    }
+    audioUnlockHandler = () => {
+      cleanupAudioUnlock();
+      resumeAudioPlayback();
+    };
+    USER_ACTIVATION_EVENTS.forEach((evt) => {
+      try { document.addEventListener(evt, audioUnlockHandler, true); } catch (_) {}
+    });
+  }
+
+  function handleAudioStartError(error) {
+    if (!error) {
+      return;
+    }
+    const message = String(error.message || '').toLowerCase();
+    if (error.name === 'NotAllowedError' || message.includes('user gesture') || message.includes('not allowed')) {
+      scheduleAudioUnlock();
+    }
+  }
+
   // Lazily wires up the looping warning audio via AudioContext when possible
   const ensureAudio = () => {
     let audio = document.getElementById(AUDIO_ID);
@@ -477,7 +525,7 @@
     }
     audio.volume = 0.2;
     if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume().catch(() => {});
+      audioContext.resume().catch(handleAudioStartError);
     } else if (audioContext && audioContext.state === 'closed') {
       audioContext = null;
       audioSource = null;
@@ -485,7 +533,7 @@
     }
     const playPromise = audio.play();
     if (playPromise && typeof playPromise.then === 'function') {
-      playPromise.catch(() => {});
+      playPromise.catch(handleAudioStartError);
     }
     return audio;
   };
@@ -613,6 +661,7 @@
     overlayElement = null;
     overlayActive = false;
     marqueeState = null;
+    cleanupAudioUnlock();
     
     
   };
@@ -817,6 +866,7 @@
         try { clearTimeout(badgeRepositionTimer); } catch (_) {}
         badgeRepositionTimer = null;
       }
+      cleanupAudioUnlock();
     });
   };
 

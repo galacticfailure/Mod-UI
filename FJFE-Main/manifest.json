@@ -2,13 +2,14 @@
   "manifest_version": 3,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "permissions": [
     "storage",
     "contextMenus"
   ],
   "host_permissions": [
-    "https://funnyjunk.com/*"
+    "https://funnyjunk.com/*",
+    "https://*.funnyjunk.com/*"
   ],
   "content_scripts": [
     {
@@ -32,12 +33,12 @@
         "content/farm/farmtile.js",
         "content/farm/farminv.js",
         "content/farm/farmset.js",
+        "content/framegif.js",
         "content/ratetrack.js",
         "content/hunt.js",
         "content/sccustom.js",
         "content/userpop.js",
         "content/nextmove.js",
-        "content/remtz.js",
         "content/rclick.js",
         "content/textcheck.js",
         "content/flagchk.js",

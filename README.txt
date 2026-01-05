@@ -7,7 +7,7 @@ Installation
 3. Proceed according to the branch you installed:
 - FJFE-Main: Extract the .zip and place the folder somewhere you'll remember. Navigate to your browser's Extensions page and enable `Developer Mode` (usually in the top right). Press Load Unpacked (usually top left), then select the unzipped folder. FJFE should load into the extension page. Refresh FJ once finished. Note: If you move or delete the folder on your PC, it will make updating the extension slightly more difficult, though minimally so.
 - FJFE-Phaser: Navigate to about:config in your URL, search for xpinstall.signatures.required, set it to false. Once complete, install the .xpi and enable the extension as needed. Refresh FJ once finished.
-4. The extension will add an icon to the bottom left of the screen on install; if you see it, it's working correctly. Mouse over the icon to remove it.
+4. The extension will add a "Mod UI" button to the sidebar; if it's there, it's working correctly.
 Note: the extension's main settings menu is in FJ's sidebar, above the NSFW button. If you have `Show extended sidebar on desktop` (FJ settings) disabled, it will not show up, so make sure it's enabled.
 
 Updating

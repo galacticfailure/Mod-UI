@@ -80,8 +80,6 @@
   };
   const DEFAULT_SETTINGS = {
     avoidNext: false,
-    removeTwilight: false,
-    customMessages: false,
     flagCheck: false,
     banCalculator: false,
     hideRateShortcuts: false,
@@ -95,20 +93,20 @@
     misrateWarning: false,
     warnOnAll: false,
     farm: false,
-    huntAssist: false
+    huntAssist: false,
+    gifViewer: false
   };
   const ALLOWED_SETTINGS_TIER1 = new Set([
     'stopUsernamePopups',
     'trackRates',
     'modJSExtras',
     'checkText',
-    'avoidNext'
+    'avoidNext',
+    'gifViewer'
   ]);
   const ALLOWED_SETTINGS_TIER2 = new Set([
     ...ALLOWED_SETTINGS_TIER1,
     'misrateWarning',
-    'removeTwilight',
-    'customMessages',
     'flagCheck',
     'banCalculator'
   ]);
@@ -557,12 +555,10 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow) => {
+const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
-    removeTwilight: removeTwilightRow.input.checked,
-    customMessages: customMessagesRow.input.checked,
     flagCheck: flagCheckRow.input.checked,
     banCalculator: banCalculatorRow.input.checked,
     hideRateShortcuts: hideRateRow.input.checked,
@@ -576,6 +572,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
     misrateWarning: misrateWarningRow.input.checked,
     warnOnAll: warnOnAllRow.input.checked,
     farm: farmRow ? Boolean(farmRow.input.checked) : false,
+    gifViewer: gifViewerRow.input.checked,
     huntAssist: huntAssistRow.input.checked
   };
 
@@ -585,14 +582,6 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
 };
 
   const avoidNextRow = createCheckboxRow('fj-sel-avoid-next', 'Avoid Next', settings.avoidNext);
-  const removeTwilightRow = createCheckboxRow('fj-sel-remove-twilight', 'Remove Twilight Zone', settings.removeTwilight);
-  const customMessagesRow = createCheckboxRow('fj-sel-custom-messages', 'Custom Messages', settings.customMessages);
-  
-  try {
-    const labelEl = customMessagesRow.wrapper.querySelector('label');
-    if (labelEl) labelEl.style.marginLeft = '22px';
-  } catch (_) {}
-  customMessagesRow.input.title = 'Enables custom hard-coded messages on mod profiles.';
   const flagCheckRow = createCheckboxRow('fj-sel-flag-check', 'Flag Check', settings.flagCheck);
   const banCalculatorRow = createCheckboxRow('fj-sel-ban-calculator', 'Ban Calculator', settings.banCalculator);
   const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Custom Shortcuts', settings.hideRateShortcuts);
@@ -606,6 +595,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
   hideShortcutsRow.input.title = 'Completely hides and disabled shortcuts.';
   const stopUserPopupRow = createCheckboxRow('fj-sel-stop-userpop', 'Stop Username Popups', settings.stopUsernamePopups);
   const trackRatesRow = createCheckboxRow('fj-sel-track-rates', 'Track Rates', settings.trackRates);
+  const gifViewerRow = createCheckboxRow('fj-sel-gif-viewer', 'Frame Viewer', settings.gifViewer);
   const modJSExtrasRow = createCheckboxRow('fj-sel-modjs', 'ModJS Extras', settings.modJSExtras);
   const walcornRow = createCheckboxRow('fj-sel-walcorn', 'Walcorn Mode', settings.walcorn);
   const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
@@ -660,7 +650,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow);
 
       const applyMisrateCheatOverrideState = (triggerSave = false) => {
         if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
@@ -688,8 +678,6 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
         persistMisrateCheatOverride(misrateCheatOverride);
       };
       avoidNextRow.input.addEventListener('change', saveHandler);
-      removeTwilightRow.input.addEventListener('change', saveHandler);
-      customMessagesRow.input.addEventListener('change', saveHandler);
       flagCheckRow.input.addEventListener('change', saveHandler);
       banCalculatorRow.input.addEventListener('change', saveHandler);
       hideRateRow.input.addEventListener('change', (e) => { onToggleMutual('custom'); saveHandler(); });
@@ -708,6 +696,7 @@ const saveSettingsLive = (avoidNextRow, removeTwilightRow, customMessagesRow, fl
       });
       warnOnAllRow.input.addEventListener('change', saveHandler);
       farmRow.input.addEventListener('change', saveHandler);
+      gifViewerRow.input.addEventListener('change', saveHandler);
       huntAssistRow.input.addEventListener('change', saveHandler);
       return {
         applyMisrateCheatOverrideState,
@@ -764,15 +753,14 @@ const setInfoContent = (button, message, imagePath) => {
 
 
     setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
-    setInfoContent(removeTwilightRow.infoButton, 'Removes the Twilight Zone lyrics from user profiles.');
-    setInfoContent(customMessagesRow.infoButton, 'Enables custom hard-coded messages on mod profiles.');
     setInfoContent(flagCheckRow.infoButton, 'Summarizes flags in Premium History.');
     setInfoContent(banCalculatorRow.infoButton, 'Adds a button to help calculate ban time.');
     setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
     setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
     setInfoContent(stopUserPopupRow.infoButton, 'Stops the profile menu from popping up when mousing over a user. User must now be clicked to bring up menu.');
     setInfoContent(trackRatesRow.infoButton, 'Keeps count of rated content.');
-    setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Import provides a code to copy that reflects last-submitted settings, Export takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
+    setInfoContent(gifViewerRow.infoButton, 'Hover over a GIF or video to view its frames.');
+    setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Export provides a code to copy that reflects last-submitted settings, Import takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
     setInfoContent(walcornRow.infoButton, 'why');
     setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
     setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
@@ -792,7 +780,7 @@ const setInfoContent = (button, message, imagePath) => {
     };
 
     const baseTabGroups = {
-      interface: [stopUserPopupRow.wrapper, removeTwilightRow.wrapper, customMessagesRow.wrapper, flagCheckRow.wrapper],
+      interface: [stopUserPopupRow.wrapper, flagCheckRow.wrapper],
       tools: [
         misrateWarningRow.wrapper,
         warnOnAllRow.wrapper,
@@ -802,6 +790,7 @@ const setInfoContent = (button, message, imagePath) => {
         hideRateRow.wrapper,
         hideShortcutsRow.wrapper,
         trackRatesRow.wrapper,
+        gifViewerRow.wrapper,
         huntAssistRow.wrapper,
       ],
       extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
@@ -837,8 +826,6 @@ const setInfoContent = (button, message, imagePath) => {
 
     const checkboxRows = {
       avoidNext: avoidNextRow,
-      removeTwilight: removeTwilightRow,
-      customMessages: customMessagesRow,
       flagCheck: flagCheckRow,
       banCalculator: banCalculatorRow,
       hideRateShortcuts: hideRateRow,
@@ -852,6 +839,7 @@ const setInfoContent = (button, message, imagePath) => {
       misrateWarning: misrateWarningRow,
       warnOnAll: warnOnAllRow,
       farm: farmRow,
+      gifViewer: gifViewerRow,
       huntAssist: huntAssistRow
     };
 
@@ -998,7 +986,7 @@ const setInfoContent = (button, message, imagePath) => {
       }
 
       if (changed) {
-        saveSettingsLive(avoidNextRow, removeTwilightRow, customMessagesRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+        saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
       }
 
       currentTier = normalizedTier;

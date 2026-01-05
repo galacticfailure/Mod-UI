@@ -22,3 +22,29 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     }
   }
 });
+
+const fetchGifBuffer = async (url) => {
+  if (!url) {
+    throw new Error('Missing URL.');
+  }
+  const response = await fetch(url, { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+  const buffer = await response.arrayBuffer();
+  const contentType = response.headers.get('content-type') || 'application/octet-stream';
+  return { buffer, contentType };
+};
+
+browser.runtime.onMessage.addListener((message) => {
+  if (!message || message.type !== 'fjfe-framegif-fetch') {
+    return undefined;
+  }
+  const { url } = message;
+  return fetchGifBuffer(url)
+    .then(({ buffer, contentType }) => {
+      const bytes = Array.from(new Uint8Array(buffer));
+      return { ok: true, buffer: bytes, contentType };
+    })
+    .catch((error) => ({ ok: false, error: error?.message || 'Fetch failed.' }));
+});

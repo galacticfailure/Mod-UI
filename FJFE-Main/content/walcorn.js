@@ -20,6 +20,23 @@
   let runescapePrimaryUrl = null;
   const activeOverlays = [];
 
+  const GNOME_FLASH_CHANCE = 0.05;
+  const FLASH_IMAGE_URL = resolveAssetUrl('icons/flashbang.png');
+  const FLASH_AUDIO_URL = resolveAssetUrl('icons/flash.mp3');
+  const FLASH_AUDIO_VOLUME = 0.5;
+  const FLASH_DROP_DURATION = 520;
+  const FLASH_FADE_IN_DURATION = 90;
+  const FLASH_HOLD_DURATION = 5000;
+  const FLASH_FADE_DURATION = 5000;
+
+  const flashState = {
+    active: false,
+    used: false,
+    overlay: null,
+    image: null,
+    audios: new Set()
+  };
+
   // Adds cache-busting query params so prank images refresh every run
   const buildBustedUrl = (relativePath) => {
     const base = resolveAssetUrl(relativePath);
@@ -35,6 +52,184 @@
 
   const getFallbackGnome = () => resolveAssetUrl('icons/hehe.png');
   const getFallbackRunescape = () => resolveAssetUrl('icons/funnyjunk_2.png');
+
+  const appendToBody = (element) => {
+    const attach = () => {
+      if (document.body && !document.body.contains(element)) {
+        document.body.appendChild(element);
+      }
+    };
+    if (document.body) {
+      attach();
+    } else {
+      document.addEventListener('DOMContentLoaded', attach, { once: true });
+    }
+  };
+
+  const maybeFinishFlashEffect = () => {
+    if (!flashState.active) {
+      return;
+    }
+    const hasOverlay = Boolean(flashState.overlay);
+    const hasImage = Boolean(flashState.image);
+    const hasAudio = flashState.audios instanceof Set ? flashState.audios.size > 0 : Boolean(flashState.audios);
+    if (!hasOverlay && !hasImage && !hasAudio) {
+      flashState.active = false;
+    }
+  };
+
+  const registerFlashAudioNode = (audioNode) => {
+    if (!audioNode) {
+      return;
+    }
+    if (!(flashState.audios instanceof Set)) {
+      flashState.audios = new Set();
+    }
+    flashState.audios.add(audioNode);
+    const releaseAudio = () => {
+      audioNode.removeEventListener('ended', releaseAudio);
+      audioNode.removeEventListener('error', releaseAudio);
+      if (flashState.audios instanceof Set) {
+        flashState.audios.delete(audioNode);
+      }
+      maybeFinishFlashEffect();
+    };
+    audioNode.addEventListener('ended', releaseAudio);
+    audioNode.addEventListener('error', releaseAudio);
+    audioNode.preload = 'auto';
+    audioNode.volume = Math.min(1, Math.max(0, FLASH_AUDIO_VOLUME));
+    try {
+      audioNode.currentTime = 0;
+    } catch (_) {}
+    try {
+      const playPromise = audioNode.play();
+      if (playPromise?.catch) {
+        playPromise.catch(() => {
+          releaseAudio();
+        });
+      }
+    } catch (_) {
+      releaseAudio();
+    }
+  };
+
+  const startFlashOverlay = () => {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = '#fff';
+    overlay.style.opacity = '0';
+    overlay.style.transition = `opacity ${FLASH_FADE_IN_DURATION}ms linear`;
+    overlay.style.zIndex = '2147483646';
+    overlay.style.pointerEvents = 'none';
+    appendToBody(overlay);
+    flashState.overlay = overlay;
+
+    let fadeOutTimer = null;
+    const handleOverlayTransitionEnd = (event) => {
+      if (event.propertyName !== 'opacity' || overlay.style.opacity !== '0') {
+        return;
+      }
+      overlay.removeEventListener('transitionend', handleOverlayTransitionEnd);
+      if (fadeOutTimer !== null) {
+        clearTimeout(fadeOutTimer);
+      }
+      overlay.remove();
+      if (flashState.overlay === overlay) {
+        flashState.overlay = null;
+        maybeFinishFlashEffect();
+      }
+    };
+    overlay.addEventListener('transitionend', handleOverlayTransitionEnd);
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+    });
+
+    fadeOutTimer = window.setTimeout(() => {
+      if (flashState.overlay !== overlay) {
+        return;
+      }
+      overlay.style.transition = `opacity ${FLASH_FADE_DURATION}ms ease-out`;
+      overlay.style.opacity = '0';
+    }, FLASH_FADE_IN_DURATION + FLASH_HOLD_DURATION);
+
+    for (let i = 0; i < 4; i += 1) {
+      registerFlashAudioNode(new Audio(FLASH_AUDIO_URL));
+    }
+  };
+
+  const triggerFlashbangEffect = () => {
+    if (flashState.active || flashState.used) {
+      return false;
+    }
+    flashState.active = true;
+    flashState.used = true;
+    const img = document.createElement('img');
+    img.src = FLASH_IMAGE_URL;
+    img.alt = '';
+    img.draggable = false;
+    img.style.position = 'fixed';
+    img.style.top = '-160px';
+    img.style.left = '50%';
+    img.style.transform = 'translateX(-50%)';
+    img.style.width = 'auto';
+    img.style.height = 'auto';
+    img.style.maxWidth = '120px';
+    img.style.maxHeight = '120px';
+    img.style.zIndex = '2147483645';
+    img.style.transition = `top ${FLASH_DROP_DURATION}ms linear`;
+    appendToBody(img);
+    flashState.image = img;
+
+    const finalizeImage = () => {
+      img.style.transition = 'opacity 200ms ease';
+      img.style.opacity = '0';
+      setTimeout(() => {
+        if (flashState.image === img) {
+          img.remove();
+          flashState.image = null;
+          maybeFinishFlashEffect();
+        }
+      }, 220);
+    };
+
+    const startFlash = () => {
+      img.removeEventListener('transitionend', handleDropComplete);
+      startFlashOverlay();
+      finalizeImage();
+    };
+
+    const handleDropComplete = (event) => {
+      if (event.propertyName !== 'top') {
+        return;
+      }
+      startFlash();
+    };
+
+    img.addEventListener('transitionend', handleDropComplete, { once: true });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        img.style.top = 'calc(50vh - 60px)';
+      });
+    });
+
+    return true;
+  };
+
+  const maybeTriggerFlashInstead = () => {
+    if (flashState.used) {
+      return false;
+    }
+    if (Math.random() >= GNOME_FLASH_CHANCE) {
+      return false;
+    }
+    return triggerFlashbangEffect();
+  };
 
   // Lazily instantiates the global Audio element for the prank sound
   const ensureAudio = () => {
@@ -294,8 +489,13 @@
     }
 
     try {
-      playSound();
-      if (effect === 'runescape') showRunescape(); else showGnome();
+      if (effect === 'runescape') {
+        playSound();
+        showRunescape();
+      } else if (!maybeTriggerFlashInstead()) {
+        playSound();
+        showGnome();
+      }
     } catch (_) {}
   };
 
@@ -332,9 +532,21 @@
           sessionStorage.removeItem(DEFER_KEY);
           const obj = JSON.parse(raw);
           if (obj && obj.effect && Math.abs(Date.now() - (obj.ts || 0)) < 15000) {
-            
             setTimeout(() => {
-              try { if (enabled) { playSound(); obj.effect === 'runescape' ? showRunescape() : showGnome(); } } catch (_) {}
+              try {
+                if (!enabled) {
+                  return;
+                }
+                if (obj.effect === 'runescape') {
+                  playSound();
+                  showRunescape();
+                } else if (obj.effect === 'gnome') {
+                  if (!maybeTriggerFlashInstead()) {
+                    playSound();
+                    showGnome();
+                  }
+                }
+              } catch (_) {}
             }, 60);
           }
         }

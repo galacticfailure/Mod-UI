@@ -35,6 +35,29 @@
   const CATEGORY_OTHER_LABEL = 'Other';
   const FLAG_FORM_SELECTOR = '#contentFlag, form.formModFlag';
   const NOTE_INPUT_SELECTOR = 'input[name="modeNote"]';
+  const FLAG_INFO_SELECTOR = '.fInfo';
+  const FLAG_BREAKDOWN_SELECTOR = '[data-fjfe-flag-breakdown="1"]';
+  const FLAG_BREAKDOWN_SPACER_SELECTOR = '[data-fjfe-flag-breakdown-spacer="1"]';
+  const FLAG_BREAKDOWN_DEBUG_SELECTOR = '[data-fjfe-flag-breakdown-debug="ignored"]';
+  const FLAG_BREAKDOWN_REASONS_SELECTOR = '[data-fjfe-flag-breakdown-reasons="ignored"]';
+  const FLAG_BREAKDOWN_METRICS = [
+    { key: 'total', label: 'Total flags', context: '(past 2 years)' },
+    { key: 'shi', label: 'Spam/Harassment/Illegal', context: '(past 30 days)' },
+    { key: 'blGore', label: 'BL/Gore', context: '(past 30 days)' },
+    { key: 'other', label: 'Other', context: '(past 30 days)' },
+    { key: 'ignored', label: 'Ignored flags', context: '' }
+  ];
+  const FLAG_TRIGGER_SELECTOR = '.cFlagS, #flagContent, .flagCn, [onclick*="dialog.flagContent"], [onclick*="dialog.flagComment"]';
+  const COMMENT_ROOT_SELECTOR = '[id^="cc"]';
+  const FLAG_HISTORY_USERNAME = 'cptcoconut';
+  const FLAG_HISTORY_OWNER_ID = 1722813;
+  const FLAG_HISTORY_API_BASE = 'https://fjme.me/api/fjuser/history';
+  const MEME_TOKEN_STORAGE_KEY = 'PT_memeToken';
+  const CONTENT_USER_ANCHOR_SELECTORS = [
+    '#cntSbmtBy .uName[href^="/user/"]',
+    '.contentTopLinks .uName[href^="/user/"]',
+    'a.trU.uName[href^="/user/"]'
+  ];
   // Settings are persisted as strings/ints, so normalize everything to booleans here.
   const coerceSettingEnabled = (value) => {
     if (value === true) {
@@ -71,6 +94,12 @@
   let checklistState = null;
   let moderatorLevel = null;
   let moderatorLevelRequestPending = false;
+  let flagHistoryFetchPromise = null;
+  let flagHistorySummary = null;
+  let flagHistoryError = null;
+  let flagHistoryTargetUsername = FLAG_HISTORY_USERNAME;
+  let flagHistoryTargetOwnerId = FLAG_HISTORY_OWNER_ID;
+  let flagHistoryTargetVersion = 0;
 
   // Skip DOM work entirely if neither the summary nor checklist are enabled.
   const hasActiveFeatures = () => summaryEnabled || checklistEnabled;
@@ -163,6 +192,219 @@
     return entries;
   };
 
+  const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
+
+  const parseUserPMetadata = (onclickValue) => {
+    if (!onclickValue || typeof onclickValue !== 'string') {
+      return null;
+    }
+    const match = onclickValue.match(/admintools\.userP\([^,]+,\s*[0-9]+\s*,\s*([0-9]+)\s*,\s*['"]([^'"]+)['"]/i);
+    if (!match) {
+      return null;
+    }
+    return {
+      userId: Number(match[1]),
+      username: trimText(match[2])
+    };
+  };
+
+  const findUserIdInScope = (scope, username) => {
+    if (!scope || typeof scope.querySelectorAll !== 'function') {
+      return null;
+    }
+    const usernameLower = trimText(username).toLowerCase();
+    const nodes = scope.querySelectorAll('.userPQ[onclick*="admintools.userP"]');
+    for (const node of nodes) {
+      const meta = parseUserPMetadata(node.getAttribute('onclick'));
+      if (!meta || !Number.isFinite(meta.userId)) {
+        continue;
+      }
+      if (!usernameLower || meta.username.toLowerCase() === usernameLower) {
+        return meta.userId;
+      }
+    }
+    return null;
+  };
+
+  const findContentFlagContext = () => {
+    let anchor = null;
+    for (const selector of CONTENT_USER_ANCHOR_SELECTORS) {
+      const candidate = document.querySelector(selector);
+      if (candidate) {
+        anchor = candidate;
+        break;
+      }
+    }
+    const username = trimText(anchor?.textContent || '');
+    if (!username) {
+      return { username: null, ownerId: null };
+    }
+    let ownerId = null;
+    const preferredRoots = [];
+    if (anchor) {
+      const cntSbmt = document.getElementById('cntSbmtBy');
+      if (cntSbmt) {
+        preferredRoots.push(cntSbmt);
+      }
+      const topLinks = anchor.closest('.contentTopLinks');
+      if (topLinks) {
+        preferredRoots.push(topLinks);
+      }
+      preferredRoots.push(anchor.parentElement);
+    }
+    for (const root of preferredRoots) {
+      ownerId = findUserIdInScope(root, username);
+      if (ownerId) {
+        break;
+      }
+    }
+    if (!ownerId) {
+      const userNodes = document.querySelectorAll('.userPQ[onclick*="admintools.userP"]');
+      for (const node of userNodes) {
+        const meta = parseUserPMetadata(node.getAttribute('onclick'));
+        if (meta && meta.username.toLowerCase() === username.toLowerCase() && Number.isFinite(meta.userId)) {
+          ownerId = meta.userId;
+          break;
+        }
+      }
+    }
+    if (!ownerId) {
+      ownerId = findUserIdInScope(document, username);
+    }
+    return { username, ownerId };
+  };
+
+  const findCommentFlagContext = (trigger) => {
+    const commentRoot =
+      (typeof trigger.closest === 'function' &&
+        (trigger.closest(COMMENT_ROOT_SELECTOR) || trigger.closest('.comParent') || trigger.closest('.com'))) ||
+      null;
+    let username = null;
+    if (commentRoot) {
+      const anchors = Array.from(commentRoot.querySelectorAll('a.uName[href^="/user/"]'));
+      const matchingAnchor = anchors.find((node) => trimText(node.textContent || '').length);
+      username = trimText(matchingAnchor?.textContent || '');
+    }
+    let ownerId = null;
+    const onclick = typeof trigger.getAttribute === 'function' ? trigger.getAttribute('onclick') : '';
+    if (onclick) {
+      const match = onclick.match(/flagComment(?:Picture)?\([^,]+,\s*([0-9]+)/i);
+      if (match) {
+        ownerId = Number(match[1]);
+      }
+    }
+    if (!ownerId && commentRoot) {
+      ownerId = findUserIdInScope(commentRoot, username);
+    }
+    return { username, ownerId };
+  };
+
+  const detectFlagTriggerType = (element) => {
+    if (!element) {
+      return null;
+    }
+    const onclickValue = typeof element.getAttribute === 'function' ? element.getAttribute('onclick') : '';
+    if (element.classList?.contains('cFlagS') || /flagComment/i.test(onclickValue || '')) {
+      return 'comment';
+    }
+    return 'content';
+  };
+
+  const updateFlagHistoryTarget = (context = {}) => {
+    const nextUsername = trimText(context.username || '');
+    let nextOwnerId = context.ownerId;
+    if (!Number.isFinite(nextOwnerId)) {
+      nextOwnerId = Number.parseInt(nextOwnerId, 10);
+    }
+    if (!nextUsername || !Number.isFinite(nextOwnerId)) {
+      return;
+    }
+    let changed = false;
+    if (nextUsername && nextUsername !== flagHistoryTargetUsername) {
+      flagHistoryTargetUsername = nextUsername;
+      changed = true;
+    }
+    if (nextOwnerId && nextOwnerId !== flagHistoryTargetOwnerId) {
+      flagHistoryTargetOwnerId = nextOwnerId;
+      changed = true;
+    }
+    if (changed) {
+      flagHistorySummary = null;
+      flagHistoryError = null;
+      flagHistoryFetchPromise = null;
+      flagHistoryTargetVersion += 1;
+      syncFlagBreakdownDebugInfo();
+    }
+  };
+
+  const resolveEventElement = (node) => {
+    if (!node) {
+      return null;
+    }
+    if (node.nodeType === 1) {
+      return node;
+    }
+    return node.parentElement || null;
+  };
+
+  const handleFlagTriggerClick = (event) => {
+    const element = resolveEventElement(event?.target);
+    if (!element || typeof element.closest !== 'function') {
+      return;
+    }
+    const trigger = element.closest(FLAG_TRIGGER_SELECTOR);
+    if (!trigger) {
+      return;
+    }
+    const triggerType = detectFlagTriggerType(trigger);
+    if (!triggerType) {
+      return;
+    }
+    const context = triggerType === 'comment' ? findCommentFlagContext(trigger) : findContentFlagContext();
+    if (!context || (!context.username && !context.ownerId)) {
+      return;
+    }
+    updateFlagHistoryTarget(context);
+  };
+
+  const normalizePremiumHistoryRecords = (records) => {
+    if (!Array.isArray(records) || !records.length) {
+      return [];
+    }
+
+    const now = Date.now();
+    const cutoffRecent = now - RECENT_WINDOW_MS;
+    const cutoffAll = new Date();
+    cutoffAll.setFullYear(cutoffAll.getFullYear() - 2);
+    const cutoffAllTime = cutoffAll.getTime();
+
+    return records.reduce((normalized, record) => {
+      const action = (record?.category || '').trim().toLowerCase();
+      if (!ACTION_ALLOW_LIST.has(action)) {
+        return normalized;
+      }
+      const date = parseDateTime((record?.date || '').trim());
+      if (!date) {
+        return normalized;
+      }
+      const timestamp = date.getTime();
+      const isOld = timestamp < cutoffAllTime;
+      const description = (record?.info || '').trim();
+      const descLower = description.toLowerCase();
+
+      normalized.push({
+        date,
+        timestamp,
+        isRecent: !isOld && timestamp >= cutoffRecent,
+        description,
+        descLower,
+        action,
+        ignoredReason: isOld ? 'old' : null
+      });
+      return normalized;
+    }, []);
+  };
+
   // Apply heuristics so the summary ignores ancient or low-signal entries.
   // Ignore roll logs and back-to-back spam flags so the summary focuses on actionable items.
   const applyIgnoreRules = (entries) => {
@@ -214,63 +456,55 @@
     tracker.reasons.push(label);
   };
 
-  // Crunch the scraped rows into totals used by the injected summary row.
-  const summarizeEntries = (table) => {
-    const entries = collectEntries(table);
-    if (!entries.length) {
-      return {
-        total: 0,
-        ignored: 0,
-        ignoredReasons: [],
-        categories: {
-          shi: createCategoryTracker(),
-          blGore: createCategoryTracker(),
-          other: createCategoryTracker()
-        }
-      };
+  const createEmptySummary = () => ({
+    total: 0,
+    ignored: 0,
+    ignoredReasons: [],
+    categories: {
+      shi: createCategoryTracker(),
+      blGore: createCategoryTracker(),
+      other: createCategoryTracker()
+    }
+  });
+
+  const summarizeNormalizedEntries = (entries) => {
+    if (!Array.isArray(entries) || !entries.length) {
+      return createEmptySummary();
     }
 
     applyIgnoreRules(entries);
 
-    let total = 0;
-    const ignoredReasons = [];
-    const categories = {
-      shi: createCategoryTracker(),
-      blGore: createCategoryTracker(),
-      other: createCategoryTracker()
-    };
-
+    const summary = createEmptySummary();
     entries.forEach((entry) => {
       if (entry.ignoredReason) {
-        ignoredReasons.push(entry.ignoredReason);
+        summary.ignored += 1;
+        summary.ignoredReasons.push(entry.ignoredReason);
         return;
       }
-      total += 1;
+      summary.total += 1;
       if (entry.isRecent) {
         const shiMatch = findCategoryRule(entry.descLower, CATEGORY_SHI_RULES);
         if (shiMatch) {
-          addCategoryReason(categories.shi, shiMatch.label);
+          addCategoryReason(summary.categories.shi, shiMatch.label);
           return;
         }
         const blGoreMatch = findCategoryRule(entry.descLower, CATEGORY_BLGORE_RULES);
         if (blGoreMatch) {
-          addCategoryReason(categories.blGore, blGoreMatch.label);
+          addCategoryReason(summary.categories.blGore, blGoreMatch.label);
           return;
         }
-        addCategoryReason(categories.other, CATEGORY_OTHER_LABEL);
+        addCategoryReason(summary.categories.other, CATEGORY_OTHER_LABEL);
       }
     });
 
-    return {
-      total,
-      ignored: ignoredReasons.length,
-      ignoredReasons,
-      categories
-    };
+    return summary;
   };
 
+  // Crunch the scraped rows into totals used by the injected summary row.
+  const summarizeEntries = (table) => summarizeNormalizedEntries(collectEntries(table));
+
   // Group ignored reasons by label so the summary can show counts.
-  const formatIgnoredReasons = (reasons) => {
+  const formatReasonCounts = (reasons) => {
     if (!Array.isArray(reasons) || !reasons.length) {
       return '';
     }
@@ -332,7 +566,7 @@
       wrapper.style.lineHeight = '1.25';
       const safeCount = typeof count === 'number' && Number.isFinite(count) ? count : 0;
       const detail = Array.isArray(reasons) && reasons.length
-        ? ` (${formatIgnoredReasons(reasons)})`
+        ? ` (${formatReasonCounts(reasons)})`
         : '';
       const mainLine = document.createElement('span');
       mainLine.textContent = `${label}: ${safeCount}${detail}`;
@@ -359,6 +593,160 @@
     appendMetric('Ignored Flags', summary.ignored, summary.ignoredReasons);
 
     cell.append(container);
+  };
+
+  const resolveFlagBreakdownMetric = (summary, key) => {
+    if (!summary) {
+      return { count: null, reasons: null };
+    }
+    const categories = summary.categories || {};
+    switch (key) {
+      case 'total':
+        return { count: summary.total, reasons: null };
+      case 'shi':
+        return categories.shi || createCategoryTracker();
+      case 'blGore':
+        return categories.blGore || createCategoryTracker();
+      case 'other':
+        return categories.other || createCategoryTracker();
+      case 'ignored':
+        return { count: summary.ignored, reasons: summary.ignoredReasons };
+      default:
+        return { count: 0, reasons: null };
+    }
+  };
+
+  const syncFlagBreakdownDebugInfo = () => {
+    const username = flagHistoryTargetUsername || 'unknown';
+    const ownerIdText = flagHistoryTargetOwnerId ? String(flagHistoryTargetOwnerId) : 'unknown';
+    const debugText = `User: ${username} (${ownerIdText})`;
+    document.querySelectorAll(FLAG_BREAKDOWN_DEBUG_SELECTOR).forEach((node) => {
+      node.textContent = debugText;
+    });
+  };
+
+  const setFlagBreakdownLoading = () => {
+    FLAG_BREAKDOWN_METRICS.forEach(({ key }) => {
+      document.querySelectorAll(`[data-fjfe-flag-breakdown-value="${key}"]`).forEach((el) => {
+        el.textContent = 'Loading...';
+      });
+    });
+    document.querySelectorAll(FLAG_BREAKDOWN_REASONS_SELECTOR).forEach((node) => {
+      node.textContent = '';
+    });
+    syncFlagBreakdownDebugInfo();
+  };
+
+  const updateFlagBreakdownDisplays = (summary, error) => {
+    FLAG_BREAKDOWN_METRICS.forEach(({ key }) => {
+      const valueEls = document.querySelectorAll(`[data-fjfe-flag-breakdown-value="${key}"]`);
+      if (error) {
+        valueEls.forEach((el) => {
+          el.textContent = '—';
+        });
+        if (key === 'ignored') {
+          document.querySelectorAll(FLAG_BREAKDOWN_REASONS_SELECTOR).forEach((node) => {
+            node.textContent = ' (history unavailable)';
+          });
+        }
+        return;
+      }
+      if (!summary) {
+        return;
+      }
+      const metric = resolveFlagBreakdownMetric(summary, key);
+      const safeCount = typeof metric.count === 'number' && Number.isFinite(metric.count) ? metric.count : 0;
+      valueEls.forEach((el) => {
+        el.textContent = `${safeCount}`;
+      });
+      if (key === 'ignored') {
+        const detailText = formatReasonCounts(metric.reasons);
+        document.querySelectorAll(FLAG_BREAKDOWN_REASONS_SELECTOR).forEach((node) => {
+          node.textContent = detailText ? `(${detailText})` : '';
+        });
+      }
+    });
+    syncFlagBreakdownDebugInfo();
+  };
+
+  const fetchPremiumHistorySummary = async (username, ownerId) => {
+    let token = null;
+    try {
+      token = window.localStorage?.getItem(MEME_TOKEN_STORAGE_KEY);
+    } catch (_) {
+      token = null;
+    }
+    if (!token) {
+      throw new Error(`Missing ${MEME_TOKEN_STORAGE_KEY} in localStorage.`);
+    }
+    if (!username || !ownerId) {
+      throw new Error('Missing user context for history request.');
+    }
+    const url = `${FLAG_HISTORY_API_BASE}/${encodeURIComponent(username)}/${encodeURIComponent(String(ownerId))}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json, text/plain, */*'
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`History request failed (${response.status})`);
+    }
+    const rawBody = await response.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch (_) {
+      throw new Error('History response was not valid JSON');
+    }
+    const entries = normalizePremiumHistoryRecords(parsed);
+    return summarizeNormalizedEntries(entries);
+  };
+
+  const ensureFlagHistorySummary = () => {
+    const username = flagHistoryTargetUsername;
+    const ownerId = flagHistoryTargetOwnerId;
+    if (!username || !ownerId) {
+      const error = new Error('Unable to determine flagged user.');
+      flagHistoryError = error;
+      updateFlagBreakdownDisplays(null, error);
+      return Promise.reject(error);
+    }
+    if (flagHistorySummary) {
+      updateFlagBreakdownDisplays(flagHistorySummary);
+      return Promise.resolve(flagHistorySummary);
+    }
+    if (flagHistoryFetchPromise) {
+      setFlagBreakdownLoading();
+      return flagHistoryFetchPromise;
+    }
+    flagHistoryError = null;
+    setFlagBreakdownLoading();
+    const requestVersion = flagHistoryTargetVersion;
+    flagHistoryFetchPromise = fetchPremiumHistorySummary(username, ownerId)
+      .then((summary) => {
+        if (requestVersion !== flagHistoryTargetVersion) {
+          return summary;
+        }
+        flagHistorySummary = summary;
+        flagHistoryError = null;
+        updateFlagBreakdownDisplays(summary);
+        return summary;
+      })
+      .catch((error) => {
+        if (requestVersion === flagHistoryTargetVersion) {
+          flagHistoryError = error;
+          updateFlagBreakdownDisplays(null, error);
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (requestVersion === flagHistoryTargetVersion) {
+          flagHistoryFetchPromise = null;
+        }
+      });
+    return flagHistoryFetchPromise;
   };
 
   const resolveNoteInputWidth = (input) => {
@@ -1618,6 +2006,96 @@
     noteLabel.insertAdjacentElement('afterend', wrapper);
   };
 
+  const ensureFlagInfoBreakdown = (form) => {
+    if (!form) {
+      return;
+    }
+    const infoSection = form.querySelector(FLAG_INFO_SELECTOR);
+    if (!infoSection) {
+      return;
+    }
+    infoSection.querySelectorAll(FLAG_BREAKDOWN_SELECTOR).forEach((node) => {
+      try {
+        node.remove();
+      } catch (_) {}
+    });
+    infoSection.querySelectorAll(FLAG_BREAKDOWN_SPACER_SELECTOR).forEach((node) => {
+      try {
+        node.remove();
+      } catch (_) {}
+    });
+    const children = Array.from(infoSection.children || []);
+    const bugsBlock = children.find((child) => {
+      const text = child?.textContent || '';
+      return text.toLowerCase().includes('bugs:');
+    });
+    const fragment = document.createDocumentFragment();
+    FLAG_BREAKDOWN_METRICS.forEach(({ key, label, context }) => {
+      const row = document.createElement('div');
+      row.dataset.fjfeFlagBreakdown = '1';
+
+      const labelText = document.createTextNode(`${label}: `);
+      const valueSpan = document.createElement('span');
+      valueSpan.dataset.fjfeFlagBreakdownValue = key;
+      valueSpan.textContent = 'Loading...';
+      valueSpan.style.display = 'inline';
+      valueSpan.style.float = 'none';
+      valueSpan.style.marginLeft = '4px';
+
+      row.append(labelText, valueSpan);
+
+      if (context) {
+        const contextLine = document.createElement('div');
+        contextLine.textContent = context;
+        contextLine.style.fontSize = '11px';
+        contextLine.style.opacity = '0.75';
+        row.append(contextLine);
+      }
+
+      if (key === 'ignored') {
+        const reasonsLine = document.createElement('div');
+        reasonsLine.dataset.fjfeFlagBreakdownReasons = 'ignored';
+        reasonsLine.style.fontSize = '11px';
+        reasonsLine.style.opacity = '0.75';
+        reasonsLine.textContent = '';
+        row.append(reasonsLine);
+
+        const debugLine = document.createElement('div');
+        debugLine.dataset.fjfeFlagBreakdownDebug = 'ignored';
+        debugLine.style.fontSize = '11px';
+        debugLine.style.opacity = '0.75';
+        debugLine.textContent = '';
+        row.append(debugLine);
+      }
+
+      fragment.append(row);
+    });
+    const insertBeforeNode = bugsBlock || null;
+    const hasMetrics = fragment.childNodes && fragment.childNodes.length > 0;
+    if (hasMetrics) {
+      const spacer = document.createElement('div');
+      spacer.dataset.fjfeFlagBreakdownSpacer = '1';
+      spacer.style.height = '6px';
+      spacer.style.width = '100%';
+      infoSection.insertBefore(spacer, insertBeforeNode);
+    }
+    infoSection.insertBefore(fragment, insertBeforeNode);
+    syncFlagBreakdownDebugInfo();
+
+    if (flagHistorySummary) {
+      updateFlagBreakdownDisplays(flagHistorySummary);
+    } else if (flagHistoryError) {
+      updateFlagBreakdownDisplays(null, flagHistoryError);
+    } else {
+      ensureFlagHistorySummary();
+    }
+  };
+
+  const enhanceFlagInfoPanels = () => {
+    const forms = document.querySelectorAll(FLAG_FORM_SELECTOR);
+    forms.forEach((form) => ensureFlagInfoBreakdown(form));
+  };
+
   // Iterate every open flag form and attach the calculator button.
   const enhanceFlagMenus = () => {
     const forms = document.querySelectorAll(FLAG_FORM_SELECTOR);
@@ -1652,6 +2130,7 @@
     }
     if (summaryEnabled) {
       scanHistoryDialogs();
+      enhanceFlagInfoPanels();
     }
     if (checklistEnabled) {
       enhanceFlagMenus();
@@ -1724,6 +2203,14 @@
     });
   };
 
+  const removeFlagBreakdownRows = () => {
+    document.querySelectorAll(FLAG_BREAKDOWN_SELECTOR).forEach((row) => {
+      try {
+        row.remove();
+      } catch (_) {}
+    });
+  };
+
   // Ditto for the calculator buttons/panel.
   const removeChecklistButtons = () => {
     document.querySelectorAll(`#${CHECKLIST_BUTTON_ID}`).forEach((button) => {
@@ -1761,6 +2248,7 @@
 
     if (!summaryEnabled) {
       removeSummaryRows();
+      removeFlagBreakdownRows();
     }
     if (!checklistEnabled) {
       removeChecklistButtons();
@@ -1778,6 +2266,7 @@
       return;
     }
     initialized = true;
+    document.addEventListener('click', handleFlagTriggerClick, true);
     document.addEventListener('fjApichkStatus', handleApichkStatus);
     cacheModeratorLevel(window.fjApichk && typeof window.fjApichk.getLevel === 'function' ? window.fjApichk.getLevel() : null);
     requestModeratorLevelUpdate();

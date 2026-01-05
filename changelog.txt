@@ -1,5 +1,11 @@
+1.0.1
+- Fixed description for ModJS Recall
+- Added Frame Viewer
+- Added documentation
+
 1.0.0
 - Added flag check and ban calculator features
+- Removed Twilight Zone remover and custom messages
 - Final bug cleanup for 1.0
 
 0.5.9
