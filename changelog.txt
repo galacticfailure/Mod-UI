@@ -1,3 +1,12 @@
+1.1.0
+- Added Batch Assist
+- Removed Count Edits button on Rate Tracker
+- Added History menu for Rate Tracker
+- Added timestamp copy button to Rate Tracker
+- Added rate limit detector to Misrate warning
+- Added cross-functionality between Rate Tracker and Misrate Warning, now shows misrates in History
+- Fixed issue where instructor review buttons would get caught in Check Text
+
 1.0.1
 - Fixed description for ModJS Recall
 - Added Frame Viewer

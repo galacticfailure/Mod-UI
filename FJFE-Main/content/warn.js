@@ -6,6 +6,21 @@
   const AUDIO_ID = 'fjfe-warning-audio';
   const WARNING_AUDIO = 'icons/warning.mp3';
   const WARNING_ICON = 'icons/warning.png';
+  const RATE_LOCK_ICON = 'icons/rate_lock.png';
+  const RATE_FAILURE_MESSAGE = 'Rate upload failed. Retrying once in 5 seconds...';
+  const RATE_LOCK_TOOLTIP = "You've been rate limited!";
+  const RATE_FAILURE_PATTERNS = Array.from(new Set([
+    'rate upload failed',
+    RATE_FAILURE_MESSAGE.toLowerCase()
+  ]));
+  const RATE_FAILURE_METHODS = ['error', 'warn', 'log', 'info', 'debug'];
+  const RATE_LIMIT_EVENT = 'fjfe:rateLimited';
+  const RATE_LIMIT_MESSAGE_TYPE = 'fjfe-rate-limit-detected';
+  const RATE_LIMIT_BRIDGE_ATTR = 'data-fjfe-rate-limit-hook';
+  const RATE_LIMIT_BRIDGE_PATH = 'content/rate-limit-bridge.js';
+  const RATE_LIMIT_BRIDGE_DATA_KEY = 'fjfeRateLimitConfig';
+  const RATE_LIMIT_EVENT_ORIGIN_PAGE = 'page';
+  const RATE_LIMIT_EVENT_ORIGIN_CONTENT = 'content';
   const POLITICS_SELECTOR = '#catControls span[data-id="2"], span.ctButton4[data-id="2"]';
   const SPICY_SELECTOR = '#catControls span[data-id="13"], span.ctButton4[data-id="13"]';
   const META_SELECTOR = '#catControls span[data-id="14"], span.ctButton4[data-id="14"]';
@@ -37,10 +52,16 @@
   let audioGain = null;
   let marqueeState = null; 
   let currentConditionState = { politics: false, skin: false, spicyOther: false, multi: false, any: false };
+  let rateLockActive = false;
+  let rateLockEventDispatched = false;
   let badgeRepositionTimer = null;
   let badgeRepositionAttempts = 0;
   const USER_ACTIVATION_EVENTS = ['pointerdown', 'keydown', 'touchstart'];
   let audioUnlockHandler = null;
+  let rateFailureConsolePatched = false;
+  let rateLimitMessageListener = null;
+  let rateLimitDomListener = null;
+  let lastRateLimitSignalId = null;
 
   // Resolves extension-relative asset paths when running inside Chrome
   const getResourceUrl = (resourcePath) => {
@@ -153,6 +174,7 @@
     const settings = window.fjTweakerSettings || {};
     
     if (isNsfwPath()) return false;
+    if (rateLockActive) return false;
     if (!settings.warnOnAll) return false;
     if (!currentConditionState.any) return false;
     if (hasRecentVoteElement() && !hasRepostBanner()) return false;
@@ -308,6 +330,14 @@
     badge.title = resolved;
   };
 
+  const setBadgeIcon = (badge, iconPath) => {
+    if (!badge) {
+      return;
+    }
+    const resolved = getResourceUrl(iconPath);
+    badge.style.backgroundImage = `url('${resolved}')`;
+  };
+
   // Human-friendly strings describing each violation type
   const getBadgeMessage = (state) => {
     if (!state?.any) {
@@ -421,7 +451,18 @@
   const updateWarningBadge = (state) => {
     
     const settings = window.fjTweakerSettings || {};
-    
+    if (rateLockActive) {
+      const badge = ensureWarningBadge();
+      setBadgeIcon(badge, RATE_LOCK_ICON);
+      if (lastBadgeMessage !== RATE_LOCK_TOOLTIP) {
+        setBadgeTooltip(badge, RATE_LOCK_TOOLTIP);
+        lastBadgeMessage = RATE_LOCK_TOOLTIP;
+      }
+      badge.style.display = 'inline-block';
+      positionWarningBadge();
+      return;
+    }
+
     const allowBadge = !isNsfwPath() && !!settings.misrateWarning && !!state?.any;
     if (!allowBadge) {
       if (warningBadge) {
@@ -436,6 +477,7 @@
     }
 
     const badge = ensureWarningBadge();
+    setBadgeIcon(badge, WARNING_ICON);
     const message = getBadgeMessage(state);
     const tooltip = message || '';
     if (tooltip !== lastBadgeMessage) {
@@ -445,6 +487,169 @@
     
     badge.style.display = 'inline-block';
     positionWarningBadge();
+  };
+
+  const announceRateLimit = () => {
+    if (rateLockEventDispatched) {
+      return;
+    }
+    rateLockEventDispatched = true;
+    try {
+      window.dispatchEvent(new CustomEvent(RATE_LIMIT_EVENT, {
+        detail: { timestamp: Date.now(), origin: RATE_LIMIT_EVENT_ORIGIN_CONTENT }
+      }));
+    } catch (_) {}
+  };
+
+  const handleRateLimitDetected = (sourceLabel) => {
+    if (rateLockActive) {
+      announceRateLimit();
+      return;
+    }
+    rateLockActive = true;
+    announceRateLimit();
+    hideWarning();
+    updateWarningBadge(currentConditionState);
+  };
+
+  const containsRateFailureMessage = (values) => {
+    if (!Array.isArray(values) || values.length === 0) {
+      return false;
+    }
+    for (const raw of values) {
+      let candidate = raw;
+      if (typeof candidate !== 'string') {
+        try {
+          candidate = String(candidate ?? '');
+        } catch (_) {
+          continue;
+        }
+      }
+      const lower = candidate.toLowerCase();
+      for (const needle of RATE_FAILURE_PATTERNS) {
+        if (needle && lower.includes(needle)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const processExternalRateLimitSignal = (sourceLabel, signalId) => {
+    if (signalId && lastRateLimitSignalId === signalId) {
+      return;
+    }
+    if (signalId) {
+      lastRateLimitSignalId = signalId;
+    }
+    handleRateLimitDetected(sourceLabel);
+  };
+
+  const handleRateLimitMessageEvent = (event) => {
+    if (!event) {
+      return;
+    }
+    const data = event.data;
+    if (!data || data.type !== RATE_LIMIT_MESSAGE_TYPE) {
+      return;
+    }
+    processExternalRateLimitSignal('page-message', data.signalId);
+  };
+  const handleRateLimitDomEvent = (event) => {
+    const origin = event?.detail?.origin;
+    if (origin !== RATE_LIMIT_EVENT_ORIGIN_PAGE) {
+      return;
+    }
+    processExternalRateLimitSignal('page-dom', event?.detail?.signalId);
+  };
+
+  const ensureRateLimitDomEventListener = () => {
+    if (rateLimitDomListener) {
+      return;
+    }
+    rateLimitDomListener = (event) => {
+      handleRateLimitDomEvent(event);
+    };
+    try {
+      window.addEventListener(RATE_LIMIT_EVENT, rateLimitDomListener, false);
+    } catch (_) {}
+  };
+
+  const ensureRateLimitMessageListener = () => {
+    if (rateLimitMessageListener) {
+      return;
+    }
+    rateLimitMessageListener = (event) => {
+      handleRateLimitMessageEvent(event);
+    };
+    try {
+      window.addEventListener('message', rateLimitMessageListener, false);
+    } catch (_) {}
+  };
+
+  const injectPageRateLimitDetector = () => {
+    const doc = document;
+    if (!doc || !doc.documentElement) {
+      window.addEventListener('DOMContentLoaded', injectPageRateLimitDetector, { once: true });
+      return;
+    }
+    if (doc.documentElement.hasAttribute(RATE_LIMIT_BRIDGE_ATTR)) {
+      return;
+    }
+    doc.documentElement.setAttribute(RATE_LIMIT_BRIDGE_ATTR, '1');
+    const script = doc.createElement('script');
+    script.type = 'text/javascript';
+    script.src = getResourceUrl(RATE_LIMIT_BRIDGE_PATH);
+    try {
+      const config = {
+        patterns: RATE_FAILURE_PATTERNS,
+        methods: RATE_FAILURE_METHODS,
+        messageType: RATE_LIMIT_MESSAGE_TYPE,
+        domEventName: RATE_LIMIT_EVENT,
+        domEventOrigin: RATE_LIMIT_EVENT_ORIGIN_PAGE
+      };
+      const encoded = encodeURIComponent(JSON.stringify(config));
+      script.dataset[RATE_LIMIT_BRIDGE_DATA_KEY] = encoded;
+    } catch (_) {}
+    const target = doc.head || doc.documentElement || doc.body;
+    (target || doc.documentElement).appendChild(script);
+  };
+
+  const patchConsoleInCurrentContext = () => {
+    if (typeof console === 'undefined') {
+      return;
+    }
+    RATE_FAILURE_METHODS.forEach((method) => {
+      const original = console[method];
+      if (typeof original !== 'function') {
+        return;
+      }
+      if (original.__fjfeRateLimitPatched) {
+        return;
+      }
+      const wrapped = function patchedRateLockConsole(...args) {
+        if (containsRateFailureMessage(args)) {
+          handleRateLimitDetected('content-console');
+        }
+        return original.apply(this, args);
+      };
+      try {
+        wrapped.__fjfeRateLimitPatched = true;
+        wrapped.__fjfeRateLimitOriginal = original;
+      } catch (_) {}
+      console[method] = wrapped;
+    });
+  };
+
+  const attachRateFailureConsoleWatch = () => {
+    if (rateFailureConsolePatched) {
+      return;
+    }
+    rateFailureConsolePatched = true;
+    patchConsoleInCurrentContext();
+    ensureRateLimitMessageListener();
+    ensureRateLimitDomEventListener();
+    injectPageRateLimitDetector();
   };
 
   function cleanupAudioUnlock() {
@@ -847,6 +1052,7 @@
     }
     initialized = true;
     evaluateState();
+    attachRateFailureConsoleWatch();
     startObserver();
     document.addEventListener('click', handleClick, true);
     document.addEventListener('fjTweakerSettingsChanged', () => {
@@ -857,10 +1063,20 @@
     window.addEventListener('beforeunload', () => {
       hideWarning();
       stopObserver();
+      rateLockEventDispatched = false;
+      lastRateLimitSignalId = null;
       if (warningBadge) {
         warningBadge.remove();
         warningBadge = null;
         lastBadgeMessage = '';
+      }
+      if (rateLimitMessageListener) {
+        try { window.removeEventListener('message', rateLimitMessageListener, false); } catch (_) {}
+        rateLimitMessageListener = null;
+      }
+      if (rateLimitDomListener) {
+        try { window.removeEventListener(RATE_LIMIT_EVENT, rateLimitDomListener, false); } catch (_) {}
+        rateLimitDomListener = null;
       }
       if (badgeRepositionTimer) {
         try { clearTimeout(badgeRepositionTimer); } catch (_) {}

@@ -94,6 +94,7 @@
     warnOnAll: false,
     farm: false,
     huntAssist: false,
+    batchAssist: false,
     gifViewer: false
   };
   const ALLOWED_SETTINGS_TIER1 = new Set([
@@ -168,8 +169,12 @@
   const persistSettings = (settings) => {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch (error) {
-    }
+    } catch (error) {}
+    try {
+      if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
+        chrome.storage.local.set({ [SETTINGS_KEY]: { ...settings } });
+      }
+    } catch (_) {}
   };
 
   const dispatchSettings = (settings) => {
@@ -555,7 +560,7 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow) => {
+const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
@@ -573,7 +578,8 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
     warnOnAll: warnOnAllRow.input.checked,
     farm: farmRow ? Boolean(farmRow.input.checked) : false,
     gifViewer: gifViewerRow.input.checked,
-    huntAssist: huntAssistRow.input.checked
+    huntAssist: huntAssistRow.input.checked,
+    batchAssist: batchAssistRow.input.checked
   };
 
   persistSettings(nextSettings);
@@ -603,6 +609,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
   const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
   const farmRow = createCheckboxRow('fj-sel-farm', 'Farm', settings.farm);
   const huntAssistRow = createCheckboxRow('fj-sel-hunt-assist', 'Hunt Assist', settings.huntAssist);
+  const batchAssistRow = createCheckboxRow('fj-sel-batch-assist', 'Batch Assist', settings.batchAssist);
 
   
   const rightClickInfoRow = createSmallButtonRow(
@@ -650,7 +657,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
 
       const applyMisrateCheatOverrideState = (triggerSave = false) => {
         if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
@@ -698,6 +705,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
       farmRow.input.addEventListener('change', saveHandler);
       gifViewerRow.input.addEventListener('change', saveHandler);
       huntAssistRow.input.addEventListener('change', saveHandler);
+      batchAssistRow.input.addEventListener('change', saveHandler);
       return {
         applyMisrateCheatOverrideState,
         toggleMisrateCheatOverrideState
@@ -769,6 +777,7 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(farmRow.infoButton, 'A farm.');
   setInfoContent(rightClickInfoRow.infoButton, 'Opens relevant FJEdu entries on right-click.');
     setInfoContent(huntAssistRow.infoButton, 'Easier hunting and list-making.');
+    setInfoContent(batchAssistRow.infoButton, 'Tools to assist in batch review.');
 
     
     const cloneGroups = (source) => {
@@ -792,6 +801,7 @@ const setInfoContent = (button, message, imagePath) => {
         trackRatesRow.wrapper,
         gifViewerRow.wrapper,
         huntAssistRow.wrapper,
+        batchAssistRow.wrapper,
       ],
       extras: [avoidNextRow.wrapper, clicker2Row.wrapper, walcornRow.wrapper, farmRow.wrapper],
     };
@@ -840,7 +850,8 @@ const setInfoContent = (button, message, imagePath) => {
       warnOnAll: warnOnAllRow,
       farm: farmRow,
       gifViewer: gifViewerRow,
-      huntAssist: huntAssistRow
+      huntAssist: huntAssistRow,
+      batchAssist: batchAssistRow
     };
 
     const resolveTabKey = (preferred) => {
@@ -986,7 +997,7 @@ const setInfoContent = (button, message, imagePath) => {
       }
 
       if (changed) {
-        saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, huntAssistRow);
+        saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
       }
 
       currentTier = normalizedTier;

@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Phaser FJ Feature Extender",
     "description": "Bunch of helper stuff.",
-    "version": "1.0.1",
+    "version": "1.2.0",
     "browser_specific_settings": {
         "gecko": {
             "id": "phaser-fj-tweaker@nonsense.com",
@@ -13,7 +13,9 @@
         "storage",
         "contextMenus",
         "https://funnyjunk.com/*",
-        "https://*.funnyjunk.com/*"
+        "https://*.funnyjunk.com/*",
+        "https://fjme.me/*",
+        "https://*.fjme.me/*"
     ],
     "content_scripts": [
         {
@@ -23,6 +25,7 @@
             "js": [
                 "content/farm/farmaudio.js",
                 "content/apichk.js",
+                "content/bs.js",
                 "content/info.js",
                 "content/sel.js",
                 "content/slick.js",
@@ -40,6 +43,7 @@
                 "content/framegif.js",
                 "content/ratetrack.js",
                 "content/hunt.js",
+                "content/batchassist.js",
                 "content/sccustom.js",
                 "content/userpop.js",
                 "content/nextmove.js",
@@ -55,6 +59,15 @@
                 "content/repost_clicker/rcprod.js",
                 "content/repost_clicker/rcmain.js",
                 "content/repost_clicker/rcdebug.js"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://fjme.me/*"
+            ],
+            "js": [
+                "content/fjme.js"
             ],
             "run_at": "document_idle"
         }
@@ -81,6 +94,7 @@
         "icons/farm/tools/*",
         "icons/farm/objects/*",
         "icons/farm/sounds/*",
-        "content/farm/farmdebug-page.js"
+        "content/farm/farmdebug-page.js",
+        "content/rate-limit-bridge.js"
     ]
 }

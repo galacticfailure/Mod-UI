@@ -25,6 +25,37 @@
     'admin', 'fj', 'funnyjunk', 'pissname', 'bluename', 'whitename'
   ];
 
+  const getSanitizedContentTitleNode = () => {
+    try {
+      const heading = document.querySelector('h1.contentTitle');
+      if (!heading) {
+        return null;
+      }
+      const clone = heading.cloneNode(true);
+      const buttons = clone.querySelectorAll('button');
+      buttons.forEach((button) => {
+        try { button.remove(); } catch (_) {}
+      });
+      const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+      const textChunks = [];
+      while (walker.nextNode()) {
+        const value = walker.currentNode?.textContent?.trim();
+        if (value) {
+          textChunks.push(value);
+        }
+      }
+      const textOnly = textChunks.join(' ').trim();
+      if (!textOnly) {
+        return null;
+      }
+      const wrapper = document.createElement('span');
+      wrapper.textContent = textOnly;
+      return wrapper;
+    } catch (_) {
+      return null;
+    }
+  };
+
   let isEnabled = false;
   let observer = null;
 
@@ -104,7 +135,7 @@
       });
     };
 
-    const contentTitle = document.querySelector('h1.contentTitle');
+    const contentTitle = getSanitizedContentTitleNode();
     if (contentTitle) {
       const { matches, foundWords } = scanElement(contentTitle);
       addUnique(allMatches, matches);
@@ -124,12 +155,6 @@
   };
 
   
-  const sanitizeMatch = (text) => {
-    if (!text) return '';
-    const cleaned = text.replace(/AcknowledgeStop$/i, '').trim();
-    return cleaned;
-  };
-
   const scanElement = (element) => {
     const text = element.textContent.toLowerCase();
     const matches = [];
@@ -144,7 +169,7 @@
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
           originalMatches.forEach(match => {
-            const cleanedMatch = sanitizeMatch(match);
+            const cleanedMatch = (match || '').trim();
             if (cleanedMatch && !foundWords.includes(cleanedMatch)) {
               foundWords.push(cleanedMatch);
             }
@@ -162,7 +187,7 @@
         const originalMatches = element.textContent.match(regex);
         if (originalMatches) {
           originalMatches.forEach(match => {
-            const cleanedMatch = sanitizeMatch(match);
+            const cleanedMatch = (match || '').trim();
             if (cleanedMatch && !foundWords.includes(cleanedMatch)) {
               foundWords.push(cleanedMatch);
             }
