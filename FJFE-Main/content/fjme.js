@@ -2,6 +2,7 @@
   const targetHost = 'fjme.me';
   const RATINGS_PATH = /^\/mods\/ratings\//i;
   const BUTTON_ID = 'fjfe-fjme-batch-assist';
+  const QUEUE_ACTIONS_ID = 'fjfe-fjme-batch-assist-actions';
   const TOAST_ID = 'fjfe-fjme-batch-assist-toast';
   const STORAGE_KEY = 'batchAssist';
   const STORAGE_META_KEY = 'batchAssistMeta';
@@ -9,7 +10,8 @@
   const FALLBACK_QUEUE_TITLE = 'Untitled import';
   const QUEUE_STATUS = {
     PENDING: 'pending',
-    APPROVED: 'approved'
+    APPROVED: 'approved',
+    ACKNOWLEDGED: 'acknowledged'
   };
   const CONTENT_INFO_PATH = /\/mods\/contentInfo\/(\d+)/i;
 
@@ -73,15 +75,23 @@
     if (!heading) {
       return '';
     }
-    const contentAnchor = heading.querySelector('a[href*="/mods/contentInfo/"]');
-    if (contentAnchor) {
-      const href = contentAnchor.getAttribute('href') || contentAnchor.href || '';
+    const headingAnchor = heading.querySelector('a[href*="/mods/contentInfo/"]');
+    if (headingAnchor) {
+      const href = headingAnchor.getAttribute('href') || headingAnchor.href || '';
       const idFromHref = extractRateIdFromHref(href);
       if (idFromHref) {
         return idFromHref;
       }
     }
-    const datasetSources = [panel, heading, contentAnchor];
+    const anyAnchor = panel.querySelector('a[href*="/mods/contentInfo/"]');
+    if (anyAnchor) {
+      const href = anyAnchor.getAttribute('href') || anyAnchor.href || '';
+      const idFromHref = extractRateIdFromHref(href);
+      if (idFromHref) {
+        return idFromHref;
+      }
+    }
+    const datasetSources = [panel, heading, headingAnchor, anyAnchor];
     for (const source of datasetSources) {
       if (!source) {
         continue;
@@ -102,10 +112,27 @@
         }
       }
     }
+    const dataElement = panel.querySelector('[data-content-id], [data-rate-id]');
+    if (dataElement) {
+      const attrCandidate = normalizeRateId(
+        dataElement.getAttribute('data-content-id') || dataElement.getAttribute('data-rate-id')
+      );
+      if (attrCandidate) {
+        return attrCandidate;
+      }
+    }
+    try {
+      const htmlMatch = (panel.innerHTML || '').match(CONTENT_INFO_PATH);
+      if (htmlMatch) {
+        return normalizeRateId(htmlMatch[1]);
+      }
+    } catch (_) {}
     return '';
   };
 
-  const normalizeEntryStatus = (value) => (value === QUEUE_STATUS.APPROVED ? QUEUE_STATUS.APPROVED : QUEUE_STATUS.PENDING);
+  const normalizeEntryStatus = (value) => (
+    value === QUEUE_STATUS.APPROVED || value === QUEUE_STATUS.ACKNOWLEDGED ? value : QUEUE_STATUS.PENDING
+  );
 
   if (window.location.hostname !== targetHost) {
     return;
@@ -117,6 +144,7 @@
   let featureEnabled = false;
   let storageListenerBound = false;
   let navListenersBound = false;
+  let queueActionWrapper = null;
 
   const normalizeEntries = (entries) => {
     if (!Array.isArray(entries)) {
@@ -141,9 +169,17 @@
       const title = typeof entry.title === 'string' ? entry.title.trim() : '';
       const status = normalizeEntryStatus(entry.status);
       const rateId = normalizeRateId(entry.rateId);
+      const approveNote = typeof entry.approveNote === 'string' ? entry.approveNote.trim() : '';
+      const rejectDetails = entry.rejectDetails && typeof entry.rejectDetails === 'object' ? entry.rejectDetails : null;
       const payload = { url, title: title || FALLBACK_QUEUE_TITLE, status };
       if (rateId) {
         payload.rateId = rateId;
+      }
+      if (approveNote && (status === QUEUE_STATUS.APPROVED || status === QUEUE_STATUS.ACKNOWLEDGED)) {
+        payload.approveNote = approveNote;
+      }
+      if (rejectDetails && status === QUEUE_STATUS.REJECTED) {
+        payload.rejectDetails = rejectDetails;
       }
       normalized.push(payload);
     });
@@ -341,7 +377,7 @@
       const entry = {
         url: normalizedUrl,
         title,
-        status: acknowledged ? QUEUE_STATUS.APPROVED : QUEUE_STATUS.PENDING
+        status: acknowledged ? QUEUE_STATUS.ACKNOWLEDGED : QUEUE_STATUS.PENDING
       };
       if (rateId) {
         entry.rateId = rateId;
@@ -349,6 +385,189 @@
       targetCollection.push(entry);
     });
     return normalizeEntries([...pendingEntries, ...acknowledgedEntries]);
+  };
+
+  const sortAcknowledgedLast = (entries) => {
+    const normalized = normalizeEntries(entries);
+    const active = [];
+    const acknowledged = [];
+    normalized.forEach((entry) => {
+      if (entry.status === QUEUE_STATUS.ACKNOWLEDGED) {
+        acknowledged.push(entry);
+      } else {
+        active.push(entry);
+      }
+    });
+    return active.concat(acknowledged);
+  };
+
+  const buildQueueMetadata = (links) => ({
+    username: getCurrentModeratorUsername(),
+    exportedAt: Date.now(),
+    total: Array.isArray(links) ? links.length : 0
+  });
+
+  const reconcileQueueLinks = (existing, detected) => {
+    const normalizedExisting = normalizeEntries(existing);
+    const normalizedDetected = normalizeEntries(detected);
+    const detectedMap = new Map();
+    normalizedDetected.forEach((entry) => {
+      if (entry?.url) {
+        detectedMap.set(entry.url, entry);
+      }
+    });
+    const merged = [];
+    normalizedExisting.forEach((entry) => {
+      if (!entry?.url || !detectedMap.has(entry.url)) {
+        return;
+      }
+      const detectedEntry = detectedMap.get(entry.url);
+      const nextEntry = { ...entry };
+      if (detectedEntry?.status === QUEUE_STATUS.ACKNOWLEDGED) {
+        nextEntry.status = QUEUE_STATUS.ACKNOWLEDGED;
+        delete nextEntry.rejectDetails;
+        if (entry.status === QUEUE_STATUS.REJECTED) {
+          delete nextEntry.approveNote;
+        }
+      }
+      merged.push(nextEntry);
+      detectedMap.delete(entry.url);
+    });
+    detectedMap.forEach((entry) => merged.push(entry));
+    return merged;
+  };
+
+  const restoreExportButton = (button) => {
+    if (queueActionWrapper && queueActionWrapper.isConnected) {
+      queueActionWrapper.replaceWith(button);
+    }
+    queueActionWrapper = null;
+  };
+
+  const createQueueActionButton = (label, styleOverrides = {}) => {
+    const actionButton = document.createElement('button');
+    actionButton.type = 'button';
+    actionButton.textContent = label;
+    Object.assign(actionButton.style, {
+      padding: '6px 10px',
+      borderRadius: '6px',
+      border: '1px solid #333',
+      background: '#222',
+      color: '#f5f5f5',
+      fontSize: '12px',
+      fontWeight: '700',
+      cursor: 'pointer',
+      minWidth: '78px'
+    }, styleOverrides);
+    return actionButton;
+  };
+
+  const showQueueOccupiedActions = (button) => {
+    if (!button || queueActionWrapper?.isConnected) {
+      return;
+    }
+    cleanupToast();
+    const wrapper = document.createElement('div');
+    wrapper.id = QUEUE_ACTIONS_ID;
+    Object.assign(wrapper.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      position: 'relative',
+      marginLeft: '8px'
+    });
+
+    const label = document.createElement('div');
+    label.textContent = 'Queue in progress!';
+    Object.assign(label.style, {
+      fontSize: '12px',
+      fontWeight: '700',
+      color: '#9d9d9d',
+      textAlign: 'center',
+      position: 'absolute',
+      left: '0',
+      right: '0',
+      bottom: '100%',
+      marginBottom: '6px',
+      pointerEvents: 'none'
+    });
+
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'inline-flex',
+      gap: '6px',
+      alignItems: 'center'
+    });
+
+    const replaceButton = createQueueActionButton('Replace', {
+      background: '#3b1515',
+      borderColor: '#6b2a2a',
+      color: '#ffd6d6'
+    });
+    const updateButton = createQueueActionButton('Update', {
+      background: '#15313b',
+      borderColor: '#2a5b6b',
+      color: '#cfeeff'
+    });
+    const cancelButton = createQueueActionButton('Cancel', {
+      background: '#1a1a1a',
+      borderColor: '#333',
+      color: '#e0e0e0'
+    });
+
+    const setDisabled = (disabled) => {
+      [replaceButton, updateButton, cancelButton].forEach((btn) => {
+        btn.disabled = disabled;
+        btn.style.opacity = disabled ? '0.6' : '';
+        btn.style.cursor = disabled ? 'default' : 'pointer';
+      });
+    };
+
+    replaceButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDisabled(true);
+      try {
+        const links = sortAcknowledgedLast(collectPanelLinks());
+        if (!links.length) {
+          restoreExportButton(button);
+          showToast(button, 'No pending items found.');
+          return;
+        }
+        await Promise.all([persistBatchAssistLinks(links), persistBatchAssistMetadata(buildQueueMetadata(links))]);
+        restoreExportButton(button);
+        showToast(button);
+      } catch (_) {
+        restoreExportButton(button);
+        showToast(button, 'Export failed');
+      }
+    });
+
+    updateButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDisabled(true);
+      try {
+        const [existing, detected] = await Promise.all([readBatchAssistLinks(), Promise.resolve(collectPanelLinks())]);
+        const nextLinks = sortAcknowledgedLast(reconcileQueueLinks(existing, detected));
+        await Promise.all([persistBatchAssistLinks(nextLinks), persistBatchAssistMetadata(buildQueueMetadata(nextLinks))]);
+        restoreExportButton(button);
+        showToast(button, 'Queue updated.');
+      } catch (_) {
+        restoreExportButton(button);
+        showToast(button, 'Update failed');
+      }
+    });
+
+    cancelButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      restoreExportButton(button);
+    });
+
+    row.append(replaceButton, updateButton, cancelButton);
+    wrapper.append(label, row);
+    queueActionWrapper = wrapper;
+    button.replaceWith(wrapper);
   };
 
   const handleButtonClick = async (event, button) => {
@@ -360,10 +579,10 @@
     }
     const existing = await readBatchAssistLinks();
     if (existing.length) {
-      showToast(button, 'Queue is occupied!');
+      showQueueOccupiedActions(button);
       return;
     }
-    const links = collectPanelLinks();
+    const links = sortAcknowledgedLast(collectPanelLinks());
     if (!links.length) {
       showToast(button, 'No pending items found.');
       return;
@@ -383,6 +602,10 @@
 
   const removeExistingButton = () => {
     cleanupToast();
+    const existingActions = document.getElementById(QUEUE_ACTIONS_ID);
+    if (existingActions) {
+      existingActions.remove();
+    }
     const existing = document.getElementById(BUTTON_ID);
     if (existing) {
       existing.remove();
@@ -444,7 +667,7 @@
       return false;
     }
 
-    if (document.getElementById(BUTTON_ID)) {
+    if (document.getElementById(BUTTON_ID) || document.getElementById(QUEUE_ACTIONS_ID)) {
       return true;
     }
 

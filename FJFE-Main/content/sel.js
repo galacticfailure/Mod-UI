@@ -81,6 +81,7 @@
   const DEFAULT_SETTINGS = {
     avoidNext: false,
     flagCheck: false,
+    workingPrev: false,
     banCalculator: false,
     hideRateShortcuts: false,
     hideShortcuts: false,
@@ -103,7 +104,8 @@
     'modJSExtras',
     'checkText',
     'avoidNext',
-    'gifViewer'
+    'gifViewer',
+    'workingPrev'
   ]);
   const ALLOWED_SETTINGS_TIER2 = new Set([
     ...ALLOWED_SETTINGS_TIER1,
@@ -560,11 +562,12 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow) => {
+const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow) => {
   
   const nextSettings = {
     avoidNext: avoidNextRow.input.checked,
     flagCheck: flagCheckRow.input.checked,
+    workingPrev: workingPrevRow.input.checked,
     banCalculator: banCalculatorRow.input.checked,
     hideRateShortcuts: hideRateRow.input.checked,
     hideShortcuts: hideShortcutsRow.input.checked,
@@ -589,6 +592,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
 
   const avoidNextRow = createCheckboxRow('fj-sel-avoid-next', 'Avoid Next', settings.avoidNext);
   const flagCheckRow = createCheckboxRow('fj-sel-flag-check', 'Flag Check', settings.flagCheck);
+  const workingPrevRow = createCheckboxRow('fj-sel-working-prev', 'Working Prev', settings.workingPrev);
   const banCalculatorRow = createCheckboxRow('fj-sel-ban-calculator', 'Ban Calculator', settings.banCalculator);
   const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Custom Shortcuts', settings.hideRateShortcuts);
   
@@ -657,7 +661,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
+  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
 
       const applyMisrateCheatOverrideState = (triggerSave = false) => {
         if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
@@ -686,6 +690,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, banCalculatorRow, hideRate
       };
       avoidNextRow.input.addEventListener('change', saveHandler);
       flagCheckRow.input.addEventListener('change', saveHandler);
+      workingPrevRow.input.addEventListener('change', saveHandler);
       banCalculatorRow.input.addEventListener('change', saveHandler);
       hideRateRow.input.addEventListener('change', (e) => { onToggleMutual('custom'); saveHandler(); });
       hideShortcutsRow.input.addEventListener('change', (e) => { onToggleMutual('hide'); saveHandler(); });
@@ -762,6 +767,7 @@ const setInfoContent = (button, message, imagePath) => {
 
     setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
     setInfoContent(flagCheckRow.infoButton, 'Summarizes flags in Premium History.');
+    setInfoContent(workingPrevRow.infoButton, 'Makes the Prev button actually work.');
     setInfoContent(banCalculatorRow.infoButton, 'Adds a button to help calculate ban time.');
     setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
     setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
@@ -789,7 +795,7 @@ const setInfoContent = (button, message, imagePath) => {
     };
 
     const baseTabGroups = {
-      interface: [stopUserPopupRow.wrapper, flagCheckRow.wrapper],
+      interface: [stopUserPopupRow.wrapper, flagCheckRow.wrapper, workingPrevRow.wrapper],
       tools: [
         misrateWarningRow.wrapper,
         warnOnAllRow.wrapper,
@@ -837,6 +843,7 @@ const setInfoContent = (button, message, imagePath) => {
     const checkboxRows = {
       avoidNext: avoidNextRow,
       flagCheck: flagCheckRow,
+      workingPrev: workingPrevRow,
       banCalculator: banCalculatorRow,
       hideRateShortcuts: hideRateRow,
       hideShortcuts: hideShortcutsRow,
@@ -997,7 +1004,7 @@ const setInfoContent = (button, message, imagePath) => {
       }
 
       if (changed) {
-        saveSettingsLive(avoidNextRow, flagCheckRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
+        saveSettingsLive(avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow);
       }
 
       currentTier = normalizedTier;

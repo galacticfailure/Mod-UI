@@ -19,7 +19,8 @@
   const QUEUE_STATUS = {
     PENDING: 'pending',
     APPROVED: 'approved',
-    REJECTED: 'rejected'
+    REJECTED: 'rejected',
+    ACKNOWLEDGED: 'acknowledged'
   };
   const MEME_TOKEN_STORAGE_KEY = 'PT_memeToken';
   const ACK_ENDPOINT_BASE = 'https://fjme.me/api/ratings/removeNeedsReview/';
@@ -53,6 +54,7 @@
   let waitingForPanelMount = false;
   let invalidDialogObserver = null;
   let loadingIndicator = null;
+  let percentIndicator = null;
 
   const getAssetUrl = (relativePath) => {
     if (!relativePath) {
@@ -184,7 +186,11 @@
     }
   };
 
-  const normalizeQueueStatus = (value) => (value === QUEUE_STATUS.APPROVED || value === QUEUE_STATUS.REJECTED ? value : QUEUE_STATUS.PENDING);
+  const normalizeQueueStatus = (value) => (
+    value === QUEUE_STATUS.APPROVED || value === QUEUE_STATUS.REJECTED || value === QUEUE_STATUS.ACKNOWLEDGED
+      ? value
+      : QUEUE_STATUS.PENDING
+  );
 
   const normalizeRateId = (value) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -380,6 +386,11 @@
       background: '#321010',
       border: '#6a1f1f',
       text: '#ffd6d6'
+    },
+    [QUEUE_STATUS.ACKNOWLEDGED]: {
+      background: '#102436',
+      border: '#1a4d7a',
+      text: '#cfe8ff'
     }
   };
 
@@ -447,8 +458,10 @@
     segments.forEach((segment, index) => {
       const valueSpan = document.createElement('span');
       valueSpan.textContent = segment.text;
-      valueSpan.style.color = segment.overridden ? '#ff7272' : '#f0f0f0';
-      if (segment.overridden) {
+      const isFlaggable = typeof segment.text === 'string' && segment.text.trim().toLowerCase() === 'flaggable';
+      const highlight = segment.overridden === true || isFlaggable;
+      valueSpan.style.color = highlight ? '#ff7272' : '#f0f0f0';
+      if (highlight) {
         valueSpan.style.fontWeight = '700';
       }
       row.appendChild(valueSpan);
@@ -525,18 +538,18 @@
       gap: '4px'
     });
     const label = document.createElement('div');
-    label.textContent = 'Approve Note';
+    label.textContent = 'Note';
     Object.assign(label.style, {
       fontSize: '10px',
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
-      color: '#9de0b5'
+      color: '#bbbbbb'
     });
     const text = document.createElement('div');
     text.textContent = trimmed;
     Object.assign(text.style, {
       fontSize: '12px',
-      color: '#d7ffe5',
+      color: '#f0f0f0',
       whiteSpace: 'pre-wrap',
       lineHeight: '1.35'
     });
@@ -666,15 +679,19 @@
       const approveNote = typeof entry.approveNote === 'string' ? entry.approveNote.trim() : '';
       const rejectDetails = sanitizeQueueRejectDetails(entry.rejectDetails);
       const rateId = normalizeRateId(entry.rateId);
+      const rateActionAdded = Boolean(entry.rateActionAdded);
       const payload = {
         url,
         title: title || FALLBACK_QUEUE_TITLE,
         status
       };
+      if (rateActionAdded) {
+        payload.rateActionAdded = true;
+      }
       if (rateId) {
         payload.rateId = rateId;
       }
-      if (approveNote && status === QUEUE_STATUS.APPROVED) {
+      if (approveNote && (status === QUEUE_STATUS.APPROVED || status === QUEUE_STATUS.ACKNOWLEDGED)) {
         payload.approveNote = approveNote;
       }
       if (rejectDetails) {
@@ -1065,7 +1082,7 @@
     let approved = 0;
     let rejected = 0;
     queueLinks.forEach((entry) => {
-      if (entry?.status === QUEUE_STATUS.APPROVED) {
+      if (entry?.status === QUEUE_STATUS.APPROVED || entry?.status === QUEUE_STATUS.ACKNOWLEDGED) {
         approved += 1;
       } else if (entry?.status === QUEUE_STATUS.REJECTED) {
         rejected += 1;
@@ -1073,6 +1090,11 @@
     });
     const total = queueLinks.length;
     countDisplay.innerHTML = formatQueueCountMarkup(approved, total, rejected);
+    if (percentIndicator) {
+      const decidedTotal = approved + rejected;
+      const percentValue = decidedTotal > 0 ? Math.round((approved / decidedTotal) * 100) : 0;
+      percentIndicator.textContent = `${percentValue}%`;
+    }
   };
 
   const getRejectSummaryText = (details) => {
@@ -1125,7 +1147,7 @@
     }
     const approvals = [];
     queueLinks.forEach((entry) => {
-      if (!entry || entry.status !== QUEUE_STATUS.APPROVED) {
+      if (!entry || (entry.status !== QUEUE_STATUS.APPROVED && entry.status !== QUEUE_STATUS.ACKNOWLEDGED)) {
         return;
       }
       const url = typeof entry.url === 'string' ? entry.url.trim() : '';
@@ -1145,6 +1167,9 @@
     const seen = new Set();
     const targets = [];
     queueLinks.forEach((entry, index) => {
+      if (entry?.rateActionAdded) {
+        return;
+      }
       const rateId = normalizeRateId(entry?.rateId);
       if (!rateId || seen.has(rateId)) {
         return;
@@ -1162,21 +1187,9 @@
       return { text: '', count: 0, rejectCount: 0, approveNoteCount: 0 };
     }
     const lines = [];
-    const appendSection = (title, values, formatter) => {
-      if (!values.length) {
-        return;
-      }
-      if (lines.length) {
-        lines.push('');
-      }
-      if (title) {
-        lines.push(title);
-      }
-      values.forEach((value, index) => {
-        lines.push(formatter(value, index));
-      });
-    };
-    appendSection(null, errors, (error, index) => {
+    const shouldDoubleSpaceRejects = errors.length > 0 && errors.length <= 15;
+
+    errors.forEach((error, index) => {
       let line = `${index + 1}. ${error.url}`;
       if (error.summary) {
         line += ` - ${error.summary}`;
@@ -1184,9 +1197,21 @@
       if (error.note) {
         line += ` - ${error.note}`;
       }
-      return line;
+      lines.push(line);
+      if (shouldDoubleSpaceRejects && index !== errors.length - 1) {
+        lines.push('');
+      }
     });
-    appendSection(null, approvals, (entry) => `${entry.url} - ${entry.note}`);
+
+    if (errors.length && approvals.length) {
+      lines.push('');
+      lines.push('');
+    }
+
+    approvals.forEach((entry) => {
+      let line = `${entry.url} - ${entry.note}`;
+      lines.push(line);
+    });
     return {
       text: lines.join('\n'),
       count: errors.length + approvals.length,
@@ -1238,10 +1263,49 @@
     titleEl.textContent = entry?.title || `Entry ${index + 1}`;
     Object.assign(titleEl.style, {
       fontSize: '14px',
-      fontWeight: '700'
+      fontWeight: '700',
+      color: '#ffffff'
     });
 
     button.append(titleEl);
+
+    if (entryStatus === QUEUE_STATUS.ACKNOWLEDGED) {
+      const acknowledgedTag = document.createElement('div');
+      acknowledgedTag.textContent = 'Acknowledged';
+      Object.assign(acknowledgedTag.style, {
+        display: 'inline-flex',
+        alignSelf: 'flex-start',
+        padding: '2px 6px',
+        borderRadius: '999px',
+        fontSize: '10px',
+        fontWeight: '700',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        background: '#1f1f1f',
+        color: '#dcdcdc',
+        border: '1px solid #3a3a3a'
+      });
+      button.append(acknowledgedTag);
+    }
+
+    if (entry?.rateActionAdded) {
+      const warningIcon = document.createElement('img');
+      warningIcon.src = getAssetUrl('icons/warning.png');
+      warningIcon.alt = '';
+      warningIcon.title = 'Misattributed rate!';
+      Object.assign(warningIcon.style, {
+        position: 'absolute',
+        right: '6px',
+        bottom: '6px',
+        width: '16px',
+        height: '16px',
+        objectFit: 'contain',
+        pointerEvents: 'auto',
+        userSelect: 'none',
+        zIndex: '2'
+      });
+      button.append(warningIcon);
+    }
 
     if (entryStatus === QUEUE_STATUS.REJECTED && entry?.rejectDetails) {
       const summaryBox = createRejectSummaryBox(entry.rejectDetails);
@@ -1254,7 +1318,7 @@
       }
     }
 
-    if (entryStatus === QUEUE_STATUS.APPROVED && entry?.approveNote) {
+    if ((entryStatus === QUEUE_STATUS.APPROVED || entryStatus === QUEUE_STATUS.ACKNOWLEDGED) && entry?.approveNote) {
       const approveBox = createApproveNoteBox(entry.approveNote);
       if (approveBox) {
         button.append(approveBox);
@@ -1728,6 +1792,27 @@
     };
     updateLoadingIndicatorPosition();
 
+    percentIndicator = document.createElement('div');
+    Object.assign(percentIndicator.style, {
+      position: 'absolute',
+      right: '14px',
+      fontSize: '11px',
+      fontWeight: '600',
+      color: '#9d9d9d',
+      letterSpacing: '0.02em',
+      textAlign: 'right',
+      pointerEvents: 'none',
+      zIndex: '2'
+    });
+    percentIndicator.textContent = '0%';
+    panel.append(percentIndicator);
+    const updatePercentIndicatorPosition = () => {
+      const paddingTop = getPanelPaddingTop();
+      const headerHeight = header?.offsetHeight || 32;
+      percentIndicator.style.top = `${paddingTop + headerHeight + 3}px`;
+    };
+    updatePercentIndicatorPosition();
+
     const countWrapper = document.createElement('div');
     Object.assign(countWrapper.style, {
       width: '100%',
@@ -1735,7 +1820,7 @@
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginTop: '-10px'
+      marginTop: '-30px'
     });
 
     countDisplay = document.createElement('div');
@@ -1873,6 +1958,9 @@
     let transientNoteTimeout = null;
     let ackProgressMessage = '';
 
+    const hasMisattributedRates = () => Array.isArray(queueLinks) && queueLinks.some((entry) => entry?.rateActionAdded);
+    const hasRejectedRates = () => Array.isArray(queueLinks) && queueLinks.some((entry) => entry?.status === QUEUE_STATUS.REJECTED);
+
     const updateNoteForState = () => {
       if (!note) {
         return;
@@ -1886,7 +1974,13 @@
         return;
       }
       if (acknowledgeConfirmVisible) {
-        note.textContent = acknowledgeConfirmText;
+        if (hasRejectedRates()) {
+          note.innerHTML = `${acknowledgeConfirmText}<br>Rejected rates are still present!`;
+        } else if (hasMisattributedRates()) {
+          note.innerHTML = `${acknowledgeConfirmText}<br>Misattributed rates won't be acknowledged.`;
+        } else {
+          note.textContent = acknowledgeConfirmText;
+        }
         return;
       }
       if (clearConfirmVisible) {
@@ -2053,6 +2147,18 @@
       updateActionVisibility();
       updateButtonInteractivity();
       updateNoteForState();
+
+      if (queueLinks.length) {
+        const nextLinks = queueLinks.map((entry) => {
+          if (!entry) {
+            return entry;
+          }
+          const nextEntry = { ...entry, status: QUEUE_STATUS.ACKNOWLEDGED };
+          delete nextEntry.rejectDetails;
+          return nextEntry;
+        });
+        setQueueLinks(nextLinks, { persist: true });
+      }
 
       const total = targets.length;
       let message;

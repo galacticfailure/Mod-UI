@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "1.2.0",
+  "version": "1.1.1",
   "permissions": [
     "storage",
     "contextMenus"
@@ -43,6 +43,7 @@
         "content/sccustom.js",
         "content/userpop.js",
         "content/nextmove.js",
+        "content/prev.js",
         "content/rclick.js",
         "content/textcheck.js",
         "content/flagchk.js",

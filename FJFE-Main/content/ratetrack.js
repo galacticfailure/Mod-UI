@@ -1323,7 +1323,8 @@
   const QUEUE_STATUS = {
     PENDING: 'pending',
     APPROVED: 'approved',
-    REJECTED: 'rejected'
+    REJECTED: 'rejected',
+    ACKNOWLEDGED: 'acknowledged'
   };
   const RATE_QUEUE_ACTION = {
     SKIP: 'skip',
@@ -1496,10 +1497,16 @@
         return;
       }
       const title = typeof entry.title === 'string' ? entry.title.trim() : '';
-      const status = entry.status === QUEUE_STATUS.APPROVED || entry.status === QUEUE_STATUS.REJECTED ? entry.status : QUEUE_STATUS.PENDING;
+      const status = entry.status === QUEUE_STATUS.APPROVED || entry.status === QUEUE_STATUS.REJECTED || entry.status === QUEUE_STATUS.ACKNOWLEDGED
+        ? entry.status
+        : QUEUE_STATUS.PENDING;
       const approveNote = typeof entry.approveNote === 'string' ? entry.approveNote.trim() : '';
       const rejectDetails = sanitizeQueueRejectDetails(entry.rejectDetails);
+      const rateActionAdded = Boolean(entry.rateActionAdded);
       const normalizedEntry = { url, title: title || QUEUE_FALLBACK_TITLE, status };
+      if (rateActionAdded) {
+        normalizedEntry.rateActionAdded = true;
+      }
       if (approveNote && status === QUEUE_STATUS.APPROVED) {
         normalizedEntry.approveNote = approveNote;
       }
@@ -1566,7 +1573,8 @@
   });
 
   const findQueueEntryIndex = (queue, url) => queue.findIndex((entry) => entry.url === url);
-  const isCompletedQueueStatus = (status) => status === QUEUE_STATUS.APPROVED || status === QUEUE_STATUS.REJECTED;
+  const isCompletedQueueStatus = (status) => status === QUEUE_STATUS.APPROVED || status === QUEUE_STATUS.REJECTED || status === QUEUE_STATUS.ACKNOWLEDGED;
+  const isAcknowledgedQueueStatus = (status) => status === QUEUE_STATUS.ACKNOWLEDGED;
 
   const getNextActionableQueueEntry = (queue, { excludeUrl } = {}) => queue.find((entry) => {
     if (isCompletedQueueStatus(entry.status)) {
@@ -1642,11 +1650,35 @@
     }
   };
 
+  const buildRateActionQueueEntry = (actionType, context = {}) => {
+    const url = normalizeQueueUrl(window.location.href);
+    if (!url) {
+      return null;
+    }
+    const title = extractHeadingTitle() || QUEUE_FALLBACK_TITLE;
+    const entry = {
+      url,
+      title,
+      status: actionType === RATE_QUEUE_ACTION.REJECT ? QUEUE_STATUS.REJECTED : QUEUE_STATUS.APPROVED,
+      rateActionAdded: true
+    };
+    if (actionType === RATE_QUEUE_ACTION.APPROVE) {
+      const note = typeof context?.approveNote === 'string' ? context.approveNote.trim() : '';
+      if (note) {
+        entry.approveNote = note;
+      }
+    }
+    if (actionType === RATE_QUEUE_ACTION.REJECT) {
+      const rejectDetails = sanitizeQueueRejectDetails(context?.rejectDetails);
+      if (rejectDetails) {
+        entry.rejectDetails = rejectDetails;
+      }
+    }
+    return entry;
+  };
+
   const applyQueueAction = async (actionType, context = {}) => {
     const queue = await readQueueEntries();
-    if (!queue.length) {
-      return { success: false, nextEntry: null };
-    }
     const working = queue.slice();
     const currentUrl = normalizeQueueUrl(window.location.href);
     const entryIndex = findQueueEntryIndex(working, currentUrl);
@@ -1657,7 +1689,18 @@
         targetEntry = { ...removed };
       }
     }
+    if (!targetEntry && (actionType === RATE_QUEUE_ACTION.APPROVE || actionType === RATE_QUEUE_ACTION.REJECT)) {
+      const createdEntry = buildRateActionQueueEntry(actionType, context);
+      if (createdEntry) {
+        targetEntry = createdEntry;
+      }
+    }
+    if (!queue.length && !targetEntry) {
+      return { success: false, nextEntry: null };
+    }
     if (targetEntry) {
+      const acknowledgedIndex = working.findIndex((entry) => isAcknowledgedQueueStatus(entry.status));
+      const acknowledgedBoundary = acknowledgedIndex === -1 ? working.length : acknowledgedIndex;
       if (actionType === RATE_QUEUE_ACTION.APPROVE) {
         targetEntry.status = QUEUE_STATUS.APPROVED;
         delete targetEntry.rejectDetails;
@@ -1667,7 +1710,7 @@
         } else {
           delete targetEntry.approveNote;
         }
-        working.push(targetEntry);
+        working.splice(acknowledgedBoundary, 0, targetEntry);
       } else if (actionType === RATE_QUEUE_ACTION.REJECT) {
         targetEntry.status = QUEUE_STATUS.REJECTED;
         const rejectDetails = sanitizeQueueRejectDetails(context?.rejectDetails);
@@ -1677,14 +1720,27 @@
           delete targetEntry.rejectDetails;
         }
         const approvedIndex = working.findIndex((entry) => entry.status === QUEUE_STATUS.APPROVED);
-        const insertIndex = approvedIndex === -1 ? working.length : approvedIndex;
+        const targetIndex = approvedIndex === -1 ? acknowledgedBoundary : Math.min(approvedIndex, acknowledgedBoundary);
+        const insertIndex = Math.min(targetIndex, acknowledgedBoundary);
         working.splice(insertIndex, 0, targetEntry);
       } else if (actionType === RATE_QUEUE_ACTION.SKIP) {
-        targetEntry.status = QUEUE_STATUS.PENDING;
-        delete targetEntry.rejectDetails;
-        const pendingTailIndex = working.findIndex((entry) => entry.status === QUEUE_STATUS.REJECTED || entry.status === QUEUE_STATUS.APPROVED);
-        const insertIndex = pendingTailIndex === -1 ? working.length : pendingTailIndex;
-        working.splice(insertIndex, 0, targetEntry);
+        if (!targetEntry.rateActionAdded) {
+          const pendingBoundaryIndex = working.findIndex((entry) => entry.status === QUEUE_STATUS.REJECTED || entry.status === QUEUE_STATUS.APPROVED || entry.status === QUEUE_STATUS.ACKNOWLEDGED);
+          const pendingBoundary = pendingBoundaryIndex === -1 ? working.length : pendingBoundaryIndex;
+          const firstApprovedIndex = working.findIndex((entry) => entry.status === QUEUE_STATUS.APPROVED);
+          const rejectedBoundary = firstApprovedIndex === -1 ? acknowledgedBoundary : Math.min(firstApprovedIndex, acknowledgedBoundary);
+          let insertIndex = acknowledgedBoundary;
+          if (targetEntry.status === QUEUE_STATUS.PENDING) {
+            insertIndex = pendingBoundary;
+          } else if (targetEntry.status === QUEUE_STATUS.REJECTED) {
+            insertIndex = working.length;
+          } else if (targetEntry.status === QUEUE_STATUS.APPROVED) {
+            insertIndex = acknowledgedBoundary;
+          } else if (targetEntry.status === QUEUE_STATUS.ACKNOWLEDGED) {
+            insertIndex = working.length;
+          }
+          working.splice(insertIndex, 0, targetEntry);
+        }
       } else {
         working.splice(entryIndex >= 0 ? entryIndex : working.length, 0, targetEntry);
       }
@@ -1693,7 +1749,7 @@
     const effectiveQueue = targetEntry ? working : queue;
     const excludeUrl = actionType === RATE_QUEUE_ACTION.SKIP ? targetEntry?.url : undefined;
     const nextEntry = getNextActionableQueueEntry(effectiveQueue, { excludeUrl });
-    return { success: Boolean(targetEntry), nextEntry };
+    return { success: Boolean(targetEntry), nextEntry, queue: effectiveQueue };
   };
 
   let rateQueueActionInFlight = false;
@@ -1705,6 +1761,8 @@
     rateQueueActionInFlight = true;
     try {
       hideQueueBanner();
+      const currentEntry = await getQueueEntryForCurrentUrl();
+      const wasRejected = currentEntry?.status === QUEUE_STATUS.REJECTED;
       let actionContext;
       if (typeof options.before === 'function') {
         const beforeResult = await options.before();
@@ -1722,8 +1780,15 @@
       if (result?.success && typeof collapseRateReviewApproveNote === 'function') {
         collapseRateReviewApproveNote();
       }
-      if (result?.nextEntry?.url) {
-        const nextUrl = result.nextEntry.url;
+      let nextEntry = result?.nextEntry || null;
+      if (wasRejected && Array.isArray(result?.queue)) {
+        const queueFinished = result.queue.every((entry) => entry?.status !== QUEUE_STATUS.PENDING);
+        if (queueFinished) {
+          nextEntry = result.queue.find((entry) => entry?.status === QUEUE_STATUS.REJECTED && entry?.url && entry.url !== currentEntry?.url) || null;
+        }
+      }
+      if (nextEntry?.url) {
+        const nextUrl = nextEntry.url;
         const normalizedNext = normalizeQueueUrl(nextUrl);
         const normalizedCurrent = normalizeQueueUrl(window.location.href);
         if (normalizedNext && normalizedNext === normalizedCurrent) {
@@ -1836,17 +1901,25 @@
       success: '#9de7b2',
       error: '#ffb0b0'
     };
+    const hasMessage = Boolean(message);
     rateCopyStatus.textContent = message || '';
     rateCopyStatus.style.color = colors[tone] || colors.info;
-    rateCopyStatus.style.opacity = message ? '1' : '0';
+    rateCopyStatus.style.opacity = hasMessage ? '1' : '0';
+    rateCopyStatus.style.display = hasMessage ? 'block' : 'none';
+    rateCopyStatus.style.marginTop = hasMessage ? '4px' : '0';
+    rateCopyStatus.style.minHeight = hasMessage ? '18px' : '0';
     if (rateCopyStatusTimeout) {
       clearTimeout(rateCopyStatusTimeout);
       rateCopyStatusTimeout = null;
     }
-    if (message) {
+    if (hasMessage) {
       rateCopyStatusTimeout = setTimeout(() => {
         if (rateCopyStatus) {
           rateCopyStatus.style.opacity = '0';
+          rateCopyStatus.style.display = 'none';
+          rateCopyStatus.style.marginTop = '0';
+          rateCopyStatus.style.minHeight = '0';
+          rateCopyStatus.textContent = '';
         }
       }, 3600);
     }
@@ -3419,14 +3492,15 @@
     rateCopyStatus = copyStatusEl;
     Object.assign(copyStatusEl.style, {
       width: '100%',
-      minHeight: '18px',
+      minHeight: '0',
       textAlign: 'center',
       fontSize: '11px',
       color: '#bdd6ff',
-      marginTop: '4px',
+      marginTop: '0',
       opacity: '0',
       transition: 'opacity 0.2s ease',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      display: 'none'
     });
     copyStatusEl.textContent = '';
     panel.append(copyStatusEl);

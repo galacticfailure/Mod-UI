@@ -21,11 +21,12 @@
     if (!window.fjTweakerModules) {
       return;
     }
-    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, walcorn, apichk, warn, hunt, batchassist } = window.fjTweakerModules;
+    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, walcorn, apichk, warn, hunt, batchassist, workingPrev } = window.fjTweakerModules;
     
     if (!__fjfe_baselineInit) {
       if (sel && typeof sel.init === 'function') sel.init();
       if (apichk && typeof apichk.init === 'function') apichk.init();
+      if (workingPrev && typeof workingPrev.init === 'function') workingPrev.init();
       __fjfe_baselineInit = true;
     }
     

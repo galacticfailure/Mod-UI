@@ -1,3 +1,20 @@
+1.1.1
+- RIP Phaser branch
+- Adjusted note titles in Batch Assist
+- Adjusted rate queue title coloration in Batch Assist
+- "Flaggable" in Batch Assist is now colored red
+- Fixed spacing in Batch Assist notes
+- Reduced space between Rate Tracker number and header
+- Reduced Rate Tracker timestamp margin of error from 1 hour to 1 minute
+- Added Working Prev
+- Added approval percentage display to Batch Assist
+- Fixed Batch Assist spacing issue
+- Approving/Rejecting a rate that is not in the Batch Assist queue will add it to the queue; Skip Rate will remove it from the queue
+- Added a warning if any rates in the queue cannot be acknowledged due to misattribution, both in the list and on Acknowledge
+- Exporting a batch from FJMeme to Batch Assist while a queue exists will now give the options to replace or update the queue, or to cancel
+- Exporting an acknowledged rate to Batch Assist will now mark it as such; acknowledging rates will do the same
+- Approving, Rejecting, or Skipping rates that are marked as rejected in the queue will now navigate to the next rejected rate if the queue is complete
+
 1.1.0
 - Added Batch Assist
 - Removed Count Edits button on Rate Tracker
