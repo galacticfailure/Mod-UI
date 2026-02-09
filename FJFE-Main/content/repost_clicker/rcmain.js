@@ -1036,6 +1036,29 @@
             } catch(_) { return 0; }
         }
 
+        const getSlotClickMultiplier = () => {
+            try {
+                const untilRaw = localStorage.getItem('fjfeSlotClickMultUntil');
+                const until = parseInt(untilRaw || '0', 10);
+                if (Number.isFinite(until) && until > 0 && Date.now() > until) {
+                    localStorage.removeItem('fjfeSlotClickMult');
+                    localStorage.removeItem('fjfeSlotClickMultUntil');
+                    return 1;
+                }
+                const raw = localStorage.getItem('fjfeSlotClickMult');
+                const v = parseFloat(raw);
+                return (Number.isFinite(v) && v > 0) ? v : 1;
+            } catch(_) { return 1; }
+        };
+
+        const getMetaClickBonusPct = () => {
+            let pct = 0;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_met8') === '1') pct += 10;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_met9') === '1') pct += 50;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_met10') === '1') pct += 50;
+            return pct;
+        };
+
         repostBtn.onclick = function() {
             
             let add = 1;
@@ -1058,6 +1081,16 @@
                         const factor = 1 << Math.min(scriptCount, 30); 
                         add = add * factor;
                     }
+                }
+            } catch(_) {}
+            try {
+                const mult = getSlotClickMultiplier();
+                if (Number.isFinite(mult) && mult > 0) add = Math.floor(add * mult);
+            } catch(_) {}
+            try {
+                const bonusPct = getMetaClickBonusPct();
+                if (Number.isFinite(bonusPct) && bonusPct > 0) {
+                    add = Math.floor(add * (1 + (bonusPct / 100)));
                 }
             } catch(_) {}
             pendingClickDeltaScaled = pendingClickDeltaScaled + BigInt(add * 10);

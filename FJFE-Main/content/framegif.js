@@ -356,14 +356,23 @@
     return null;
   };
 
-  const isExcludedMediaTarget = (node) => {
+  const isIncludedMediaTarget = (node) => {
     if (!node) {
       return false;
     }
     if (node.id === 'lightbox-secNav-btnClose') {
+      return false;
+    }
+    if (typeof node.closest !== 'function') {
+      return false;
+    }
+    if (node.closest('#lightbox-secNav-btnClose')) {
+      return false;
+    }
+    if (node.closest('.contentContainer')) {
       return true;
     }
-    if (typeof node.closest === 'function' && node.closest('#lightbox-secNav-btnClose')) {
+    if (node.closest('.t.withAv')) {
       return true;
     }
     return false;
@@ -1004,7 +1013,7 @@
     }
     const target = event.target;
     const kind = getMediaKind(target);
-    if (!kind || isExcludedMediaTarget(target)) {
+    if (!kind || !isIncludedMediaTarget(target)) {
       return;
     }
     showHoverButton(target, event);

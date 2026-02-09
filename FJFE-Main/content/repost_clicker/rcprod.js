@@ -1,5 +1,34 @@
 (function() {
   const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+  const SCROLLBAR_STYLE_ID = 'fjfe-clicker-scrollbar-style';
+
+  function ensureClickerScrollbarStyles(){
+    try {
+      if (document.getElementById(SCROLLBAR_STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = SCROLLBAR_STYLE_ID;
+      style.textContent = `
+        .fjfe-clicker-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #6a6a6a transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-thumb {
+          background: #6a6a6a;
+          border-radius: 6px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+      `;
+      document.head && document.head.appendChild(style);
+    } catch(_) {}
+  }
 
   function clampSafe(n) {
     if (!Number.isFinite(n) || isNaN(n)) return 0;
@@ -55,6 +84,12 @@
     try {
       localStorage.setItem(key, String(clampSafe(v)));
     } catch (_) {}
+  }
+
+  function hasStoreUpgrade(id) {
+    try {
+      return localStorage.getItem(`fjTweakerStoreUpgrade_${id}`) === '1';
+    } catch(_) { return false; }
   }
 
   function getMoney() {
@@ -120,7 +155,9 @@
   }
 
   function getPriceDiscountFactorGlobal() {
-    return 1.0;
+    try {
+      return hasStoreUpgrade('met3') ? 0.99 : 1.0;
+    } catch(_) { return 1.0; }
   }
 
   function loadUpgradeLevelByIdGlobal(id) {
@@ -133,23 +170,52 @@
     }
   }
 
+  function getProducerMultiplierFactor(id) {
+    try {
+      const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${id}`);
+      const stored = parseFloat(raw);
+      let base = 1;
+      if (Number.isFinite(stored) && stored > 0) {
+        base = stored <= 10 ? stored : (stored / 100);
+      }
+      const alt = getProducerAltMultiplierFactor(id);
+      const meta = hasStoreUpgrade('met2') ? 1.01 : 1;
+      const combined = base * (Number.isFinite(alt) && alt > 0 ? alt : 1) * meta;
+      return combined > 0 ? combined : 1;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  function getProducerAltMultiplierFactor(id) {
+    try {
+      const raw = localStorage.getItem(`fjTweakerStoreAltMultiplier_${id}`);
+      const stored = parseFloat(raw);
+      if (!Number.isFinite(stored) || stored <= 0) return 1;
+      if (stored <= 10) return stored;
+      return stored / 100;
+    } catch (_) {
+      return 1;
+    }
+  }
+
   
   const MULTIPLIER = 1.15;
   const UPGRADE_LIST = [
-    { id: 'script',            basePrice: 15,                         rpsAdd: 0.1,             name: 'Script',             tt: 'A simple script to repost your reposts.' },
-    { id: 'groupChat',         basePrice: 100,                        rpsAdd: 1,               name: 'Group Chat',         tt: 'Produces fresh content to steal.' },
-    { id: 'workshop',          basePrice: 1100,                       rpsAdd: 8,               name: 'Workshop',           tt: 'Carefully assembles memes from provided parts.' },
-    { id: 'studio',            basePrice: 12000,                      rpsAdd: 47,              name: 'Studio',             tt: 'Films high-effort content for you to effortlessly steal.' },
-    { id: 'recyclingCenter',   basePrice: 130000,                     rpsAdd: 260,             name: 'Recycling Center',   tt: 'Recycles old content into new content.' },
-    { id: 'digsite',           basePrice: 1400000,                    rpsAdd: 1400,            name: 'Digsite',            tt: 'Digs up ancient memes from a better time.' },
-    { id: 'officeBuilding',    basePrice: 20000000,                   rpsAdd: 7800,            name: 'Office Building',    tt: 'Analyzes market trends to produce relatable memes.' },
-    { id: 'contentFarm',       basePrice: 300000000,                  rpsAdd: 44000,           name: 'Content Farm',       tt: 'Grows content using industrial farming techniques.' },
-    { id: 'botnet',            basePrice: 5100000000,                 rpsAdd: 260000,          name: 'Botnet',             tt: 'Reposts at blinding speeds, changing IP every time.' },
-    { id: 'spaceport',         basePrice: 75000000000,                rpsAdd: 1600000,         name: 'Spaceport',          tt: 'Imports content from alien worlds.' },
-    { id: 'ritualCircle',      basePrice: 1000000000000,              rpsAdd: 10000000,        name: 'Ritual Circle',      tt: 'Uses unholy rituals to summon extradimensional content.' },
-    { id: 'memecatcher',       basePrice: 14000000000000,             rpsAdd: 65000000,        name: 'Memecatcher',        tt: 'Harvests memes from dreams.' },
-    { id: 'quantumHarmonizer', basePrice: 170000000000000,            rpsAdd: 430000000,       name: 'Quantum Harmonizer', tt: 'Finds content that may not exist and forces it to.' },
-    { id: 'timeForge',         basePrice: 2100000000000000,           rpsAdd: 2900000000,      name: 'Time Forge',         tt: 'Forges memes from the fabric of time itself.' },
+    { id: 'script',            basePrice: 15,                          rpsAdd: 0.1,             name: 'Script',             tt: 'A simple script to repost your reposts.' },
+    { id: 'groupChat',         basePrice: 100,                         rpsAdd: 1,               name: 'Group Chat',         tt: 'Produces fresh content to steal.' },
+    { id: 'workshop',          basePrice: 1100,                        rpsAdd: 8,               name: 'Workshop',           tt: 'Carefully assembles memes from provided parts.' },
+    { id: 'studio',            basePrice: 12000,                       rpsAdd: 47,              name: 'Studio',             tt: 'Films high-effort content for you to effortlessly steal.' },
+    { id: 'recyclingCenter',   basePrice: 130000,                      rpsAdd: 260,             name: 'Recycling Center',   tt: 'Recycles old content into new content.' },
+    { id: 'digsite',           basePrice: 1400000,                     rpsAdd: 1400,            name: 'Digsite',            tt: 'Digs up ancient memes from a better time.' },
+    { id: 'officeBuilding',    basePrice: 20000000,                    rpsAdd: 7800,            name: 'Office Building',    tt: 'Analyzes market trends to produce relatable memes.' },
+    { id: 'contentFarm',       basePrice: 300000000,                   rpsAdd: 44000,           name: 'Content Farm',       tt: 'Grows content using industrial farming techniques.' },
+    { id: 'botnet',            basePrice: 5100000000,                  rpsAdd: 260000,          name: 'Botnet',             tt: 'Reposts at blinding speeds, changing IP every time.' },
+    { id: 'spaceport',         basePrice: 75000000000,                 rpsAdd: 1600000,         name: 'Spaceport',          tt: 'Imports content from alien worlds.' },
+    { id: 'ritualCircle',      basePrice: 1000000000000,               rpsAdd: 10000000,        name: 'Ritual Circle',      tt: 'Uses unholy rituals to summon extradimensional content.' },
+    { id: 'memecatcher',       basePrice: 14000000000000,              rpsAdd: 65000000,        name: 'Memecatcher',        tt: 'Harvests memes from dreams.' },
+    { id: 'quantumHarmonizer', basePrice: 170000000000000,             rpsAdd: 430000000,       name: 'Quantum Harmonizer', tt: 'Finds content that may not exist and forces it to.' },
+    { id: 'timeForge',         basePrice: 2100000000000000,            rpsAdd: 2900000000,      name: 'Time Forge',         tt: 'Forges memes from the fabric of time itself.' },
     { id: 'wormhole',          basePrice: 26000000000000000n,          rpsAdd: 21000000000,     name: 'Wormhole',           tt: 'Pulls content from who knows where, or when.' },
     { id: 'pocketDimension',   basePrice: 310000000000000000n,         rpsAdd: 150000000000,    name: 'Pocket Dimension',   tt: 'An entire dimension, dedicated to created memes. After all, their survival depends on it.' },
     { id: 'agiShitposter',     basePrice: 71000000000000000000n,       rpsAdd: 1100000000000,   name: 'AGI Shitposter',     tt: 'True artificial intelligence, purpose-built for stealing memes.' },
@@ -216,19 +282,20 @@
     });
   }
 
+  function toBigIntPrice(v) {
+    try {
+      if (typeof v === 'bigint') return v < 0n ? 0n : v;
+      const num = Number(v);
+      if (!Number.isFinite(num) || num <= 0) return 0n;
+      return BigInt(Math.floor(num));
+    } catch(_) { return 0n; }
+  }
+
   function calcPriceFor(def, curNum) {
     
     
     
-    const toBigInt = (v) => {
-      try {
-        if (typeof v === 'bigint') return v < 0n ? 0n : v;
-        const num = Number(v);
-        if (!Number.isFinite(num) || num <= 0) return 0n;
-        return BigInt(Math.floor(num));
-      } catch(_) { return 0n; }
-    };
-    const baseBI = toBigInt(def && def.basePrice);
+    const baseBI = toBigIntPrice(def && def.basePrice);
     if (baseBI <= 0n) return 0n;
     const S = 1000n; 
     
@@ -248,6 +315,48 @@
     return priceBI;
   }
 
+  function calcPriceForQty(def, curNum, qty) {
+    try {
+      const count = Math.max(1, Math.floor(qty || 1));
+      const baseBI = toBigIntPrice(def && def.basePrice);
+      if (baseBI <= 0n) return 0n;
+      const S = 1000n;
+      let growthScaled = S;
+      for (let i = 0; i < Math.max(0, Math.floor(curNum || 0)); i++) {
+        growthScaled = (growthScaled * 115n) / 100n;
+        if (growthScaled <= 0n) { growthScaled = S; }
+      }
+      let gf = 1.0;
+      try { gf = Number(getPriceDiscountFactorGlobal('red')) || 1.0; } catch(_) {}
+      const gfScaled = BigInt(Math.floor(Math.max(0, gf) * Number(S)));
+      let total = 0n;
+      for (let i = 0; i < count; i++) {
+        let priceBI = (baseBI * growthScaled);
+        priceBI = (priceBI * gfScaled) / (S * S);
+        if (priceBI < 0n) priceBI = 0n;
+        total += priceBI;
+        growthScaled = (growthScaled * 115n) / 100n;
+        if (growthScaled <= 0n) { growthScaled = S; }
+      }
+      return total;
+    } catch(_) { return 0n; }
+  }
+
+  const BUY_QTY_KEY_PREFIX = 'fjfeProdBuyQty_';
+  function loadBuyQty(id) {
+    try {
+      const raw = localStorage.getItem(BUY_QTY_KEY_PREFIX + id);
+      const v = parseInt(raw, 10);
+      if (v === 10 || v === 100 || v === 1) return v;
+      return 1;
+    } catch(_) { return 1; }
+  }
+  function saveBuyQty(id, qty) {
+    try {
+      localStorage.setItem(BUY_QTY_KEY_PREFIX + id, String(qty));
+    } catch(_) {}
+  }
+
   function getTotalRps() {
     let sum = 0;
     const tools = window.fjfeClickerNumbers;
@@ -256,24 +365,8 @@
       if (lvl > 0) {
         let contribution = lvl * (u.rpsAdd || 0);
         
-        
-        try {
-          const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${u.id}`);
-          const stored = parseFloat(raw);
-          if (Number.isFinite(stored)) {
-            
-            
-            let factor;
-            if (stored <= 0) {
-              factor = 1;
-            } else if (stored > 10) {
-              factor = 1 + (stored / 100);
-            } else {
-              factor = stored;
-            }
-            if (Number.isFinite(factor) && factor > 0) contribution = contribution * factor;
-          }
-        } catch (_) {}
+        const factor = getProducerMultiplierFactor(u.id);
+        if (Number.isFinite(factor) && factor > 0) contribution = contribution * factor;
         
         if (tools && typeof tools.quantize === 'function') {
           sum += tools.quantize(contribution);
@@ -288,6 +381,67 @@
       if (Number.isFinite(bonusPct) && bonusPct > 0) {
         sum = sum * (1 + (bonusPct / 100));
       }
+    } catch(_) {}
+    try {
+      const metaPct = (hasStoreUpgrade('met1') ? 10 : 0) + (hasStoreUpgrade('met2') ? 5 : 0);
+      if (Number.isFinite(metaPct) && metaPct > 0) {
+        sum = sum * (1 + (metaPct / 100));
+      }
+    } catch(_) {}
+    try {
+      const getMemetypePct = (idx)=>{
+        if (idx <= 4) return 1;
+        if (idx <= 29) return 2;
+        if (idx <= 35) return 3;
+        if (idx <= 71) return 4;
+        return 5;
+      };
+      let memetypeMult = 1;
+      for (let i = 1; i <= 142; i++) {
+        const key = `fjTweakerStoreUpgrade_mbt${i}`;
+        if (localStorage.getItem(key) === '1') {
+          const pct = getMemetypePct(i);
+          if (pct > 0) memetypeMult *= (1 + (pct / 100));
+        }
+      }
+      const extraSets = [
+        { prefix: 'lct', count: 6, pct: 2 },
+        { prefix: 'gat', count: 17, pct: 3 },
+        { prefix: 'fbt', count: 9, pct: 3 },
+        { prefix: 'tgt', count: 5, pct: 4 },
+        { prefix: 'vgt', count: 7, pct: 4 },
+        { prefix: 'fgt', count: 7, pct: 4 },
+        { prefix: 'fjt', count: 9, pct: 5 },
+        { prefix: 'spt', count: 2, pct: 10 },
+      ];
+      for (const set of extraSets) {
+        for (let i = 1; i <= set.count; i++) {
+          const key = `fjTweakerStoreUpgrade_${set.prefix}${i}`;
+          if (localStorage.getItem(key) === '1') {
+            memetypeMult *= (1 + (set.pct / 100));
+          }
+        }
+      }
+      if (Number.isFinite(memetypeMult) && memetypeMult > 1) {
+        sum = sum * memetypeMult;
+      }
+    } catch(_) {}
+    try {
+      const readTimedMult = (key)=>{
+        const untilRaw = localStorage.getItem(key + 'Until');
+        const until = parseInt(untilRaw || '0', 10);
+        if (Number.isFinite(until) && until > 0 && Date.now() > until) {
+          localStorage.removeItem(key);
+          localStorage.removeItem(key + 'Until');
+          return 1;
+        }
+        const raw = localStorage.getItem(key);
+        const v = parseFloat(raw);
+        return (Number.isFinite(v) && v > 0) ? v : 1;
+      };
+      const mult = readTimedMult('fjfeSlotRpsMult');
+      const pctMult = readTimedMult('fjfeSlotRpsPctMult');
+      sum = sum * mult * pctMult;
     } catch(_) {}
     if (tools && typeof tools.quantize === 'function') {
       return tools.quantize(sum);
@@ -312,6 +466,8 @@
       borderRadius: '0',
       padding: '0',
       userSelect: 'none',
+      position: 'relative',
+      overflow: 'visible',
     });
     try { row.setAttribute('unselectable','on'); } catch(_) {}
     try { row.onselectstart = () => false; } catch(_) {}
@@ -492,7 +648,8 @@
     const fmt = (window.fjfeClickerNumbers && window.fjfeClickerNumbers.formatAbbrev) ? window.fjfeClickerNumbers.formatAbbrev : formatCompact;
     return fmt(num);
   };
-  const calcPrice = () => calcPriceFor(def, curNum);
+  let selectedQty = loadBuyQty(id);
+  const calcPrice = () => calcPriceForQty(def, curNum, selectedQty);
 
   priceNum.textContent = computeUnlocked() ? formatPriceAny(calcPrice()) : '???';
     Object.assign(priceNum.style, {
@@ -504,6 +661,28 @@
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       maxWidth: '100%',
+    });
+
+    const qtyBtn = document.createElement('div');
+    Object.assign(qtyBtn.style, {
+      width: '28px',
+      minWidth: '28px',
+      height: '16px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '9px',
+      fontWeight: '800',
+      color: '#fff',
+      background: '#222',
+      border: '1px solid #444',
+      borderRadius: '3px',
+      marginRight: '4px',
+      cursor: 'pointer',
+      userSelect: 'none',
+      lineHeight: '1',
+      padding: '0',
+      boxSizing: 'border-box',
     });
 
     const priceIcon = document.createElement('img');
@@ -523,6 +702,7 @@
 
   
   priceIcon.style.marginRight = '0px';
+  priceWrap.appendChild(qtyBtn);
   priceWrap.appendChild(priceIcon);
   priceWrap.appendChild(priceNum);
     textCol.appendChild(priceWrap);
@@ -577,6 +757,8 @@
       try {
         
         curNum = loadNum();
+        selectedQty = loadBuyQty(id);
+        updateQtyButtons();
         updateNum();
         updateUnlockVisual();
       } catch (_) {}
@@ -620,17 +802,8 @@
             const tools2 = window.fjfeClickerNumbers;
             
             let per2 = def && def.rpsAdd ? def.rpsAdd : 0;
-            try {
-              const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${id}`);
-              const stored = parseFloat(raw);
-              if (Number.isFinite(stored)) {
-                let factor;
-                if (stored <= 0) factor = 1;
-                else if (stored > 10) factor = 1 + (stored / 100);
-                else factor = stored; 
-                if (Number.isFinite(factor) && factor > 0) per2 = per2 * factor;
-              }
-            } catch(_) {}
+            const factor2 = getProducerMultiplierFactor(id);
+            if (Number.isFinite(factor2) && factor2 > 0) per2 = per2 * factor2;
             const lvl2 = loadUpgradeLevelByIdGlobal(id);
             const total2 = (lvl2 || 0) * (per2 || 0);
           const fmtSmall2 = tools2 && tools2.formatWordsSmallDecimals ? tools2.formatWordsSmallDecimals : (tools2 && tools2.formatWords ? tools2.formatWords : (x=>String(x)));
@@ -642,7 +815,7 @@
           window.fjfeRcInfo.show({ imageSrc: imgEl && imgEl.src ? imgEl.src : '', name: currentName, cost: currentCost, bodyTop: topLine2, bodyMid: midLine2, bodyTT: ttLine2 });
         }
       } catch (_) {}
-    curNum++;
+    curNum += Math.max(1, Math.floor(selectedQty || 1));
       persistNum(curNum);
   priceNum.textContent = formatPriceAny(calcPrice());
       updateNum();
@@ -670,6 +843,33 @@
       } catch (_) {}
     };
 
+    const setSelectedQty = (qty) => {
+      selectedQty = qty;
+      saveBuyQty(id, qty);
+      updateQtyButtons();
+      try {
+        priceNum.textContent = formatPriceAny(calcPrice());
+        const clickable = upgrade._isClickableNow();
+        row.style.cursor = clickable ? 'pointer' : 'not-allowed';
+        row.style.opacity = clickable ? '1' : '0.6';
+      } catch(_) {}
+    };
+    const updateQtyButtons = () => {
+      qtyBtn.textContent = `x${selectedQty}`;
+      qtyBtn.style.background = '#222';
+    };
+    updateQtyButtons();
+
+    const cycleQty = () => {
+      const next = selectedQty === 1 ? 10 : (selectedQty === 10 ? 100 : 1);
+      setSelectedQty(next);
+    };
+    qtyBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      cycleQty();
+    });
+    qtyBtn.addEventListener('mousedown', (ev) => ev.preventDefault());
+
     row.appendChild(upgrade);
     row.appendChild(levelDiv);
     updateUnlockVisual();
@@ -691,17 +891,8 @@
         const tools = window.fjfeClickerNumbers;
         
         let per = def && def.rpsAdd ? def.rpsAdd : 0;
-        try {
-          const raw = localStorage.getItem(`fjTweakerStoreMultiplier_${id}`);
-          const stored = parseFloat(raw);
-          if (Number.isFinite(stored)) {
-            let factor;
-            if (stored <= 0) factor = 1;
-            else if (stored > 10) factor = 1 + (stored / 100);
-            else factor = stored;
-            if (Number.isFinite(factor) && factor > 0) per = per * factor;
-          }
-        } catch(_) {}
+        const factor = getProducerMultiplierFactor(id);
+        if (Number.isFinite(factor) && factor > 0) per = per * factor;
         const lvl = loadUpgradeLevelByIdGlobal(id);
         const total = (lvl || 0) * (per || 0);
         const fmtSmall = tools && tools.formatWordsSmallDecimals ? tools.formatWordsSmallDecimals : (tools && tools.formatWords ? tools.formatWords : (x=>String(x)));
@@ -763,6 +954,7 @@
     });
 
     const upgradeList = document.createElement('div');
+    upgradeList.classList.add('fjfe-clicker-scroll');
     Object.assign(upgradeList.style, {
       display: 'flex',
       flexDirection: 'column',

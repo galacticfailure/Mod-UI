@@ -2,6 +2,7 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'batchassist';
   const SETTING_KEY = 'batchAssist';
+  const SETTINGS_STORAGE_KEY = 'fjTweakerSettings';
   const STORAGE_KEY = 'batchAssist';
   const STORAGE_META_KEY = 'batchAssistMeta';
   const PANEL_ID = 'fjfe-batchassist-menu';
@@ -26,13 +27,23 @@
   const ACK_ENDPOINT_BASE = 'https://fjme.me/api/ratings/removeNeedsReview/';
   const ACK_REQUEST_DELAY_MS = 650;
   const SPINNER_STYLE_ID = 'fjfe-batchassist-spinner-style';
+  const SCROLLBAR_STYLE_ID = 'fjfe-batchassist-scrollbar-style';
   const CATEGORY_MULTISELECT_LABELS = new Set(['spicy', 'meta']);
   const CATEGORY_OTHER_MEMES_LABEL = 'other/memes';
   const INVALID_DIALOG_MESSAGES = [
     "Go to the mods FJMeme ratings page and check if they've done any work ever."
   ];
+  const ASSIST_WRAPPER_ID = 'fj-assist-buttons';
+  const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
+  const ASSIST_BUTTON_ID = 'fj-assist-batch-button';
+  const ASSIST_BUTTON_ORDER = 2;
+  const ASSIST_ICON_PATH = 'icons/batchassist.png';
+  const TOGGLE_STORAGE_KEY = 'fjTweakerBatchAssistToggle';
+  const ASSIST_GLOW_COLOR = 'rgba(88, 164, 255, 0.75)';
 
   let featureEnabled = false;
+  let settingEnabled = false;
+  let toggleEnabled = false;
   let queueLinks = [];
   let queueMetadata = {};
   let panel = null;
@@ -55,6 +66,29 @@
   let invalidDialogObserver = null;
   let loadingIndicator = null;
   let percentIndicator = null;
+  let noteElement = null;
+  let queueStatusNote = '';
+  let updateNoteForStateRef = null;
+  let queueRemainingNote = '';
+  let queueBarState = { approved: 0, rejected: 0, total: 0 };
+
+  const getStoredSettings = () => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (_) {
+      return {};
+    }
+  };
+
+  const getSettingValue = () => {
+    const settings = window.fjTweakerSettings || getStoredSettings();
+    if (typeof settings[SETTING_KEY] === 'undefined') {
+      return false;
+    }
+    return Boolean(settings[SETTING_KEY]);
+  };
 
   const getAssetUrl = (relativePath) => {
     if (!relativePath) {
@@ -66,6 +100,296 @@
       }
     } catch (_) {}
     return relativePath;
+  };
+
+  const isAssistElementVisible = (el) => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (Number(style.opacity) === 0) return false;
+    if (el.offsetParent === null && style.position !== 'fixed') return false;
+    return true;
+  };
+
+  const findAssistSearchButton = () => {
+    const selectors = [
+      '.userbarBttn .fjse',
+      '.userbarBttn a[title*="search" i]',
+      '#sectionsNav .search-inner button.btn.btn-primary',
+      '#sectionsNav .search-inner button[type="submit"]',
+      '#sectionsNav .search-inner button',
+      'button#searchBtn',
+      'button.searchBtn',
+      'button.searchButton',
+      'button.search-btn',
+      'button#searchButton',
+      'input#searchBtn',
+      'input.searchBtn',
+      'form[action*="search"] button[type="submit"]',
+      'form[action*="search"] input[type="submit"]',
+      'form[action*="search"] button',
+      'button[type="submit"][aria-label*="search" i]',
+      'button[title*="search" i]',
+      'button[class*="search" i]',
+      'a[class*="search" i]',
+      'a[title*="search" i]',
+      'input[type="image"][alt*="search" i]'
+    ];
+    const candidates = [];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => candidates.push(el));
+    });
+    const visible = candidates.find(isAssistElementVisible);
+    if (visible) return visible;
+    return candidates[0] || null;
+  };
+
+  const isAssistCompressedAnchor = (searchButton) => (
+    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+  );
+
+  const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    if (!wrapper || !anchor) return;
+    const parent = anchor.parentElement;
+    if (!parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const rect = anchor.getBoundingClientRect();
+    const left = rect.right - parentRect.left + 4;
+    const top = rect.top - parentRect.top - 7;
+    wrapper.style.left = `${left}px`;
+    wrapper.style.top = `${top}px`;
+  };
+
+  const applyAssistButtonStyling = (button, searchButton) => {
+    if (!button || !searchButton) return;
+    const searchStyle = window.getComputedStyle(searchButton);
+    button.className = searchButton.className || '';
+    if (searchButton.getAttribute('style')) {
+      button.style.cssText = searchButton.getAttribute('style');
+    }
+    const sizeProps = ['width', 'height', 'minWidth', 'minHeight', 'padding', 'borderRadius', 'font', 'lineHeight'];
+    sizeProps.forEach((prop) => {
+      const value = searchStyle[prop];
+      if (value && value !== 'auto') {
+        button.style[prop] = value;
+      }
+    });
+    button.style.display = 'inline-flex';
+    button.style.alignItems = 'center';
+    button.style.justifyContent = 'center';
+    button.style.overflow = 'visible';
+    const size = parseFloat(searchStyle.height) || parseFloat(searchStyle.width) || 28;
+    button.style.width = `${size}px`;
+    button.style.height = `${size}px`;
+    button.style.minWidth = `${size}px`;
+    button.style.minHeight = `${size}px`;
+    button.style.padding = '0';
+    button.style.borderRadius = '6px';
+    button.style.backgroundRepeat = 'no-repeat';
+    button.style.backgroundPosition = 'center';
+    button.style.backgroundSize = '70% 70%';
+    if (!button.dataset.fjAssistBaseShadow) {
+      button.dataset.fjAssistBaseShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.12)';
+    }
+    if (!button.dataset.fjAssistBaseFilter) {
+      button.dataset.fjAssistBaseFilter = button.style.filter || '';
+    }
+    button.style.boxShadow = button.dataset.fjAssistBaseShadow;
+    button.style.transition = 'transform 120ms ease, box-shadow 180ms ease, filter 180ms ease';
+    button.style.transformOrigin = 'center';
+    button.style.transform = 'translateZ(0)';
+    button.style.backfaceVisibility = 'hidden';
+    button.style.willChange = 'transform, box-shadow, filter';
+    if (!button.dataset.fjAssistPressBound) {
+      button.dataset.fjAssistPressBound = '1';
+      button.addEventListener('pointerdown', () => {
+        button.style.transform = 'translateZ(0) scale(0.92)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        button.addEventListener(evt, () => {
+          button.style.transform = 'translateZ(0)';
+        });
+      });
+    }
+  };
+
+  const applyAssistIconButtonStyling = (button, searchButton, options) => {
+    if (!button) return;
+    applyAssistButtonStyling(button, searchButton);
+    if (!options) return;
+    if (options.background) button.style.backgroundColor = options.background;
+    if (options.border) button.style.borderColor = options.border;
+    if (options.color) button.style.color = options.color;
+    if (options.iconPath) {
+      button.style.backgroundImage = `url(${getAssetUrl(options.iconPath)})`;
+    }
+  };
+
+  const loadToggleEnabled = () => {
+    try {
+      return localStorage.getItem(TOGGLE_STORAGE_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const persistToggleEnabled = () => {
+    try {
+      if (toggleEnabled) {
+        localStorage.setItem(TOGGLE_STORAGE_KEY, '1');
+      } else {
+        localStorage.removeItem(TOGGLE_STORAGE_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const setAssistButtonActive = (active) => {
+    if (!assistButton) return;
+    const baseShadow = assistButton.dataset.fjAssistBaseShadow || '';
+    const baseFilter = assistButton.dataset.fjAssistBaseFilter || '';
+    if (active) {
+      assistButton.style.filter = 'brightness(1.2) saturate(1.1)';
+      assistButton.style.boxShadow = `0 0 10px ${ASSIST_GLOW_COLOR}, 0 0 18px ${ASSIST_GLOW_COLOR}, ${baseShadow}`;
+    } else {
+      assistButton.style.filter = baseFilter;
+      assistButton.style.boxShadow = baseShadow;
+    }
+  };
+
+  const ensureAssistWrapper = () => {
+    let wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const currentAnchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    let anchor = currentAnchor && isAssistElementVisible(currentAnchor) ? currentAnchor : null;
+    if (!anchor) {
+      anchor = findAssistSearchButton();
+    }
+    if (wrapper && anchor) {
+      if (currentAnchor && currentAnchor !== anchor) {
+        delete currentAnchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      anchor.dataset[ASSIST_ANCHOR_ATTR] = '1';
+      wrapper.style.marginLeft = '6px';
+      wrapper.style.position = 'relative';
+      wrapper.style.gap = '6px';
+      wrapper.style.zIndex = '999';
+      wrapper.style.overflow = 'visible';
+      wrapper.style.paddingRight = '12px';
+      wrapper.style.left = '';
+      wrapper.style.top = '';
+      anchor.insertAdjacentElement('afterend', wrapper);
+      return { wrapper, anchor };
+    }
+
+    const searchButton = anchor || findAssistSearchButton();
+    if (!searchButton) return null;
+
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.id = ASSIST_WRAPPER_ID;
+      Object.assign(wrapper.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        position: 'relative',
+        marginLeft: '6px',
+        verticalAlign: 'middle',
+        overflow: 'visible',
+        paddingRight: '12px'
+      });
+    }
+
+    const previousAnchor = currentAnchor || document.querySelector('[data-fj-assist-anchor="1"]');
+    if (previousAnchor && previousAnchor !== searchButton) {
+      delete previousAnchor.dataset[ASSIST_ANCHOR_ATTR];
+    }
+    searchButton.dataset[ASSIST_ANCHOR_ATTR] = '1';
+    wrapper.style.marginLeft = '6px';
+    wrapper.style.position = 'relative';
+    wrapper.style.gap = '6px';
+    wrapper.style.zIndex = '999';
+    wrapper.style.left = '';
+    wrapper.style.top = '';
+    searchButton.insertAdjacentElement('afterend', wrapper);
+
+    return { wrapper, anchor: searchButton };
+  };
+
+  let assistButton = null;
+  let assistRefreshScheduled = false;
+  let assistRefreshBound = false;
+
+  const scheduleAssistRefresh = () => {
+    if (assistRefreshScheduled) return;
+    assistRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      assistRefreshScheduled = false;
+      if (settingEnabled) {
+        ensureAssistButton();
+      }
+    });
+  };
+
+  const bindAssistRefresh = () => {
+    if (assistRefreshBound) return;
+    assistRefreshBound = true;
+    window.addEventListener('resize', scheduleAssistRefresh, { passive: true });
+    window.addEventListener('scroll', scheduleAssistRefresh, { passive: true });
+  };
+
+  const ensureAssistButton = () => {
+    const wrapperInfo = ensureAssistWrapper();
+    if (!wrapperInfo) return;
+    const { wrapper, anchor } = wrapperInfo;
+    if (!assistButton) {
+      assistButton = document.getElementById(ASSIST_BUTTON_ID);
+    }
+    if (!assistButton) {
+      assistButton = document.createElement('button');
+      assistButton.type = 'button';
+      assistButton.id = ASSIST_BUTTON_ID;
+      assistButton.setAttribute('aria-label', 'Batch Assist');
+      assistButton.setAttribute('title', 'Batch Assist');
+    }
+    applyAssistIconButtonStyling(assistButton, anchor, {
+      background: '#1f4f7a',
+      border: '#163958',
+      color: '#e6f2ff',
+      iconPath: ASSIST_ICON_PATH
+    });
+    assistButton.style.order = String(ASSIST_BUTTON_ORDER);
+    setAssistButtonActive(toggleEnabled);
+    if (!wrapper.contains(assistButton)) {
+      wrapper.appendChild(assistButton);
+    }
+    if (!assistButton.dataset.fjAssistBound) {
+      assistButton.dataset.fjAssistBound = '1';
+      assistButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleEnabled = !toggleEnabled;
+        persistToggleEnabled();
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+        try {
+          window.dispatchEvent(new CustomEvent('fjTweakerBatchAssistToggle', { detail: { enabled: toggleEnabled } }));
+        } catch (_) {}
+      });
+    }
+  };
+
+  const removeAssistButton = () => {
+    const wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const anchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    if (assistButton && assistButton.parentElement) {
+      assistButton.remove();
+    }
+    assistButton = null;
+    if (wrapper && wrapper.children.length === 0) {
+      if (anchor) {
+        delete anchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      wrapper.remove();
+    }
   };
 
   const copyTextToClipboard = async (text) => {
@@ -110,6 +434,33 @@
     const style = document.createElement('style');
     style.id = SPINNER_STYLE_ID;
     style.textContent = `@keyframes fjfeBatchAssistSpinner { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+    document.head?.appendChild(style);
+  };
+
+  const ensureScrollbarStyles = () => {
+    if (document.getElementById(SCROLLBAR_STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = SCROLLBAR_STYLE_ID;
+    style.textContent = `
+      .fjfe-batchassist-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #6a6a6a transparent;
+      }
+      .fjfe-batchassist-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      .fjfe-batchassist-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .fjfe-batchassist-scroll::-webkit-scrollbar-thumb {
+        background: #6a6a6a;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+    `;
     document.head?.appendChild(style);
   };
 
@@ -402,6 +753,7 @@
     element.style.background = style.background;
     element.style.border = `1px solid ${style.border}`;
     element.style.color = style.text;
+    element.style.borderLeft = `4px solid ${style.border}`;
   };
 
   const getRejectSummarySegments = (details) => {
@@ -452,7 +804,7 @@
       flexWrap: 'wrap',
       alignItems: 'center',
       fontSize: '12px',
-      fontWeight: '600',
+      fontWeight: '400',
       gap: '0'
     });
     segments.forEach((segment, index) => {
@@ -461,9 +813,6 @@
       const isFlaggable = typeof segment.text === 'string' && segment.text.trim().toLowerCase() === 'flaggable';
       const highlight = segment.overridden === true || isFlaggable;
       valueSpan.style.color = highlight ? '#ff7272' : '#f0f0f0';
-      if (highlight) {
-        valueSpan.style.fontWeight = '700';
-      }
       row.appendChild(valueSpan);
       if (index < segments.length - 1) {
         const divider = document.createElement('span');
@@ -508,7 +857,8 @@
     const text = document.createElement('div');
     text.textContent = trimmed;
     Object.assign(text.style, {
-      fontSize: '12px',
+      fontSize: '11px',
+      fontWeight: '400',
       color: '#f0f0f0',
       whiteSpace: 'pre-wrap',
       lineHeight: '1.35'
@@ -548,7 +898,8 @@
     const text = document.createElement('div');
     text.textContent = trimmed;
     Object.assign(text.style, {
-      fontSize: '12px',
+      fontSize: '11px',
+      fontWeight: '400',
       color: '#f0f0f0',
       whiteSpace: 'pre-wrap',
       lineHeight: '1.35'
@@ -650,6 +1001,31 @@
     if (event && typeof event.stopPropagation === 'function') {
       event.stopPropagation();
     }
+  };
+
+  const applyButtonAnimations = (button) => {
+    if (!button || button.dataset.fjfeAnimBound) return;
+    button.dataset.fjfeAnimBound = '1';
+    button.style.transition = 'transform 120ms ease, filter 160ms ease, box-shadow 160ms ease';
+    button.style.transformOrigin = 'center';
+    const press = (event) => {
+      stopPropagation(event);
+      button.style.transform = 'scale(0.96)';
+    };
+    const release = (event) => {
+      stopPropagation(event);
+      button.style.transform = '';
+    };
+    button.addEventListener('pointerdown', press);
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+      button.addEventListener(evt, release);
+    });
+    button.addEventListener('mouseenter', () => {
+      button.style.filter = 'brightness(1.08)';
+    });
+    button.addEventListener('mouseleave', () => {
+      button.style.filter = '';
+    });
   };
 
   const storageAvailable = () => Boolean(typeof chrome !== 'undefined' && chrome?.storage?.local);
@@ -1069,9 +1445,9 @@
 
   const formatQueueCountMarkup = (approved, total, rejected) => {
     const span = (value, color) => `<span style="color:${color}">${value}</span>`;
-    const approvedSpan = span(approved, '#4fdc8c');
+    const approvedSpan = span(approved, '#3aae66');
     const totalSpan = span(total, '#f6f6f6');
-    const rejectedSpan = span(rejected, '#ff7b7b');
+    const rejectedSpan = span(rejected, '#c04a4a');
     return `${approvedSpan}/${totalSpan} (${rejectedSpan})`;
   };
 
@@ -1090,10 +1466,20 @@
     });
     const total = queueLinks.length;
     countDisplay.innerHTML = formatQueueCountMarkup(approved, total, rejected);
-    if (percentIndicator) {
-      const decidedTotal = approved + rejected;
-      const percentValue = decidedTotal > 0 ? Math.round((approved / decidedTotal) * 100) : 0;
-      percentIndicator.textContent = `${percentValue}%`;
+    queueBarState = { approved, rejected, total };
+    if (total === 0) {
+      queueRemainingNote = '';
+      queueStatusNote = 'Import links from FJMeme to populate the queue.';
+    } else {
+      const remaining = Math.max(0, total - approved - rejected);
+      const errorRate = Math.round((rejected / total) * 100);
+      queueRemainingNote = `${remaining} REMAINING`;
+      queueStatusNote = `${errorRate}% ERROR RATE`;
+    }
+    if (typeof updateNoteForStateRef === 'function') {
+      updateNoteForStateRef();
+    } else if (noteElement) {
+      noteElement.textContent = queueStatusNote;
     }
   };
 
@@ -1162,21 +1548,57 @@
 
   const collectRateIdTargets = () => {
     if (!Array.isArray(queueLinks) || !queueLinks.length) {
+      console.debug('[BatchAssist] collectRateIdTargets: queue is empty or invalid.', {
+        hasQueueLinks: Array.isArray(queueLinks),
+        queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
+      });
       return [];
     }
     const seen = new Set();
     const targets = [];
+    const stats = {
+      total: queueLinks.length,
+      skippedRateActionAdded: 0,
+      skippedMissingRateId: 0,
+      skippedDuplicateRateId: 0,
+      added: 0
+    };
     queueLinks.forEach((entry, index) => {
       if (entry?.rateActionAdded) {
+        stats.skippedRateActionAdded += 1;
+        console.debug('[BatchAssist] collectRateIdTargets skip: rateActionAdded', {
+          index,
+          url: entry?.url,
+          status: entry?.status
+        });
         return;
       }
       const rateId = normalizeRateId(entry?.rateId);
-      if (!rateId || seen.has(rateId)) {
+      if (!rateId) {
+        stats.skippedMissingRateId += 1;
+        console.debug('[BatchAssist] collectRateIdTargets skip: missing rateId', {
+          index,
+          url: entry?.url,
+          status: entry?.status,
+          rawRateId: entry?.rateId
+        });
+        return;
+      }
+      if (seen.has(rateId)) {
+        stats.skippedDuplicateRateId += 1;
+        console.debug('[BatchAssist] collectRateIdTargets skip: duplicate rateId', {
+          index,
+          url: entry?.url,
+          status: entry?.status,
+          rateId
+        });
         return;
       }
       seen.add(rateId);
       targets.push({ rateId, index, url: typeof entry?.url === 'string' ? entry.url : '' });
+      stats.added += 1;
     });
+    console.debug('[BatchAssist] collectRateIdTargets summary.', stats);
     return targets;
   };
 
@@ -1232,7 +1654,7 @@
       padding: '10px 12px',
       color: '#f6f6f6',
       fontSize: '13px',
-      fontWeight: '600',
+      fontWeight: '400',
       lineHeight: '1.3',
       cursor: 'pointer',
       whiteSpace: 'normal',
@@ -1278,7 +1700,7 @@
         padding: '2px 6px',
         borderRadius: '999px',
         fontSize: '10px',
-        fontWeight: '700',
+        fontWeight: '500',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         background: '#1f1f1f',
@@ -1497,7 +1919,7 @@
       top: 'auto',
       right: PANEL_MARGIN + 'px',
       width: '180px',
-      padding: '12px',
+      padding: '0 12px 12px 12px',
       background: '#0d0d0d',
       color: '#f6f6f6',
       border: '1px solid #333',
@@ -1520,57 +1942,73 @@
       alignSelf: 'stretch',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       borderBottom: '1px solid #1f1f1f',
-      padding: '0',
-      gap: '8px',
-      minHeight: '32px',
-      cursor: 'move'
+      padding: '6px 0 4px 0',
+      minHeight: '26px',
+      gap: '8px'
     });
 
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
       cursor: 'move',
-      fontSize: '11px',
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: '#a5a5a5',
       userSelect: 'none',
-      flex: '1 1 auto',
       display: 'flex',
       alignItems: 'center',
-      height: '100%'
+      justifyContent: 'flex-start',
+      minHeight: '22px',
+      flex: '0 0 auto'
     });
-    dragHandle.textContent = 'DRAG';
+    const dragIcon = document.createElement('img');
+    dragIcon.src = getAssetUrl('icons/menu.png');
+    dragIcon.alt = '';
+    Object.assign(dragIcon.style, {
+      width: '20px',
+      height: '20px',
+      objectFit: 'contain',
+      opacity: '0.75'
+    });
+    dragHandle.append(dragIcon);
     dragHandle.title = 'Drag to reposition';
     dragHandle.addEventListener('pointerdown', startDrag);
 
+    const headerSpacer = document.createElement('div');
+    Object.assign(headerSpacer.style, {
+      flex: '1 1 auto'
+    });
+
     lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '28px',
-      height: '28px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
+      textAlign: 'center',
+      fontSize: '17px',
+      border: '1px solid #3a3a3a',
       borderRadius: '4px',
       cursor: 'pointer',
-      flex: '0 0 auto'
+      flex: '0 0 auto',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     });
+    applyButtonAnimations(lockButton);
+    lockButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
 
     const applyLockButtonUI = () => {
       if (!lockButton) return;
       if (panelLocked) {
-        lockButton.textContent = '🔒︎';
-        lockButton.style.background = '#142a14';
-        lockButton.style.color = '#66cc66';
-        lockButton.title = 'Locked to screen (toggle)';
-      } else {
         lockButton.textContent = '🔓︎';
-        lockButton.style.background = '#2a1515';
-        lockButton.style.color = '#dd6666';
-        lockButton.title = 'Moves with page (toggle)';
+        lockButton.style.background = 'linear-gradient(180deg, #5a5a5a 0%, #2d2d2d 55%, #1f1f1f 100%)';
+        lockButton.style.color = '#e0e0e0';
+        lockButton.style.borderColor = '#3a3a3a';
+        lockButton.title = 'Unlock position';
+      } else {
+        lockButton.textContent = '🔒︎';
+        lockButton.style.background = 'linear-gradient(180deg, #8c8c8c 0%, #6a6a6a 55%, #515151 100%)';
+        lockButton.style.color = '#1a1a1a';
+        lockButton.style.borderColor = '#7a7a7a';
+        lockButton.title = 'Lock position';
       }
     };
 
@@ -1608,93 +2046,62 @@
     instructorButton.tabIndex = -1;
     instructorButton.setAttribute('aria-hidden', 'true');
     Object.assign(instructorButton.style, {
-      width: '28px',
-      height: '28px',
+      width: '25px',
+      height: '25px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: '4px',
       border: '1px solid #155427',
-      background: '#1c7a36',
+      background: 'linear-gradient(180deg, #2f9a52 0%, #1c7a36 52%, #145428 100%)',
       cursor: 'pointer',
       flex: '0 0 auto',
       padding: '2px'
     });
-    instructorButton.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.35)';
+    instructorButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
     instructorButton.title = 'Copy instructor bot command';
     const instructorIcon = document.createElement('img');
     instructorIcon.src = getAssetUrl('icons/terminal.png');
     instructorIcon.alt = '';
     Object.assign(instructorIcon.style, {
-      width: '18px',
-      height: '18px',
+      width: '17px',
+      height: '17px',
       objectFit: 'contain'
     });
     instructorButton.appendChild(instructorIcon);
+    applyButtonAnimations(instructorButton);
 
     const crestButton = document.createElement('button');
     crestButton.type = 'button';
     crestButton.tabIndex = -1;
     crestButton.setAttribute('aria-hidden', 'true');
     Object.assign(crestButton.style, {
-      width: '28px',
-      height: '28px',
+      width: '25px',
+      height: '25px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: '4px',
       border: '1px solid #143462',
-      background: '#12438a',
+      background: 'linear-gradient(180deg, #2f67c0 0%, #12438a 52%, #0c2f61 100%)',
       cursor: 'pointer',
       flex: '0 0 auto',
       padding: '2px'
     });
-    crestButton.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.35)';
+    crestButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
     crestButton.title = 'Copy queue errors to clipboard';
     const crestIcon = document.createElement('img');
     crestIcon.src = getAssetUrl('icons/copy.png');
     crestIcon.alt = '';
     Object.assign(crestIcon.style, {
-      width: '18px',
-      height: '18px',
+      width: '17px',
+      height: '17px',
       objectFit: 'contain'
     });
     crestButton.appendChild(crestIcon);
+    applyButtonAnimations(crestButton);
 
-    const crestStatus = document.createElement('div');
-    Object.assign(crestStatus.style, {
-      width: '100%',
-      minHeight: '18px',
-      textAlign: 'center',
-      fontSize: '11px',
-      color: '#bdd6ff',
-      marginTop: '4px',
-      opacity: '0',
-      transition: 'opacity 0.2s ease',
-      pointerEvents: 'none'
-    });
-    crestStatus.textContent = '';
-
-    let crestStatusTimeout = null;
-    const showCrestCopyStatus = (message, tone = 'info') => {
-      const colors = {
-        info: '#bdd6ff',
-        success: '#9de7b2',
-        error: '#ffb0b0'
-      };
-      crestStatus.textContent = message || '';
-      crestStatus.style.color = colors[tone] || colors.info;
-      crestStatus.style.opacity = message ? '1' : '0';
-      if (crestStatusTimeout) {
-        clearTimeout(crestStatusTimeout);
-        crestStatusTimeout = null;
-      }
-      if (message) {
-        crestStatusTimeout = setTimeout(() => {
-          crestStatus.style.opacity = '0';
-        }, 3600);
-      }
-    };
+    let showStatusMessage = () => {};
 
     instructorButton.addEventListener('pointerdown', stopPropagation);
     instructorButton.addEventListener('click', async (event) => {
@@ -1702,7 +2109,7 @@
       event.preventDefault();
       const username = getModeratorUsername();
       if (!username) {
-        showCrestCopyStatus('Moderator username not detected.', 'error');
+        showStatusMessage('Moderator username not detected.', 'error');
         return;
       }
       const totalRates = Array.isArray(queueLinks) ? queueLinks.length : 0;
@@ -1710,9 +2117,9 @@
       const commandText = `!instructor ${username} ${totalRates} ${errorCount}`;
       const success = await copyTextToClipboard(commandText);
       if (success) {
-        showCrestCopyStatus('Instructor bot code copied.', 'success');
+        showStatusMessage('Instructor bot code copied.', 'success');
       } else {
-        showCrestCopyStatus('Unable to copy instructor code.', 'error');
+        showStatusMessage('Unable to copy instructor code.', 'error');
       }
     });
 
@@ -1722,7 +2129,7 @@
       event.preventDefault();
       const { text, count, rejectCount = 0, approveNoteCount = 0 } = buildQueueErrorClipboardPayload();
       if (!count) {
-        showCrestCopyStatus('No rejected rates or noted approvals to copy.', 'error');
+        showStatusMessage('No rejected rates or noted approvals to copy.', 'error');
         return;
       }
       const success = await copyTextToClipboard(text);
@@ -1737,16 +2144,15 @@
           const noun = approveNoteCount === 1 ? 'noted approval' : 'noted approvals';
           message = `Copied ${approveNoteCount} ${noun}.`;
         }
-        showCrestCopyStatus(message, 'success');
+        showStatusMessage(message, 'success');
       } else {
-        showCrestCopyStatus('Unable to copy entries to clipboard.', 'error');
+        showStatusMessage('Unable to copy entries to clipboard.', 'error');
       }
     });
 
     applyLockButtonUI();
-    header.append(dragHandle, instructorButton, crestButton, lockButton);
+    header.append(dragHandle, headerSpacer, instructorButton, crestButton, lockButton);
     panel.append(header);
-    panel.append(crestStatus);
 
     const setLoadingIndicatorVisible = (visible) => {
       if (!loadingIndicator) {
@@ -1756,6 +2162,7 @@
     };
 
     ensureSpinnerStyles();
+    ensureScrollbarStyles();
     loadingIndicator = document.createElement('div');
     Object.assign(loadingIndicator.style, {
       position: 'absolute',
@@ -1792,41 +2199,22 @@
     };
     updateLoadingIndicatorPosition();
 
-    percentIndicator = document.createElement('div');
-    Object.assign(percentIndicator.style, {
-      position: 'absolute',
-      right: '14px',
-      fontSize: '11px',
-      fontWeight: '600',
-      color: '#9d9d9d',
-      letterSpacing: '0.02em',
-      textAlign: 'right',
-      pointerEvents: 'none',
-      zIndex: '2'
-    });
-    percentIndicator.textContent = '0%';
-    panel.append(percentIndicator);
-    const updatePercentIndicatorPosition = () => {
-      const paddingTop = getPanelPaddingTop();
-      const headerHeight = header?.offsetHeight || 32;
-      percentIndicator.style.top = `${paddingTop + headerHeight + 3}px`;
-    };
-    updatePercentIndicatorPosition();
 
     const countWrapper = document.createElement('div');
     Object.assign(countWrapper.style, {
       width: '100%',
-      minHeight: '32px',
+      minHeight: '42px',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginTop: '-30px'
+      position: 'relative'
     });
 
     countDisplay = document.createElement('div');
     Object.assign(countDisplay.style, {
-      fontSize: '32px',
+      fontSize: '33px',
       fontWeight: '700',
+      fontFamily: "'Segoe UI Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif",
       lineHeight: '1',
       textAlign: 'center',
       width: '100%'
@@ -1838,28 +2226,115 @@
 
     const defaultNoteText = 'Import links from FJMeme to populate the queue.';
     const confirmNoteText = 'Are you sure?';
-    const note = document.createElement('div');
-    note.textContent = defaultNoteText;
-    Object.assign(note.style, {
-      fontSize: '11px',
-      textAlign: 'center',
-      color: '#9d9d9d'
+    const noteWrapper = document.createElement('div');
+    Object.assign(noteWrapper.style, {
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '4px',
+      marginTop: '-4px',
+      marginBottom: '0'
     });
-    panel.append(note);
+
+    const noteSingle = document.createElement('div');
+    noteSingle.textContent = defaultNoteText;
+    Object.assign(noteSingle.style, {
+      fontSize: '9px',
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      color: '#9a9a9a',
+      textAlign: 'center',
+      width: '100%',
+      lineHeight: '1.2'
+    });
+
+    const noteRemaining = document.createElement('div');
+    noteRemaining.textContent = '';
+    Object.assign(noteRemaining.style, {
+      fontSize: '9px',
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      color: '#9a9a9a',
+      textAlign: 'center',
+      width: '100%',
+      lineHeight: '1.2'
+    });
+
+    const progressBar = document.createElement('div');
+    Object.assign(progressBar.style, {
+      width: '100%',
+      height: '3px',
+      background: '#242424',
+      borderRadius: '999px',
+      overflow: 'visible',
+      position: 'relative',
+      boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 10px rgba(0, 0, 0, 0.7)'
+    });
+    const progressApproved = document.createElement('div');
+    Object.assign(progressApproved.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      bottom: '0',
+      width: '0%',
+      background: '#2b8a52',
+      boxShadow: '0 0 4px rgba(84, 240, 150, 0.28), 0 0 7px rgba(43, 138, 82, 0.22)',
+      filter: 'drop-shadow(0 0 2px rgba(84, 240, 150, 0.25))'
+    });
+    const progressRejected = document.createElement('div');
+    Object.assign(progressRejected.style, {
+      position: 'absolute',
+      right: '0',
+      top: '0',
+      bottom: '0',
+      width: '0%',
+      background: '#a03a3a',
+      boxShadow: '0 0 4px rgba(255, 110, 110, 0.28), 0 0 7px rgba(160, 58, 58, 0.22)',
+      filter: 'drop-shadow(0 0 2px rgba(255, 110, 110, 0.25))'
+    });
+    progressBar.append(progressApproved, progressRejected);
+
+    const noteError = document.createElement('div');
+    noteError.textContent = '';
+    Object.assign(noteError.style, {
+      fontSize: '9px',
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      color: '#9a9a9a',
+      textAlign: 'center',
+      width: '100%',
+      lineHeight: '1.2'
+    });
+
+    noteWrapper.append(noteSingle, noteRemaining, progressBar, noteError);
+    panel.append(noteWrapper);
+    noteElement = noteSingle;
+    noteWrapper.dataset.fjfeNoteWrapper = '1';
+    noteSingle.dataset.fjfeNoteSingle = '1';
+    noteRemaining.dataset.fjfeNoteRemaining = '1';
+    noteError.dataset.fjfeNoteError = '1';
+    progressBar.dataset.fjfeNoteBar = '1';
+    progressApproved.dataset.fjfeNoteApproved = '1';
+    progressRejected.dataset.fjfeNoteRejected = '1';
 
     const resetButton = document.createElement('button');
     resetButton.textContent = 'Clear Queue';
     Object.assign(resetButton.style, {
-      width: '100%',
-      padding: '6px 8px',
+      width: '80%',
+      padding: '5px 8px',
       fontSize: '14px',
-      fontWeight: '600',
+      fontWeight: '500',
       color: '#ffaa00',
       background: '#161616',
-      border: '1px solid #332200',
+      border: '2px solid #332200',
       borderRadius: '4px',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      alignSelf: 'center',
+      marginTop: '4px',
+      marginBottom: '-4px'
     });
+    applyButtonAnimations(resetButton);
     const confirmWrapper = document.createElement('div');
     Object.assign(confirmWrapper.style, {
       width: '100%',
@@ -1880,6 +2355,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(confirmClearButton);
 
     const confirmCancelButton = document.createElement('button');
     confirmCancelButton.textContent = "Don't Clear";
@@ -1894,6 +2370,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(confirmCancelButton);
 
     confirmWrapper.append(confirmClearButton, confirmCancelButton);
 
@@ -1902,17 +2379,20 @@
     acknowledgeButton.type = 'button';
     acknowledgeButton.textContent = 'Acknowledge';
     Object.assign(acknowledgeButton.style, {
-      width: '100%',
-      marginTop: '6px',
-      padding: '6px 8px',
+      width: '80%',
+      padding: '5px 8px',
       fontSize: '14px',
-      fontWeight: '600',
+      fontWeight: '500',
       color: '#66d0ff',
       background: '#101d29',
-      border: '1px solid #1f3650',
+      border: '2px solid #1f3650',
       borderRadius: '4px',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      alignSelf: 'center',
+      marginTop: '0',
+      marginBottom: '-4px'
     });
+    applyButtonAnimations(acknowledgeButton);
 
     const acknowledgeConfirmWrapper = document.createElement('div');
     Object.assign(acknowledgeConfirmWrapper.style, {
@@ -1934,6 +2414,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(acknowledgeConfirmYesButton);
 
     const acknowledgeConfirmNoButton = document.createElement('button');
     acknowledgeConfirmNoButton.textContent = 'No';
@@ -1948,6 +2429,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(acknowledgeConfirmNoButton);
 
     acknowledgeConfirmWrapper.append(acknowledgeConfirmYesButton, acknowledgeConfirmNoButton);
 
@@ -1962,33 +2444,69 @@
     const hasRejectedRates = () => Array.isArray(queueLinks) && queueLinks.some((entry) => entry?.status === QUEUE_STATUS.REJECTED);
 
     const updateNoteForState = () => {
-      if (!note) {
+      if (!noteSingle || !noteRemaining || !noteError || !progressBar || !progressApproved || !progressRejected) {
         return;
       }
       if (transientNoteMessage) {
-        note.textContent = transientNoteMessage;
+        noteSingle.textContent = transientNoteMessage;
+        noteSingle.style.display = 'block';
+        noteRemaining.style.display = 'none';
+        noteError.style.display = 'none';
+        progressBar.style.display = 'none';
         return;
       }
       if (acknowledgeInProgress && ackProgressMessage) {
-        note.textContent = ackProgressMessage;
+        noteSingle.textContent = ackProgressMessage;
+        noteSingle.style.display = 'block';
+        noteRemaining.style.display = 'none';
+        noteError.style.display = 'none';
+        progressBar.style.display = 'none';
         return;
       }
       if (acknowledgeConfirmVisible) {
+        noteSingle.style.display = 'block';
+        noteRemaining.style.display = 'none';
+        noteError.style.display = 'none';
+        progressBar.style.display = 'none';
         if (hasRejectedRates()) {
-          note.innerHTML = `${acknowledgeConfirmText}<br>Rejected rates are still present!`;
+          noteSingle.innerHTML = `${acknowledgeConfirmText}<br>Rejected rates are still present!`;
         } else if (hasMisattributedRates()) {
-          note.innerHTML = `${acknowledgeConfirmText}<br>Misattributed rates won't be acknowledged.`;
+          noteSingle.innerHTML = `${acknowledgeConfirmText}<br>Misattributed rates won't be acknowledged.`;
         } else {
-          note.textContent = acknowledgeConfirmText;
+          noteSingle.textContent = acknowledgeConfirmText;
         }
         return;
       }
       if (clearConfirmVisible) {
-        note.textContent = confirmNoteText;
+        noteSingle.textContent = confirmNoteText;
+        noteSingle.style.display = 'block';
+        noteRemaining.style.display = 'none';
+        noteError.style.display = 'none';
+        progressBar.style.display = 'none';
         return;
       }
-      note.textContent = defaultNoteText;
+      if (!queueBarState.total) {
+        noteSingle.textContent = queueStatusNote || defaultNoteText;
+        noteSingle.style.display = 'block';
+        noteRemaining.style.display = 'none';
+        noteError.style.display = 'none';
+        progressBar.style.display = 'none';
+        return;
+      }
+      noteSingle.style.display = 'none';
+      noteRemaining.style.display = 'block';
+      noteError.style.display = 'block';
+      progressBar.style.display = 'block';
+      noteRemaining.textContent = queueRemainingNote;
+      noteError.textContent = queueStatusNote;
+      const total = Math.max(1, queueBarState.total);
+      const approvedPct = Math.max(0, Math.min(100, (queueBarState.approved / total) * 100));
+      const rejectedPct = Math.max(0, Math.min(100, (queueBarState.rejected / total) * 100));
+      progressApproved.style.width = `${approvedPct}%`;
+      progressRejected.style.width = `${rejectedPct}%`;
     };
+
+    updateNoteForStateRef = updateNoteForState;
 
     const setTransientNoteMessage = (message, duration = 3600) => {
       if (transientNoteTimeout) {
@@ -2004,6 +2522,11 @@
         }, duration);
       }
       updateNoteForState();
+    };
+
+    showStatusMessage = (message, tone = 'info') => {
+      void tone;
+      setTransientNoteMessage(message, 3600);
     };
 
     const updateActionVisibility = () => {
@@ -2102,11 +2625,24 @@
       setTransientNoteMessage('');
       const token = readMemeToken();
       if (!token) {
+        console.warn('[BatchAssist] Acknowledge aborted: missing review token.', {
+          storageKey: MEME_TOKEN_STORAGE_KEY,
+          queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
+        });
         setTransientNoteMessage('Review token not found on funnyjunk.com (PT_memeToken).', 4800);
         return;
       }
       const targets = collectRateIdTargets();
+      console.info('[BatchAssist] Acknowledge requested.', {
+        targetCount: targets.length,
+        hasToken: Boolean(token),
+        tokenLength: token.length,
+        queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
+      });
       if (!targets.length) {
+        console.warn('[BatchAssist] Acknowledge aborted: no rate IDs found.', {
+          queueSample: Array.isArray(queueLinks) ? queueLinks.slice(0, 3) : null
+        });
         setTransientNoteMessage('No rate IDs available to acknowledge.', 3600);
         return;
       }
@@ -2125,18 +2661,55 @@
         const { rateId, url } = targets[index];
         ackProgressMessage = `Acknowledging ${index + 1}/${targets.length}...`;
         updateNoteForState();
+        console.debug('[BatchAssist] Acknowledge attempt starting.', {
+          index: index + 1,
+          total: targets.length,
+          rateId,
+          url
+        });
+        const startedAt = Date.now();
         const result = await sendAcknowledgeRequest(rateId, token);
+        const elapsedMs = Date.now() - startedAt;
         if (result.ok) {
           successCount += 1;
+          console.debug('[BatchAssist] Acknowledge attempt succeeded.', {
+            index: index + 1,
+            total: targets.length,
+            rateId,
+            url,
+            elapsedMs
+          });
         } else if (result.rateLimited) {
           rateLimited = true;
-          console.warn('[BatchAssist] Rate limit encountered while acknowledging rate', { rateId });
+          console.warn('[BatchAssist] Rate limit encountered while acknowledging rate', {
+            index: index + 1,
+            total: targets.length,
+            rateId,
+            url,
+            elapsedMs,
+            status: result.status,
+            bodyText: result.bodyText
+          });
           break;
         } else {
           failureCount += 1;
-          console.warn('[BatchAssist] Failed to acknowledge rate', { rateId, url, result });
+          console.warn('[BatchAssist] Failed to acknowledge rate', {
+            index: index + 1,
+            total: targets.length,
+            rateId,
+            url,
+            elapsedMs,
+            status: result.status,
+            bodyText: result.bodyText,
+            networkError: result.networkError,
+            error: result.error
+          });
         }
         if (index < targets.length - 1) {
+          console.debug('[BatchAssist] Acknowledge attempt waiting before next request.', {
+            nextIndex: index + 2,
+            delayMs: ACK_REQUEST_DELAY_MS
+          });
           await sleep(ACK_REQUEST_DELAY_MS);
         }
       }
@@ -2147,6 +2720,13 @@
       updateActionVisibility();
       updateButtonInteractivity();
       updateNoteForState();
+
+      console.info('[BatchAssist] Acknowledge flow complete.', {
+        total: targets.length,
+        successCount,
+        failureCount,
+        rateLimited
+      });
 
       if (queueLinks.length) {
         const nextLinks = queueLinks.map((entry) => {
@@ -2181,13 +2761,22 @@
       await runAcknowledgeFlow();
     });
 
-    panel.append(resetButton, confirmWrapper, acknowledgeButton, acknowledgeConfirmWrapper);
+    panel.append(acknowledgeButton, acknowledgeConfirmWrapper, resetButton, confirmWrapper);
     updateActionVisibility();
     updateButtonInteractivity();
 
+    const acknowledgeQueueDivider = document.createElement('div');
+    Object.assign(acknowledgeQueueDivider.style, {
+      width: '100%',
+      height: '1px',
+      background: '#232323',
+      margin: '1px 0 0 0'
+    });
+    panel.append(acknowledgeQueueDivider);
+
     historySection = document.createElement('div');
     historySection.style.width = '100%';
-    historySection.style.marginTop = '8px';
+    historySection.style.marginTop = '1px';
     historySection.style.position = 'relative';
     historySection.style.alignSelf = 'stretch';
 
@@ -2197,26 +2786,27 @@
     Object.assign(historyButton.style, {
       width: '100%',
       margin: '0',
-      height: '36px',
-      border: 'none',
+      height: '32px',
+      border: '1px solid #4a4a7a',
       borderRadius: '6px',
-      padding: '0 10px',
+      padding: '0 8px',
       cursor: 'pointer',
       boxShadow: '0 2px 6px #0006',
       outline: 'none',
-      background: '#61afff',
+      background: '#242436',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: '0px'
     });
+    applyButtonAnimations(historyButton);
 
     const makeHistoryArrowIcon = () => {
       const img = document.createElement('img');
       img.src = getAssetUrl('icons/down_icon.png');
       Object.assign(img.style, {
-        width: '24px',
-        height: '24px',
+        width: '12px',
+        height: '12px',
         objectFit: 'contain',
         pointerEvents: 'none',
         userSelect: 'none',
@@ -2227,14 +2817,16 @@
 
     const historyArrowLeft = makeHistoryArrowIcon();
     const historyArrowRight = makeHistoryArrowIcon();
+    historyArrowLeft.style.marginRight = '2px';
+    historyArrowRight.style.marginLeft = '2px';
 
     const historyLabel = document.createElement('span');
     historyLabel.textContent = 'QUEUE';
     Object.assign(historyLabel.style, {
-      fontWeight: '800',
-      letterSpacing: '0.18em',
-      fontSize: '11px',
-      color: '#191919',
+      fontWeight: '600',
+      letterSpacing: '0.12em',
+      fontSize: '10px',
+      color: '#d9d9e6',
       pointerEvents: 'none',
       userSelect: 'none',
       flex: '1 1 auto',
@@ -2246,23 +2838,8 @@
 
     historyButton.append(historyArrowLeft, historyLabel, historyArrowRight);
 
-    const pressHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = 'scale(0.96)';
-    };
-    const releaseHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = '';
-    };
-
-    historyButton.addEventListener('pointerdown', pressHistoryButton);
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
-      historyButton.addEventListener(type, releaseHistoryButton);
-    });
-
     historyButton.addEventListener('click', (event) => {
       stopPropagation(event);
-      releaseHistoryButton(event);
       toggleHistoryDropdown();
     });
 
@@ -2300,6 +2877,7 @@
     });
 
     const historyContentWrapper = document.createElement('div');
+    historyContentWrapper.className = 'fjfe-batchassist-scroll';
     Object.assign(historyContentWrapper.style, {
       maxHeight: String(HISTORY_VISIBLE_COUNT * 64) + 'px',
       overflowY: 'auto',
@@ -2343,10 +2921,30 @@
     }
     if (featureEnabled) {
       applyPanelPosition();
-      panel.style.display = 'flex';
+      const slickModule = window.fjTweakerModules && window.fjTweakerModules.slick;
+      if (slickModule && slickModule.openRateCounter) {
+        slickModule.openRateCounter(panel);
+      } else if (slickModule && slickModule.openTweakerMenu) {
+        panel.style.display = 'flex';
+        slickModule.openTweakerMenu(panel);
+      } else {
+        panel.style.display = 'flex';
+        if (window.fjfeSlickAnimateIn) {
+          window.fjfeSlickAnimateIn(panel);
+        }
+      }
     } else {
       setHistoryDropdownOpen(false);
-      panel.style.display = 'none';
+      const slickModule = window.fjTweakerModules && window.fjTweakerModules.slick;
+      if (slickModule && slickModule.closeRateCounter) {
+        slickModule.closeRateCounter(panel);
+      } else if (slickModule && slickModule.closeTweakerMenu) {
+        slickModule.closeTweakerMenu(panel).then(() => {
+          panel.style.display = 'none';
+        });
+      } else {
+        panel.style.display = 'none';
+      }
     }
   };
 
@@ -2376,17 +2974,24 @@
   };
 
   const applySetting = (value) => {
-    const nextEnabled = Boolean(value);
-    if (nextEnabled === featureEnabled) {
+    settingEnabled = Boolean(value);
+    if (settingEnabled) {
+      ensureAssistButton();
+      bindAssistRefresh();
+    } else {
+      removeAssistButton();
+    }
+    const nextActive = settingEnabled && toggleEnabled;
+    if (nextActive === featureEnabled) {
+      updatePanelVisibility();
       return;
     }
-    featureEnabled = nextEnabled;
+    featureEnabled = nextActive;
     markDocument(featureEnabled);
     if (featureEnabled) {
       ensurePanel();
       ensureInvalidDialogObserver();
-    }
-    if (!featureEnabled) {
+    } else {
       teardownInvalidDialogObserver();
     }
     updatePanelVisibility();
@@ -2406,8 +3011,16 @@
     }
     refreshQueueLinks();
     bindStorageListener();
-    applySetting(window.fjTweakerSettings?.[SETTING_KEY]);
+    toggleEnabled = loadToggleEnabled();
+    applySetting(getSettingValue());
     document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged, { passive: true });
+    window.addEventListener('storage', (event) => {
+      if (event.key === TOGGLE_STORAGE_KEY) {
+        toggleEnabled = event.newValue === '1';
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+      }
+    });
   };
 
   if (!window.fjTweakerModules) {

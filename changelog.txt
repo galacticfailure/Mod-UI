@@ -1,3 +1,16 @@
+1.2.0
+- Added BOS Radar
+- Added Review Assist
+- Added UFJP
+- Corrected boog and top poster ban times in ban calculator
+- Added top bar buttons for Batch Assist, Hunt Assist, and Rate Tracker
+- Added Student branch; comprised of Rate Tracker, ModJS Extras, and Right-Click FJEdu
+- Visual refresh of Mod UI settings menu, Batch Assist, Rate Tracker, and Hunt Assist
+- Changed upgrade descriptions in Clicker to better reflect what they do
+- Flag checker will now pull from different, more accurate, stats
+- Frame Viewer now only targets videos/gifs in content and comments
+- Boosted clicker substantially
+
 1.1.1
 - RIP Phaser branch
 - Adjusted note titles in Batch Assist

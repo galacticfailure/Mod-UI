@@ -1,0 +1,68 @@
+{
+  "manifest_version": 2,
+  "name": "FJFE",
+  "description": "Bunch of helper stuff.",
+  "version": "1.2.0",
+  "permissions": [
+    "storage",
+    "https://funnyjunk.com/*",
+    "https://*.funnyjunk.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://funnyjunk.com/*"
+      ],
+      "js": [
+        "content/apichk.js",
+        "content/info.js",
+        "content/sel.js",
+        "content/slick.js",
+        "content/modjs.js",
+        "content/framegif.js",
+        "content/ratetrack.js",
+        "content/revassist.js",
+        "content/sccustom.js",
+        "content/prev.js",
+        "content/textcheck.js",
+        "content/flagchk.js",
+        "content/warn.js",
+        "content/funnyjunkModifier.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "browser_action": {
+    "default_title": "FJ Feature Extender"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "fjfe-sushi@local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    "content/rate-limit-bridge.js",
+    "icons/copy.png",
+    "icons/down_icon.png",
+    "icons/fjinfo.png",
+    "icons/frames.png",
+    "icons/hehe.png",
+    "icons/icon128.png",
+    "icons/menu.png",
+    "icons/rate_lock.png",
+    "icons/ratetracker.png",
+    "icons/reset.png",
+    "icons/thumb.png",
+    "icons/warning.mp3",
+    "icons/warning.png"
+  ]
+}

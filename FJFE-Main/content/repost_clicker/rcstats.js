@@ -1,6 +1,7 @@
 (function(){
   const state = { anchorEl: null, openMenu: null, allMenus: [] };
   let purchasedGridEl = null;
+  const SCROLLBAR_STYLE_ID = 'fjfe-clicker-scrollbar-style';
 
   
   const K = {
@@ -12,6 +13,7 @@
     TIMES_PRESTIGED: 'fjfeStats_timesPrestiged',
     CLICK_BONUS_PCT: 'fjfeStats_clickBonusPct',
     PRESTIGE_BONUS_PCT: 'fjfeStats_prestigeBonusPct',
+    ALTS_SPENT: 'fjfeStats_altsSpent',
   };
 
   function loadInt(key, d=0) { try { const v = parseInt(localStorage.getItem(key), 10); return Number.isFinite(v) ? v : d; } catch(_) { return d; } }
@@ -79,6 +81,34 @@
 
   function formatCounter(n){ try { const t = window.fjfeClickerNumbers; return (t && t.formatCounter) ? t.formatCounter(n) : String(n); } catch(_) { return String(n); } }
 
+  function ensureClickerScrollbarStyles(){
+    try {
+      if (document.getElementById(SCROLLBAR_STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = SCROLLBAR_STYLE_ID;
+      style.textContent = `
+        .fjfe-clicker-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #6a6a6a transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-thumb {
+          background: #6a6a6a;
+          border-radius: 6px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+      `;
+      document.head && document.head.appendChild(style);
+    } catch(_) {}
+  }
+
   function closeMenu(){
     const hadAny = !!(state.allMenus && state.allMenus.length);
     state.allMenus.forEach(menu => {
@@ -104,22 +134,53 @@
     name.textContent = label;
     Object.assign(name.style, { fontWeight:'800', color:'#fff' });
     const val = document.createElement('div');
-    if (opts.thumb){
+    if (opts.thumb || opts.iconPath){
       const img = document.createElement('img');
-      img.src = chrome.runtime.getURL ? chrome.runtime.getURL('icons/clicker/thumb.png') : 'icons/clicker/thumb.png';
+      const iconPath = opts.iconPath || 'icons/clicker/thumb.png';
+      img.src = chrome.runtime.getURL ? chrome.runtime.getURL(iconPath) : iconPath;
   try { img.draggable = false; } catch(_) {}
   Object.assign(img.style, { width:'10px', height:'10px', verticalAlign:'middle', marginRight:'3px', filter:'drop-shadow(0 0 1px #0008)' });
       val.appendChild(img);
     }
-    const span = document.createElement('span');
-    span.textContent = value;
-    val.appendChild(span);
+    if (typeof opts.valueBuilder === 'function') {
+      opts.valueBuilder(val);
+    } else {
+      const span = document.createElement('span');
+      span.textContent = value;
+      if (opts.valueColor) span.style.color = opts.valueColor;
+      val.appendChild(span);
+    }
     Object.assign(val.style, { fontWeight:'600', color:'#ddd', display:'flex', alignItems:'center' });
     row.appendChild(name); row.appendChild(val);
     return row;
   }
 
+  function calcAltsProgress(allTimeThumbs){
+    try {
+      if (typeof allTimeThumbs !== 'bigint') return 0n;
+      const safeAllTime = allTimeThumbs < 0n ? 0n : allTimeThumbs;
+      const T = 1000000000000n;
+      const floorCbrt = (x) => {
+        if (x <= 0n) return 0n;
+        let lo = 0n, hi = 1n;
+        while (hi*hi*hi <= x) hi <<= 1n;
+        while (hi - lo > 1n) {
+          const mid = (lo + hi) >> 1n;
+          const m3 = mid*mid*mid;
+          if (m3 <= x) lo = mid; else hi = mid;
+        }
+        return lo;
+      };
+      const s = floorCbrt(safeAllTime / T);
+      const next = (s + 1n);
+      const threshold = next*next*next * T;
+      const remain = threshold - safeAllTime;
+      return { alts: s, remain: (remain > 0n ? remain : 0n) };
+    } catch(_) { return { alts: 0n, remain: 0n }; }
+  }
+
   function actuallyOpenMenu(){
+    ensureClickerScrollbarStyles();
     const anchorEl = state.anchorEl; if (!anchorEl) return;
     const rect = anchorEl.getBoundingClientRect();
     const vx = (window.scrollX||window.pageXOffset||0);
@@ -128,6 +189,7 @@
     Object.assign(menu.style, { position:'absolute', left:(rect.left+vx)+'px', top:(rect.bottom+vy)+'px', width:(rect.right-rect.left-2)+'px', minWidth:(rect.right-rect.left-2)+'px', height:'246px', background:'#181818', border:'1.5px solid #333', borderRadius:'0 0 10px 10px', boxSizing:'border-box', boxShadow:'0 8px 24px #0007', zIndex:2147483642, display:'flex', flexDirection:'column', alignItems:'stretch', justifyContent:'flex-start', padding:'0', color:'#fff', pointerEvents:'auto', overflow:'hidden', transform:'translateY(-12px)', opacity:0, transition:'transform 0.22s ease, opacity 0.18s ease' });
 
     const list = document.createElement('div');
+    list.classList.add('fjfe-clicker-scroll');
     Object.assign(list.style, { display:'flex', flexDirection:'column', overflowY:'auto', gap:'6px', width:'100%', height:'100%', padding:'8px' });
 
     
@@ -137,6 +199,10 @@
     const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
     const allTimeThumbs = loadInt(K.THUMBS_ALL_TIME, 0);
     const timesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
+    const allTimeThumbsBig = loadBigInt(K.THUMBS_ALL_TIME);
+    const altsProgress = calcAltsProgress(allTimeThumbsBig);
+    const altsSpent = loadBigInt(K.ALTS_SPENT);
+    const altsAvailable = altsProgress.alts > altsSpent ? (altsProgress.alts - altsSpent) : 0n;
     const clickBonusPct = loadInt(K.CLICK_BONUS_PCT, 0);
     const prestigeBonusPct = loadInt(K.PRESTIGE_BONUS_PCT, 0);
 
@@ -144,8 +210,30 @@
     list.appendChild(statRow('Thumbs per Click:', formatCounter(thumbsPerClickLast), { thumb:true }));
     list.appendChild(statRow('Thumbs from Clicking:', formatCounter(thumbsFromClicking), { thumb:true }));
     list.appendChild(statRow('Thumbs Generated:', formatCounter(thumbsGenerated), { thumb:true }));
-    list.appendChild(statRow('All-Time Thumbs Generated:', formatCounter(allTimeThumbs), { thumb:true }));
+    list.appendChild(statRow('All-Time Thumbs:', formatCounter(allTimeThumbs), { thumb:true }));
     list.appendChild(statRow('Times Prestiged:', String(timesPrestiged)));
+    list.appendChild(statRow('Alts:', '', {
+      iconPath:'icons/clicker/alts.png',
+      valueBuilder: (val) => {
+        const spanAvail = document.createElement('span');
+        spanAvail.dataset.role = 'alts-available';
+        spanAvail.textContent = formatBigAbbrev(altsAvailable);
+        spanAvail.style.color = '#5bb8ff';
+        const open = document.createElement('span');
+        open.textContent = ' (';
+        const spanTotal = document.createElement('span');
+        spanTotal.dataset.role = 'alts-total';
+        spanTotal.textContent = formatBigAbbrev(altsProgress.alts);
+        spanTotal.style.color = '#5bb8ff';
+        const close = document.createElement('span');
+        close.textContent = ')';
+        val.appendChild(spanAvail);
+        val.appendChild(open);
+        val.appendChild(spanTotal);
+        val.appendChild(close);
+      }
+    }));
+    list.appendChild(statRow('Thumbs to Next Alt:', formatBigAbbrev(altsProgress.remain), { thumb:true, valueColor:'#3f3' }));
 
     
     const sep = document.createElement('div'); sep.style.height='8px'; list.appendChild(sep);
@@ -188,6 +276,10 @@
         const thumbsGenerated = loadInt(K.THUMBS_GENERATED_TOTAL, 0);
         const allTimeThumbs = loadInt(K.THUMBS_ALL_TIME, 0);
         const timesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
+        const allTimeThumbsBig = loadBigInt(K.THUMBS_ALL_TIME);
+        const altsProgress = calcAltsProgress(allTimeThumbsBig);
+        const altsSpent = loadBigInt(K.ALTS_SPENT);
+        const altsAvailable = altsProgress.alts > altsSpent ? (altsProgress.alts - altsSpent) : 0n;
         const clickBonusPct = loadInt(K.CLICK_BONUS_PCT, 0);
         const prestigeBonusPct = loadInt(K.PRESTIGE_BONUS_PCT, 0);
         
@@ -201,9 +293,19 @@
         updateRow(3, formatCounter(thumbsGenerated));
         updateRow(4, formatCounter(allTimeThumbs));
         updateRow(5, String(timesPrestiged));
+        {
+          const row = children[6];
+          if (row) {
+            const avail = row.querySelector('[data-role="alts-available"]');
+            if (avail) avail.textContent = formatBigAbbrev(altsAvailable);
+            const total = row.querySelector('[data-role="alts-total"]');
+            if (total) total.textContent = formatBigAbbrev(altsProgress.alts);
+          }
+        }
+        updateRow(7, formatBigAbbrev(altsProgress.remain));
         
-        updateRow(7, String(clickBonusPct)+'%');
-        updateRow(8, String(prestigeBonusPct)+'%');
+        updateRow(9, String(clickBonusPct)+'%');
+        updateRow(10, String(prestigeBonusPct)+'%');
         
         refreshPurchasedGrid();
       } catch(_) {}
@@ -246,8 +348,37 @@
         const toURL = (p)=> (chrome.runtime && chrome.runtime.getURL) ? chrome.runtime.getURL(p) : p;
         
         let iconPath;
-        if (/^clickt\d+$/.test(def.id)) iconPath = 'icons/clicker/upgrades/clickup.png';
-        else {
+        if (def.icon) {
+          iconPath = def.icon;
+        } else if (/^mbt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/meme.png';
+        } else if (/^lct\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/lolcat.png';
+        } else if (/^gat\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/alpha.png';
+        } else if (/^fbt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/facebook.png';
+        } else if (/^tgt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/tragedy.png';
+        } else if (/^vgt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/vidya.png';
+        } else if (/^fgt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/foreign.png';
+        } else if (/^fjt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/fj.png';
+        } else if (/^spt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/special.png';
+        } else if (/^slott\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/spin.png';
+        } else if (def.currency === 'alts' && def.producerId) {
+          const baseName = (def.producerId || '')
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_');
+          iconPath = `icons/clicker/production/${baseName}.png`;
+        } else if (/^clickt\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/upgrades/clickup.png';
+        } else {
           const m = def.id.match(/^(.+?)t(\d+)$/);
           const producerId = m ? m[1] : '';
           iconPath = producerId ? `icons/clicker/upgrades/${producerId}up.png` : 'icons/clicker/upgrades/clickup.png';
@@ -288,10 +419,38 @@
               return s + '%';
             };
             
+            const getMemeTypePercentFromId = (upgradeId)=>{
+              const match = (upgradeId || '').match(/^mbt(\d+)$/);
+              if (!match) return 0;
+              const idx = parseInt(match[1], 10);
+              if (!Number.isFinite(idx) || idx <= 0) return 0;
+              if (idx <= 4) return 1;
+              if (idx <= 29) return 2;
+              if (idx <= 35) return 3;
+              if (idx <= 71) return 4;
+              return 5;
+            };
+            const getExtraMemeTypePercentFromId = (upgradeId)=>{
+              if (/^lct\d+$/.test(upgradeId)) return 2;
+              if (/^gat\d+$/.test(upgradeId)) return 3;
+              if (/^fbt\d+$/.test(upgradeId)) return 3;
+              if (/^tgt\d+$/.test(upgradeId)) return 4;
+              if (/^vgt\d+$/.test(upgradeId)) return 4;
+              if (/^fgt\d+$/.test(upgradeId)) return 4;
+              if (/^fjt\d+$/.test(upgradeId)) return 5;
+              if (/^spt\d+$/.test(upgradeId)) return 10;
+              return 0;
+            };
             let topLine = '';
             let midLine = '';
             if (def.id && /^clickt\d+$/.test(def.id)) {
               topLine = '+5% of RPS on click.';
+            } else if (def.id && /^mbt\d+$/.test(def.id)) {
+              const pct = getMemeTypePercentFromId(def.id);
+              topLine = pct > 0 ? `Increases RPS by +${pct}%.` : '';
+            } else if (def.id && /^(lct|gat|fbt|tgt|vgt|fgt|fjt|spt)\d+$/.test(def.id)) {
+              const pct = getExtraMemeTypePercentFromId(def.id);
+              topLine = pct > 0 ? `Increases RPS by +${pct}%.` : '';
             } else if (typeof def.inc === 'number') {
               const m = def.id.match(/^(.+?)t(\d+)$/);
               const producerId = m ? m[1] : '';
@@ -352,11 +511,14 @@
     reset(){ try { Object.values(K).forEach(k => { localStorage.removeItem(k); }); } catch(_) {} },
     prestigeReset(){
       try {
+        const grantScripts = localStorage.getItem('fjTweakerStoreUpgrade_met6') === '1';
+        const grantGroupChats = localStorage.getItem('fjTweakerStoreUpgrade_met7') === '1';
         
         const keepAllTime = loadInt(K.THUMBS_ALL_TIME, 0);
         const keepTimesClicked = loadInt(K.TIMES_CLICKED, 0);
         const keepTimesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
         const keepPrestigeBonus = loadInt(K.PRESTIGE_BONUS_PCT, 0);
+        const keepAltsSpent = loadBigInt(K.ALTS_SPENT);
 
         
         Object.values(K).forEach(k => { localStorage.removeItem(k); });
@@ -366,6 +528,7 @@
         setInt(K.TIMES_CLICKED, keepTimesClicked);
         setInt(K.TIMES_PRESTIGED, keepTimesPrestiged);
         setInt(K.PRESTIGE_BONUS_PCT, keepPrestigeBonus);
+        setBigInt(K.ALTS_SPENT, keepAltsSpent);
 
         
         try {
@@ -381,9 +544,17 @@
         try {
           const keys = Object.keys(localStorage);
           keys.forEach(k => {
-            if (k.startsWith('fjTweakerStoreUpgrade_')) localStorage.removeItem(k);
+            if (k.startsWith('fjTweakerStoreUpgrade_') && !k.startsWith('fjTweakerStoreUpgrade_altt')) {
+              localStorage.removeItem(k);
+            }
             if (k.startsWith('fjTweakerStoreMultiplier_')) localStorage.removeItem(k);
           });
+        } catch(_) {}
+
+        try {
+          if (window.fjfeRcStore && typeof window.fjfeRcStore.reapplyAltUpgradeMultipliers === 'function') {
+            window.fjfeRcStore.reapplyAltUpgradeMultipliers();
+          }
         } catch(_) {}
 
         
@@ -392,6 +563,11 @@
           keys.forEach(k => {
             if (k.startsWith('fjTweakerUpgradeNum_')) localStorage.removeItem(k);
           });
+        } catch(_) {}
+
+        try {
+          if (grantScripts) localStorage.setItem('fjTweakerUpgradeNum_script', '10');
+          if (grantGroupChats) localStorage.setItem('fjTweakerUpgradeNum_groupChat', '5');
         } catch(_) {}
 
         

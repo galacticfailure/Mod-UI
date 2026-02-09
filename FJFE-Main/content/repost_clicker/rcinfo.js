@@ -116,9 +116,10 @@
     Object.assign(name.style, {
       fontWeight: '800',
       fontSize: '14px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
+      whiteSpace: 'normal',
+      overflow: 'visible',
+      textOverflow: 'clip',
+      wordBreak: 'break-word',
       color: '#fff',
       maxWidth: '100%',
     });
@@ -278,16 +279,23 @@
     const hideCost = Boolean(data && data.hideCost);
     if (costContainer) costContainer.style.display = hideCost ? 'none' : 'flex';
     if (!hideCost) {
-      if (cost) cost.textContent = costTextVal;
+      if (cost) {
+        cost.textContent = costTextVal;
+        if (data && data.costColor) cost.style.color = String(data.costColor);
+        else cost.style.color = '';
+      }
       if (costIcon) {
         try {
-          const src = chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL('icons/clicker/thumb_down.png') : 'icons/clicker/thumb_down.png';
+          const hideIcon = Boolean(data && data.hideCostIcon);
+          costIcon.style.display = hideIcon ? 'none' : 'inline-block';
+          const iconPath = (data && data.costIcon) ? String(data.costIcon) : 'icons/clicker/thumb_down.png';
+          const src = chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL(iconPath) : iconPath;
           costIcon.src = src;
         } catch (_) {}
       }
     } else {
       if (cost) cost.textContent = '';
-      if (costIcon) costIcon.src = '';
+      if (costIcon) { costIcon.src = ''; costIcon.style.display = 'none'; }
     }
     
     if (topText || midText || ttText) {

@@ -7,6 +7,7 @@
    */
   const MODULE_KEY = 'hunt';
   const SETTING_KEY = 'huntAssist';
+  const SETTINGS_STORAGE_KEY = 'fjTweakerSettings';
   const PANEL_POSITION_KEY = 'fjTweakerHuntPanelPosition';
   const PANEL_LOCK_KEY = 'fjTweakerHuntPanelLocked';
   const PANEL_MARGIN = 12;
@@ -14,6 +15,13 @@
   const CUSTOM_CROSSHAIR_KEY = 'fjTweakerCustomCrosshair';
   const CROSSHAIR_SIZE_KEY = 'fjTweakerCrosshairSize';
   const DEFAULT_CROSSHAIR_SIZE = 40;
+  const ASSIST_WRAPPER_ID = 'fj-assist-buttons';
+  const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
+  const ASSIST_BUTTON_ID = 'fj-assist-hunt-button';
+  const ASSIST_BUTTON_ORDER = 3;
+  const ASSIST_ICON_PATH = 'icons/huntassist.png';
+  const TOGGLE_STORAGE_KEY = 'fjTweakerHuntAssistToggle';
+  const ASSIST_GLOW_COLOR = 'rgba(255, 96, 96, 0.75)';
 
   
   // Keep hunt-specific tooltip text from overflowing by forcing pre-line.
@@ -44,6 +52,8 @@
   };
 
   let featureEnabled = false;
+  let settingEnabled = false;
+  let toggleEnabled = false;
   let panel = null;
   let lockButton = null;
   let panelPosition = null;
@@ -56,15 +66,314 @@
   let currentHighlightedElement = null;
   let huntedLinks = [];
   let menuContentEl = null;
+  let menuListEl = null;
   let copyButton = null;
+  let copyStatusEl = null;
   let crosshairLocked = false;
+  let crosshairRafId = 0;
+  let pendingCrosshairPos = null;
   let lastCtrlPressTime = 0;
   const DOUBLE_TAP_DELAY = 400; 
   let customSubmenuEl = null;
   let customCrosshairSrc = null;
   let crosshairSize = DEFAULT_CROSSHAIR_SIZE;
+  let isCommentsPage = false;
 
   const resolve = (p) => (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
+
+  const getStoredSettings = () => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (_) {
+      return {};
+    }
+  };
+
+  const isAssistElementVisible = (el) => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (Number(style.opacity) === 0) return false;
+    if (el.offsetParent === null && style.position !== 'fixed') return false;
+    return true;
+  };
+
+  const findAssistSearchButton = () => {
+    const selectors = [
+      '.userbarBttn .fjse',
+      '.userbarBttn a[title*="search" i]',
+      '#sectionsNav .search-inner button.btn.btn-primary',
+      '#sectionsNav .search-inner button[type="submit"]',
+      '#sectionsNav .search-inner button',
+      'button#searchBtn',
+      'button.searchBtn',
+      'button.searchButton',
+      'button.search-btn',
+      'button#searchButton',
+      'input#searchBtn',
+      'input.searchBtn',
+      'form[action*="search"] button[type="submit"]',
+      'form[action*="search"] input[type="submit"]',
+      'form[action*="search"] button',
+      'button[type="submit"][aria-label*="search" i]',
+      'button[title*="search" i]',
+      'button[class*="search" i]',
+      'a[class*="search" i]',
+      'a[title*="search" i]',
+      'input[type="image"][alt*="search" i]'
+    ];
+    const candidates = [];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => candidates.push(el));
+    });
+    const visible = candidates.find(isAssistElementVisible);
+    if (visible) return visible;
+    return candidates[0] || null;
+  };
+
+  const isAssistCompressedAnchor = (searchButton) => (
+    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+  );
+
+  const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    if (!wrapper || !anchor) return;
+    const parent = anchor.parentElement;
+    if (!parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const rect = anchor.getBoundingClientRect();
+    const left = rect.right - parentRect.left + 4;
+    const top = rect.top - parentRect.top - 7;
+    wrapper.style.left = `${left}px`;
+    wrapper.style.top = `${top}px`;
+  };
+
+  const applyAssistButtonStyling = (button, searchButton) => {
+    if (!button || !searchButton) return;
+    const searchStyle = window.getComputedStyle(searchButton);
+    button.className = searchButton.className || '';
+    if (searchButton.getAttribute('style')) {
+      button.style.cssText = searchButton.getAttribute('style');
+    }
+    const sizeProps = ['width', 'height', 'minWidth', 'minHeight', 'padding', 'borderRadius', 'font', 'lineHeight'];
+    sizeProps.forEach((prop) => {
+      const value = searchStyle[prop];
+      if (value && value !== 'auto') {
+        button.style[prop] = value;
+      }
+    });
+    button.style.display = 'inline-flex';
+    button.style.alignItems = 'center';
+    button.style.justifyContent = 'center';
+    button.style.overflow = 'visible';
+    const size = parseFloat(searchStyle.height) || parseFloat(searchStyle.width) || 28;
+    button.style.width = `${size}px`;
+    button.style.height = `${size}px`;
+    button.style.minWidth = `${size}px`;
+    button.style.minHeight = `${size}px`;
+    button.style.padding = '0';
+    button.style.borderRadius = '6px';
+    button.style.backgroundRepeat = 'no-repeat';
+    button.style.backgroundPosition = 'center';
+    button.style.backgroundSize = '70% 70%';
+    if (!button.dataset.fjAssistBaseShadow) {
+      button.dataset.fjAssistBaseShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.12)';
+    }
+    if (!button.dataset.fjAssistBaseFilter) {
+      button.dataset.fjAssistBaseFilter = button.style.filter || '';
+    }
+    button.style.boxShadow = button.dataset.fjAssistBaseShadow;
+    button.style.transition = 'transform 120ms ease, box-shadow 180ms ease, filter 180ms ease';
+    button.style.transformOrigin = 'center';
+    if (!button.dataset.fjAssistPressBound) {
+      button.dataset.fjAssistPressBound = '1';
+      button.addEventListener('pointerdown', () => {
+        button.style.transform = 'scale(0.92)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        button.addEventListener(evt, () => {
+          button.style.transform = '';
+        });
+      });
+    }
+  };
+
+  const applyAssistIconButtonStyling = (button, searchButton, options) => {
+    if (!button) return;
+    applyAssistButtonStyling(button, searchButton);
+    if (!options) return;
+    if (options.background) button.style.backgroundColor = options.background;
+    if (options.border) button.style.borderColor = options.border;
+    if (options.color) button.style.color = options.color;
+    if (options.iconPath) {
+      button.style.backgroundImage = `url(${resolve(options.iconPath)})`;
+    }
+  };
+
+  const loadToggleEnabled = () => {
+    try {
+      return localStorage.getItem(TOGGLE_STORAGE_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const persistToggleEnabled = () => {
+    try {
+      if (toggleEnabled) {
+        localStorage.setItem(TOGGLE_STORAGE_KEY, '1');
+      } else {
+        localStorage.removeItem(TOGGLE_STORAGE_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const setAssistButtonActive = (active) => {
+    if (!assistButton) return;
+    const baseShadow = assistButton.dataset.fjAssistBaseShadow || '';
+    const baseFilter = assistButton.dataset.fjAssistBaseFilter || '';
+    if (active) {
+      assistButton.style.filter = 'brightness(1.2) saturate(1.1)';
+      assistButton.style.boxShadow = `0 0 10px ${ASSIST_GLOW_COLOR}, 0 0 18px ${ASSIST_GLOW_COLOR}, ${baseShadow}`;
+    } else {
+      assistButton.style.filter = baseFilter;
+      assistButton.style.boxShadow = baseShadow;
+    }
+  };
+
+  const ensureAssistWrapper = () => {
+    let wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const currentAnchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    let anchor = currentAnchor && isAssistElementVisible(currentAnchor) ? currentAnchor : null;
+    if (!anchor) {
+      anchor = findAssistSearchButton();
+    }
+    if (wrapper && anchor) {
+      if (currentAnchor && currentAnchor !== anchor) {
+        delete currentAnchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      anchor.dataset[ASSIST_ANCHOR_ATTR] = '1';
+      wrapper.style.marginLeft = '6px';
+      wrapper.style.position = 'relative';
+      wrapper.style.gap = '6px';
+      wrapper.style.zIndex = '999';
+      wrapper.style.overflow = 'visible';
+      wrapper.style.paddingRight = '12px';
+      wrapper.style.left = '';
+      wrapper.style.top = '';
+      anchor.insertAdjacentElement('afterend', wrapper);
+      return { wrapper, anchor };
+    }
+
+    const searchButton = anchor || findAssistSearchButton();
+    if (!searchButton) return null;
+
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.id = ASSIST_WRAPPER_ID;
+      Object.assign(wrapper.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        position: 'relative',
+        marginLeft: '6px',
+        verticalAlign: 'middle',
+        overflow: 'visible',
+        paddingRight: '12px'
+      });
+    }
+
+    const previousAnchor = currentAnchor || document.querySelector('[data-fj-assist-anchor="1"]');
+    if (previousAnchor && previousAnchor !== searchButton) {
+      delete previousAnchor.dataset[ASSIST_ANCHOR_ATTR];
+    }
+    searchButton.dataset[ASSIST_ANCHOR_ATTR] = '1';
+    wrapper.style.marginLeft = '6px';
+    wrapper.style.position = 'relative';
+    wrapper.style.gap = '6px';
+    wrapper.style.zIndex = '999';
+    wrapper.style.left = '';
+    wrapper.style.top = '';
+    searchButton.insertAdjacentElement('afterend', wrapper);
+
+    return { wrapper, anchor: searchButton };
+  };
+
+  let assistButton = null;
+  let assistRefreshScheduled = false;
+  let assistRefreshBound = false;
+
+  const scheduleAssistRefresh = () => {
+    if (assistRefreshScheduled) return;
+    assistRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      assistRefreshScheduled = false;
+      if (settingEnabled) {
+        ensureAssistButton();
+      }
+    });
+  };
+
+  const bindAssistRefresh = () => {
+    if (assistRefreshBound) return;
+    assistRefreshBound = true;
+    window.addEventListener('resize', scheduleAssistRefresh, { passive: true });
+    window.addEventListener('scroll', scheduleAssistRefresh, { passive: true });
+  };
+
+  const ensureAssistButton = () => {
+    const wrapperInfo = ensureAssistWrapper();
+    if (!wrapperInfo) return;
+    const { wrapper, anchor } = wrapperInfo;
+    if (!assistButton) {
+      assistButton = document.getElementById(ASSIST_BUTTON_ID);
+    }
+    if (!assistButton) {
+      assistButton = document.createElement('button');
+      assistButton.type = 'button';
+      assistButton.id = ASSIST_BUTTON_ID;
+      assistButton.setAttribute('aria-label', 'Hunt Assist');
+      assistButton.setAttribute('title', 'Hunt Assist');
+    }
+    applyAssistIconButtonStyling(assistButton, anchor, {
+      background: '#8b1d1d',
+      border: '#5c1010',
+      color: '#ffecec',
+      iconPath: ASSIST_ICON_PATH
+    });
+    assistButton.style.order = String(ASSIST_BUTTON_ORDER);
+    setAssistButtonActive(toggleEnabled);
+    if (!wrapper.contains(assistButton)) {
+      wrapper.appendChild(assistButton);
+    }
+    if (!assistButton.dataset.fjAssistBound) {
+      assistButton.dataset.fjAssistBound = '1';
+      assistButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleEnabled = !toggleEnabled;
+        persistToggleEnabled();
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+      });
+    }
+  };
+
+  const removeAssistButton = () => {
+    const wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const anchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    if (assistButton && assistButton.parentElement) {
+      assistButton.remove();
+    }
+    assistButton = null;
+    if (wrapper && wrapper.children.length === 0) {
+      if (anchor) {
+        delete anchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      wrapper.remove();
+    }
+  };
 
   const stopPropagation = (event) => {
     event.stopPropagation();
@@ -281,13 +590,14 @@
     });
     
     navigator.clipboard.writeText(text.trim()).then(() => {
-      
-      if (copyButton) {
-        const originalBg = copyButton.style.background;
-        copyButton.style.background = '#2a5a2a';
+      if (copyStatusEl) {
+        copyStatusEl.textContent = 'Hunt list copied!';
+        copyStatusEl.style.opacity = '1';
         setTimeout(() => {
-          copyButton.style.background = originalBg;
-        }, 200);
+          if (copyStatusEl) {
+            copyStatusEl.style.opacity = '0';
+          }
+        }, 1400);
       }
     }).catch(err => {
       console.error('Failed to copy:', err);
@@ -299,13 +609,22 @@
     if (!menuContentEl) return;
     
     menuContentEl.innerHTML = '';
-    
+    menuListEl = document.createElement('div');
+    Object.assign(menuListEl.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      maxHeight: '240px',
+      overflowY: 'auto',
+      paddingRight: '4px'
+    });
+    menuListEl.className = 'fjfe-hunt-scroll';
     
     const header = document.createElement('div');
     header.textContent = '!hunt';
     Object.assign(header.style, {
-      fontWeight: '700',
-      fontSize: '16px',
+      fontWeight: '600',
+      fontSize: '15px',
       marginBottom: '10px',
       color: '#f6f6f6'
     });
@@ -316,31 +635,48 @@
       const row = document.createElement('div');
       Object.assign(row.style, {
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
+        alignItems: 'stretch',
         gap: '6px',
-        marginBottom: '8px',
-        width: '100%'
+        marginBottom: '0',
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '8px 8px 8px 6px',
+        background: '#141414',
+        border: '1px solid #242424',
+        borderLeft: '4px solid #3b3b3b',
+        borderRadius: '4px'
       });
       
       
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = '✕';
       Object.assign(deleteBtn.style, {
-        width: '20px',
-        height: '20px',
+        width: '24px',
+        height: '24px',
         fontSize: '14px',
         fontWeight: '700',
         color: '#fff',
-        background: '#a11',
-        border: '1px solid #c33',
+        background: 'linear-gradient(180deg, #c13838 0%, #8d1c1c 55%, #5f0f0f 100%)',
+        border: '1px solid #7a2626',
         borderRadius: '3px',
         cursor: 'pointer',
         padding: '0',
-        lineHeight: '20px',
+        lineHeight: '24px',
         flexShrink: '0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
+      });
+      deleteBtn.style.transition = 'transform 120ms ease';
+      deleteBtn.style.transformOrigin = 'center';
+      deleteBtn.addEventListener('pointerdown', () => {
+        deleteBtn.style.transform = 'scale(0.94)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        deleteBtn.addEventListener(evt, () => {
+          deleteBtn.style.transform = '';
+        });
       });
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -360,7 +696,7 @@
       
       const linkLine = document.createElement('div');
       Object.assign(linkLine.style, {
-        fontSize: '13px',
+        fontSize: '12.5px',
         wordBreak: 'break-all',
         color: '#f6f6f6'
       });
@@ -388,19 +724,28 @@
       contentContainer.appendChild(linkLine);
       
       
+      const noteRow = document.createElement('div');
+      Object.assign(noteRow.style, {
+        display: 'flex',
+        alignItems: 'stretch',
+        gap: '6px'
+      });
+
       const noteInput = document.createElement('input');
       noteInput.type = 'text';
       noteInput.value = item.note;
       noteInput.placeholder = 'Add note...';
       Object.assign(noteInput.style, {
         width: '200px',
+        height: '24px',
         padding: '4px 6px',
         background: '#2b2a2a',
         color: '#fff',
         border: '1px solid #444',
         borderRadius: '3px',
-        fontSize: '12px',
-        fontFamily: 'inherit'
+        fontSize: '11.5px',
+        fontFamily: 'inherit',
+        boxSizing: 'border-box'
       });
       noteInput.addEventListener('input', (e) => {
         updateLinkNote(index, e.target.value);
@@ -412,12 +757,14 @@
         e.stopPropagation();
       });
       
-      contentContainer.appendChild(noteInput);
+      noteRow.appendChild(deleteBtn);
+      noteRow.appendChild(noteInput);
+      contentContainer.appendChild(noteRow);
       
-      row.appendChild(deleteBtn);
       row.appendChild(contentContainer);
-      menuContentEl.appendChild(row);
+      menuListEl.appendChild(row);
     });
+    menuContentEl.appendChild(menuListEl);
   };
 
   // Hide the native cursor while aim mode is active so only the crosshair is visible.
@@ -457,6 +804,7 @@
       opacity: '0.8',
       display: 'none',
       transform: 'translate(-50%, -50%)',
+      willChange: 'transform, left, top'
     });
     crosshairEl.draggable = false;
     crosshairEl.decoding = 'async';
@@ -470,9 +818,15 @@
 
   const updateCrosshairPosition = (e) => {
     if (!crosshairEl || !ctrlPressed) return;
-    
-    crosshairEl.style.left = e.clientX + 'px';
-    crosshairEl.style.top = e.clientY + 'px';
+
+    pendingCrosshairPos = { x: e.clientX, y: e.clientY };
+    if (crosshairRafId) return;
+    crosshairRafId = requestAnimationFrame(() => {
+      crosshairRafId = 0;
+      if (!crosshairEl || !ctrlPressed || !pendingCrosshairPos) return;
+      crosshairEl.style.left = pendingCrosshairPos.x + 'px';
+      crosshairEl.style.top = pendingCrosshairPos.y + 'px';
+    });
   };
 
   const showCrosshair = () => {
@@ -493,6 +847,11 @@
     if (crosshairEl) {
       crosshairEl.style.display = 'none';
     }
+    if (crosshairRafId) {
+      cancelAnimationFrame(crosshairRafId);
+      crosshairRafId = 0;
+    }
+    pendingCrosshairPos = null;
     document.body.classList.remove('fj-hunt-active');
     document.removeEventListener('mousemove', updateCrosshairPosition);
   };
@@ -848,7 +1207,7 @@
       top: '100%',
       right: '0',
       marginTop: '4px',
-      padding: '12px',
+      padding: '3px 12px 12px',
       background: '#0d0d0d',
       border: '1px solid #333',
       borderRadius: '6px',
@@ -912,6 +1271,16 @@
       fontSize: '13px',
       fontWeight: '600'
     });
+    resetBtn.style.transition = 'transform 120ms ease';
+    resetBtn.style.transformOrigin = 'center';
+    resetBtn.addEventListener('pointerdown', () => {
+      resetBtn.style.transform = 'scale(0.96)';
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+      resetBtn.addEventListener(evt, () => {
+        resetBtn.style.transform = '';
+      });
+    });
     resetBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       customCrosshairSrc = '';
@@ -942,6 +1311,16 @@
       cursor: 'pointer',
       fontSize: '13px',
       fontWeight: '600'
+    });
+    uploadBtn.style.transition = 'transform 120ms ease';
+    uploadBtn.style.transformOrigin = 'center';
+    uploadBtn.addEventListener('pointerdown', () => {
+      uploadBtn.style.transform = 'scale(0.96)';
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+      uploadBtn.addEventListener(evt, () => {
+        uploadBtn.style.transform = '';
+      });
     });
     
     
@@ -1085,13 +1464,13 @@
       top: 'auto',
       right: PANEL_MARGIN + 'px',
       width: '320px',
-      padding: '12px',
+      padding: '5px 12px 12px',
       background: '#0d0d0d',
       color: '#f6f6f6',
       border: '1px solid #333',
       borderRadius: '6px',
       boxShadow: '0 6px 18px rgba(0, 0, 0, 0.45)',
-      font: "500 15px 'Segoe UI', sans-serif",
+      font: "400 15px 'Segoe UI', sans-serif",
       display: 'none',
       flexDirection: 'column',
       alignItems: 'center',
@@ -1113,14 +1492,66 @@
       });
     });
 
+    const applyGlossyButtonStyle = (button, options = {}) => {
+      if (!button) return;
+      if (options.background) button.style.background = options.background;
+      if (options.borderColor) button.style.borderColor = options.borderColor;
+      if (options.color) button.style.color = options.color;
+      button.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    };
+
+    const applyClickAnimation = (button) => {
+      if (!button || button.dataset.fjClickAnimBound) return;
+      button.dataset.fjClickAnimBound = '1';
+      button.style.transition = button.style.transition
+        ? `${button.style.transition}, transform 120ms ease`
+        : 'transform 120ms ease';
+      button.style.transformOrigin = 'center';
+      button.addEventListener('pointerdown', () => {
+        button.style.transform = 'scale(0.94)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        button.addEventListener(evt, () => {
+          button.style.transform = '';
+        });
+      });
+    };
+
+    const ensureHuntScrollbarStyles = () => {
+      if (document.getElementById('fjfe-hunt-scrollbar-style')) {
+        return;
+      }
+      const style = document.createElement('style');
+      style.id = 'fjfe-hunt-scrollbar-style';
+      style.textContent = `
+        .fjfe-hunt-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #6a6a6a transparent;
+        }
+        .fjfe-hunt-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .fjfe-hunt-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .fjfe-hunt-scroll::-webkit-scrollbar-thumb {
+          background: #6a6a6a;
+          border-radius: 6px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+      `;
+      document.head?.appendChild(style);
+    };
+
     const header = document.createElement('div');
     Object.assign(header.style, {
       alignSelf: 'stretch',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      justifyContent: 'flex-start',
       borderBottom: '1px solid #1f1f1f',
-      padding: '2px 0',
+      padding: '0 0 2px',
       gap: '8px',
       position: 'relative'
     });
@@ -1128,40 +1559,58 @@
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
       cursor: 'move',
-      fontSize: '11px',
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: '#a5a5a5',
+      width: '24px',
+      height: '24px',
       userSelect: 'none',
-      flex: '1 1 auto'
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: '0 0 auto',
+      marginRight: 'auto'
     });
-    dragHandle.textContent = 'Drag';
+    const dragImg = document.createElement('img');
+    dragImg.src = resolve('icons/menu.png');
+    dragImg.alt = '';
+    Object.assign(dragImg.style, {
+      width: '18px',
+      height: '18px',
+      objectFit: 'contain',
+      opacity: '0.85'
+    });
+    dragHandle.appendChild(dragImg);
     dragHandle.addEventListener('pointerdown', startDrag);
 
     lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
-      fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      fontSize: '17px',
+      border: '1px solid #3a3a3a',
       borderRadius: '4px',
       cursor: 'pointer',
-      flex: '0 0 auto'
+      flex: '0 0 auto',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     });
+    lockButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    applyClickAnimation(lockButton);
     const applyLockButtonUI = () => {
       if (!lockButton) return;
       if (panelLocked) {
-        lockButton.textContent = '🔒︎';
-        lockButton.style.background = '#142a14';
-        lockButton.style.color = '#66cc66';
-        lockButton.title = 'Locked to screen (toggle)';
-      } else {
         lockButton.textContent = '🔓︎';
-        lockButton.style.background = '#2a1515';
-        lockButton.style.color = '#dd6666';
-        lockButton.title = 'Moves with page (toggle)';
+        lockButton.style.background = 'linear-gradient(180deg, #5a5a5a 0%, #2d2d2d 55%, #1f1f1f 100%)';
+        lockButton.style.color = '#e0e0e0';
+        lockButton.style.borderColor = '#3a3a3a';
+        lockButton.title = 'Unlock position';
+      } else {
+        lockButton.textContent = '🔒︎';
+        lockButton.style.background = 'linear-gradient(180deg, #8c8c8c 0%, #6a6a6a 55%, #515151 100%)';
+        lockButton.style.color = '#1a1a1a';
+        lockButton.style.borderColor = '#7a7a7a';
+        lockButton.title = 'Lock position';
       }
     };
     lockButton.addEventListener('click', (e) => {
@@ -1195,19 +1644,24 @@
 
     copyButton = document.createElement('button');
     Object.assign(copyButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
       fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      border: '1px solid #143462',
       borderRadius: '4px',
       cursor: 'pointer',
       flex: '0 0 auto',
-      background: '#1a3a5a',
+      background: 'linear-gradient(180deg, #2f67c0 0%, #12438a 52%, #0c2f61 100%)',
       color: '#6af',
-      padding: '0'
+      padding: '0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     });
+    copyButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    applyClickAnimation(copyButton);
     copyButton.title = 'Copy to clipboard';
     
     const copyImg = document.createElement('img');
@@ -1215,7 +1669,6 @@
     copyImg.style.width = '16px';
     copyImg.style.height = '16px';
     copyImg.style.display = 'block';
-    copyImg.style.margin = 'auto';
     copyButton.appendChild(copyImg);
     
     copyButton.addEventListener('click', (e) => {
@@ -1226,23 +1679,25 @@
 
     const clearAllButton = document.createElement('button');
     Object.assign(clearAllButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
       fontSize: '16px',
       fontWeight: '700',
-      border: '1px solid #2f2f2f',
+      border: '1px solid #7a2626',
       borderRadius: '4px',
       cursor: 'pointer',
       flex: '0 0 auto',
-      background: '#a11',
+      background: 'linear-gradient(180deg, #c13838 0%, #8d1c1c 55%, #5f0f0f 100%)',
       color: '#fff',
       padding: '0',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'
     });
+    clearAllButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    applyClickAnimation(clearAllButton);
     clearAllButton.textContent = '✕';
     clearAllButton.title = 'Clear all';
     
@@ -1262,8 +1717,8 @@
           fallback.type = 'button';
           fallback.textContent = 'i';
           Object.assign(fallback.style, {
-            width: '24px',
-            height: '24px',
+            width: '25px',
+            height: '25px',
             font: "600 14px 'Segoe UI', sans-serif",
             color: '#f8f8f8',
             background: '#202020',
@@ -1274,6 +1729,7 @@
           });
           return fallback;
         })();
+    applyClickAnimation(infoButton);
     
     
     const infoText = 'Hold ctrl to activate crosshair\nDouble-tap ctrl to toggle crosshair\nClick anywhere on red highlights to add to list';
@@ -1295,20 +1751,22 @@
     const customButton = document.createElement('button');
     customButton.id = 'fj-hunt-custom-button';
     Object.assign(customButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
       fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      border: '1px solid #3a3a3a',
       borderRadius: '4px',
       cursor: 'pointer',
       flex: '0 0 auto',
-      background: '#2a2a2a',
+      background: 'linear-gradient(180deg, #4a4a4a 0%, #2b2b2b 55%, #1f1f1f 100%)',
       color: '#f6f6f6',
       padding: '0',
       position: 'relative'
     });
+    customButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    applyClickAnimation(customButton);
     customButton.title = 'Custom crosshair settings';
     
     const customImg = document.createElement('img');
@@ -1325,7 +1783,25 @@
       toggleCustomSubmenu();
     });
 
-    header.append(dragHandle, infoButton, customButton, clearAllButton, copyButton, lockButton);
+    copyStatusEl = document.createElement('div');
+    Object.assign(copyStatusEl.style, {
+      flex: '1 1 auto',
+      minWidth: '0',
+      textAlign: 'center',
+      fontSize: '11px',
+      fontWeight: '300',
+      color: '#7fe07f',
+      opacity: '0',
+      transition: 'opacity 0.2s ease',
+      pointerEvents: 'none',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      marginTop: '4px'
+    });
+    copyStatusEl.textContent = '';
+
+    header.append(dragHandle, copyStatusEl, infoButton, customButton, clearAllButton, copyButton, lockButton);
     panel.append(header);
 
     
@@ -1340,6 +1816,7 @@
       gap: '8px',
       width: '100%'
     });
+    ensureHuntScrollbarStyles();
     panel.append(menuContentEl);
 
     updateMenuContent();
@@ -1357,14 +1834,24 @@
     
     if (featureEnabled) {
       applyPanelPosition();
-      if (slickModule && slickModule.openHuntAssist) {
-        slickModule.openHuntAssist(panel);
+      if (slickModule && slickModule.openRateCounter) {
+        slickModule.openRateCounter(panel);
+      } else if (slickModule && slickModule.openTweakerMenu) {
+        panel.style.display = 'flex';
+        slickModule.openTweakerMenu(panel);
       } else {
         panel.style.display = 'flex';
+        if (window.fjfeSlickAnimateIn) {
+          window.fjfeSlickAnimateIn(panel);
+        }
       }
     } else {
-      if (slickModule && slickModule.closeHuntAssist) {
-        slickModule.closeHuntAssist(panel);
+      if (slickModule && slickModule.closeRateCounter) {
+        slickModule.closeRateCounter(panel);
+      } else if (slickModule && slickModule.closeTweakerMenu) {
+        slickModule.closeTweakerMenu(panel).then(() => {
+          panel.style.display = 'none';
+        });
       } else {
         panel.style.display = 'none';
       }
@@ -1372,7 +1859,7 @@
   };
 
   const getSettingValue = () => {
-    const settings = window.fjTweakerSettings || {};
+    const settings = window.fjTweakerSettings || getStoredSettings();
     if (typeof settings[SETTING_KEY] === 'undefined') {
       return false;
     }
@@ -1380,7 +1867,28 @@
   };
 
   const applySetting = (enabled) => {
-    featureEnabled = enabled;
+    settingEnabled = Boolean(enabled);
+
+    if (settingEnabled) {
+      ensureAssistButton();
+      bindAssistRefresh();
+    } else {
+      removeAssistButton();
+    }
+
+    const nextActive = settingEnabled && toggleEnabled;
+    if (nextActive === featureEnabled) {
+      if (isCommentsPage) {
+        updatePanelVisibility();
+      }
+      return;
+    }
+
+    featureEnabled = nextActive;
+
+    if (!isCommentsPage) {
+      return;
+    }
 
     ensurePanel();
     updatePanelVisibility();
@@ -1449,21 +1957,30 @@
   };
 
   const init = () => {
-    
-    const isCommentsPage = /^https?:\/\/(?:www\.)?funnyjunk\.com\/sfw_mod\/comments\//.test(window.location.href);
+    isCommentsPage = /^https?:\/\/(?:www\.)?funnyjunk\.com\/sfw_mod\/comments\//.test(window.location.href);
+    toggleEnabled = loadToggleEnabled();
+    applySetting(getSettingValue());
+    document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged);
+    window.addEventListener('storage', (event) => {
+      if (event.key === TOGGLE_STORAGE_KEY) {
+        toggleEnabled = event.newValue === '1';
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+      }
+    });
+
     if (!isCommentsPage) {
       return;
     }
-    
-    
+
     loadHuntedLinks();
     loadCustomCrosshair();
-    
+    createCrosshair();
+
     ensurePanel();
-    applySetting(getSettingValue());
-    document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged);
-    
-    
+    if (menuContentEl) {
+      updateMenuContent();
+    }
     window.addEventListener('storage', handleStorageChange);
   };
 

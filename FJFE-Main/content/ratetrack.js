@@ -7,6 +7,7 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'ratetrack';
   const SETTING_KEY = 'trackRates';
+  const SETTINGS_STORAGE_KEY = 'fjTweakerSettings';
   const COUNT_KEY = 'fjTweakerRateCounter';
   const COUNT_EDITS_KEY = 'fjTweakerRateCountEdits';
   const PANEL_POSITION_KEY = 'fjTweakerRatePanelPosition';
@@ -41,7 +42,15 @@
   const RATE_LIMIT_BRIDGE_DATA_KEY = 'fjfeRateLimitConfig';
   const RATE_LIMIT_EVENT_ORIGIN_PAGE = 'page';
   const MISRATE_WARNING_ICON = 'icons/warning.png';
+  const SCROLLBAR_STYLE_ID = 'fjfe-ratetrack-scrollbar-style';
   const MISRATE_ALLOWED_MULTI_CATEGORIES = new Set(['spicy', 'meta']);
+  const ASSIST_WRAPPER_ID = 'fj-assist-buttons';
+  const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
+  const ASSIST_BUTTON_ID = 'fj-assist-ratetrack-button';
+  const ASSIST_BUTTON_ORDER = 4;
+  const ASSIST_ICON_PATH = 'icons/ratetracker.png';
+  const TOGGLE_STORAGE_KEY = 'fjTweakerRateTrackToggle';
+  const ASSIST_GLOW_COLOR = 'rgba(255, 215, 64, 0.75)';
   const RATE_REVIEW_ACTIONS_CLASS = 'fjfe-rate-review-actions';
   const RATE_REVIEW_FLAG_LABEL = 'Flaggable';
   const RATE_REVIEW_REASON_GROUPS = [
@@ -87,6 +96,300 @@
       }
     } catch (_) {}
     return resourcePath;
+  };
+
+  const getStoredSettings = () => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (_) {
+      return {};
+    }
+  };
+
+  const isAssistElementVisible = (el) => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (Number(style.opacity) === 0) return false;
+    if (el.offsetParent === null && style.position !== 'fixed') return false;
+    return true;
+  };
+
+  const findAssistSearchButton = () => {
+    const selectors = [
+      '.userbarBttn .fjse',
+      '.userbarBttn a[title*="search" i]',
+      '#sectionsNav .search-inner button.btn.btn-primary',
+      '#sectionsNav .search-inner button[type="submit"]',
+      '#sectionsNav .search-inner button',
+      'button#searchBtn',
+      'button.searchBtn',
+      'button.searchButton',
+      'button.search-btn',
+      'button#searchButton',
+      'input#searchBtn',
+      'input.searchBtn',
+      'form[action*="search"] button[type="submit"]',
+      'form[action*="search"] input[type="submit"]',
+      'form[action*="search"] button',
+      'button[type="submit"][aria-label*="search" i]',
+      'button[title*="search" i]',
+      'button[class*="search" i]',
+      'a[class*="search" i]',
+      'a[title*="search" i]',
+      'input[type="image"][alt*="search" i]'
+    ];
+    const candidates = [];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => candidates.push(el));
+    });
+    const visible = candidates.find(isAssistElementVisible);
+    if (visible) return visible;
+    return candidates[0] || null;
+  };
+
+  const isAssistCompressedAnchor = (searchButton) => (
+    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+  );
+
+  const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    if (!wrapper || !anchor) return;
+    const parent = anchor.parentElement;
+    if (!parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const rect = anchor.getBoundingClientRect();
+    const left = rect.right - parentRect.left + 4;
+    const top = rect.top - parentRect.top - 7;
+    wrapper.style.left = `${left}px`;
+    wrapper.style.top = `${top}px`;
+  };
+
+  const applyAssistButtonStyling = (button, searchButton) => {
+    if (!button || !searchButton) return;
+    const searchStyle = window.getComputedStyle(searchButton);
+    button.className = searchButton.className || '';
+    if (searchButton.getAttribute('style')) {
+      button.style.cssText = searchButton.getAttribute('style');
+    }
+    const sizeProps = ['width', 'height', 'minWidth', 'minHeight', 'padding', 'borderRadius', 'font', 'lineHeight'];
+    sizeProps.forEach((prop) => {
+      const value = searchStyle[prop];
+      if (value && value !== 'auto') {
+        button.style[prop] = value;
+      }
+    });
+    button.style.display = 'inline-flex';
+    button.style.alignItems = 'center';
+    button.style.justifyContent = 'center';
+    button.style.overflow = 'visible';
+    const size = parseFloat(searchStyle.height) || parseFloat(searchStyle.width) || 28;
+    button.style.width = `${size}px`;
+    button.style.height = `${size}px`;
+    button.style.minWidth = `${size}px`;
+    button.style.minHeight = `${size}px`;
+    button.style.padding = '0';
+    button.style.borderRadius = '6px';
+    button.style.backgroundRepeat = 'no-repeat';
+    button.style.backgroundPosition = 'center';
+    button.style.backgroundSize = '70% 70%';
+    if (!button.dataset.fjAssistBaseShadow) {
+      button.dataset.fjAssistBaseShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.12)';
+    }
+    if (!button.dataset.fjAssistBaseFilter) {
+      button.dataset.fjAssistBaseFilter = button.style.filter || '';
+    }
+    button.style.boxShadow = button.dataset.fjAssistBaseShadow;
+    button.style.transition = 'transform 120ms ease, box-shadow 180ms ease, filter 180ms ease';
+    button.style.transformOrigin = 'center';
+    if (!button.dataset.fjAssistPressBound) {
+      button.dataset.fjAssistPressBound = '1';
+      button.addEventListener('pointerdown', () => {
+        button.style.transform = 'scale(0.92)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        button.addEventListener(evt, () => {
+          button.style.transform = '';
+        });
+      });
+    }
+  };
+
+  const applyAssistIconButtonStyling = (button, searchButton, options) => {
+    if (!button) return;
+    applyAssistButtonStyling(button, searchButton);
+    if (!options) return;
+    if (options.background) button.style.backgroundColor = options.background;
+    if (options.border) button.style.borderColor = options.border;
+    if (options.color) button.style.color = options.color;
+    if (options.iconPath) {
+      button.style.backgroundImage = `url(${getResourceUrl(options.iconPath)})`;
+    }
+  };
+
+  const loadToggleEnabled = () => {
+    try {
+      return localStorage.getItem(TOGGLE_STORAGE_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const persistToggleEnabled = () => {
+    try {
+      if (toggleEnabled) {
+        localStorage.setItem(TOGGLE_STORAGE_KEY, '1');
+      } else {
+        localStorage.removeItem(TOGGLE_STORAGE_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const setAssistButtonActive = (active) => {
+    if (!assistButton) return;
+    const baseShadow = assistButton.dataset.fjAssistBaseShadow || '';
+    const baseFilter = assistButton.dataset.fjAssistBaseFilter || '';
+    if (active) {
+      assistButton.style.filter = 'brightness(1.2) saturate(1.1)';
+      assistButton.style.boxShadow = `0 0 10px ${ASSIST_GLOW_COLOR}, 0 0 18px ${ASSIST_GLOW_COLOR}, ${baseShadow}`;
+    } else {
+      assistButton.style.filter = baseFilter;
+      assistButton.style.boxShadow = baseShadow;
+    }
+  };
+
+  const ensureAssistWrapper = () => {
+    let wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const currentAnchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    let anchor = currentAnchor && isAssistElementVisible(currentAnchor) ? currentAnchor : null;
+    if (!anchor) {
+      anchor = findAssistSearchButton();
+    }
+    if (wrapper && anchor) {
+      if (currentAnchor && currentAnchor !== anchor) {
+        delete currentAnchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      anchor.dataset[ASSIST_ANCHOR_ATTR] = '1';
+      wrapper.style.marginLeft = '6px';
+      wrapper.style.position = 'relative';
+      wrapper.style.gap = '6px';
+      wrapper.style.zIndex = '999';
+      wrapper.style.overflow = 'visible';
+      wrapper.style.paddingRight = '12px';
+      wrapper.style.left = '';
+      wrapper.style.top = '';
+      anchor.insertAdjacentElement('afterend', wrapper);
+      return { wrapper, anchor };
+    }
+
+    const searchButton = anchor || findAssistSearchButton();
+    if (!searchButton) return null;
+
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.id = ASSIST_WRAPPER_ID;
+      Object.assign(wrapper.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        position: 'relative',
+        marginLeft: '6px',
+        verticalAlign: 'middle',
+        overflow: 'visible',
+        paddingRight: '12px'
+      });
+    }
+
+    const previousAnchor = currentAnchor || document.querySelector('[data-fj-assist-anchor="1"]');
+    if (previousAnchor && previousAnchor !== searchButton) {
+      delete previousAnchor.dataset[ASSIST_ANCHOR_ATTR];
+    }
+    searchButton.dataset[ASSIST_ANCHOR_ATTR] = '1';
+    wrapper.style.marginLeft = '6px';
+    wrapper.style.position = 'relative';
+    wrapper.style.gap = '6px';
+    wrapper.style.zIndex = '999';
+    wrapper.style.left = '';
+    wrapper.style.top = '';
+    searchButton.insertAdjacentElement('afterend', wrapper);
+
+    return { wrapper, anchor: searchButton };
+  };
+
+  let assistButton = null;
+  let assistRefreshScheduled = false;
+  let assistRefreshBound = false;
+
+  const scheduleAssistRefresh = () => {
+    if (assistRefreshScheduled) return;
+    assistRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      assistRefreshScheduled = false;
+      if (settingEnabled) {
+        ensureAssistButton();
+      }
+    });
+  };
+
+  const bindAssistRefresh = () => {
+    if (assistRefreshBound) return;
+    assistRefreshBound = true;
+    window.addEventListener('resize', scheduleAssistRefresh, { passive: true });
+    window.addEventListener('scroll', scheduleAssistRefresh, { passive: true });
+  };
+
+  const ensureAssistButton = () => {
+    const wrapperInfo = ensureAssistWrapper();
+    if (!wrapperInfo) return;
+    const { wrapper, anchor } = wrapperInfo;
+    if (!assistButton) {
+      assistButton = document.getElementById(ASSIST_BUTTON_ID);
+    }
+    if (!assistButton) {
+      assistButton = document.createElement('button');
+      assistButton.type = 'button';
+      assistButton.id = ASSIST_BUTTON_ID;
+      assistButton.setAttribute('aria-label', 'Rate Tracker');
+      assistButton.setAttribute('title', 'Rate Tracker');
+    }
+    applyAssistIconButtonStyling(assistButton, anchor, {
+      background: '#8a6a00',
+      border: '#6b5200',
+      color: '#fff6d1',
+      iconPath: ASSIST_ICON_PATH
+    });
+    assistButton.style.order = String(ASSIST_BUTTON_ORDER);
+    setAssistButtonActive(toggleEnabled);
+    if (!wrapper.contains(assistButton)) {
+      wrapper.appendChild(assistButton);
+    }
+    if (!assistButton.dataset.fjAssistBound) {
+      assistButton.dataset.fjAssistBound = '1';
+      assistButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleEnabled = !toggleEnabled;
+        persistToggleEnabled();
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+      });
+    }
+  };
+
+  const removeAssistButton = () => {
+    const wrapper = document.getElementById(ASSIST_WRAPPER_ID);
+    const anchor = document.querySelector('[data-fj-assist-anchor="1"]');
+    if (assistButton && assistButton.parentElement) {
+      assistButton.remove();
+    }
+    assistButton = null;
+    if (wrapper && wrapper.children.length === 0) {
+      if (anchor) {
+        delete anchor.dataset[ASSIST_ANCHOR_ATTR];
+      }
+      wrapper.remove();
+    }
   };
 
   const isNsfwPath = () => {
@@ -213,14 +516,14 @@
       width: 'auto',
       maxWidth: '180px',
       alignSelf: 'flex-start',
-      minHeight: '26px',
-      padding: '6px 12px',
-      borderRadius: '999px',
+      minHeight: '28px',
+      padding: '5px 10px',
+      borderRadius: '4px',
       border: `1px solid ${border}`,
       background,
       color: text,
       fontSize: '11px',
-      fontWeight: '700',
+      fontWeight: '600',
       letterSpacing: '0.06em',
       textTransform: 'uppercase',
       cursor: 'pointer',
@@ -262,11 +565,11 @@
     }
     button.dataset.fjfeSelected = selected ? '1' : '0';
     if (selected) {
-      button.style.background = '#7a1111';
-      button.style.borderColor = '#b82525';
+      button.style.background = '#5a1b1b';
+      button.style.borderColor = '#8a2a2a';
     } else {
-      button.style.background = '#1a1a1a';
-      button.style.borderColor = '#333';
+      button.style.background = '#2a2a2a';
+      button.style.borderColor = '#3a3a3a';
     }
   };
 
@@ -343,14 +646,14 @@
     button.type = 'button';
     button.textContent = label;
     Object.assign(button.style, {
-      padding: '6px 12px',
-      borderRadius: '999px',
-      border: '1px solid #333',
-      background: '#1a1a1a',
+      padding: '5px 9px',
+      borderRadius: '6px',
+      border: '1px solid #3a3a3a',
+      background: '#2a2a2a',
       color: '#f6f6f6',
-      fontSize: '12px',
-      fontWeight: '600',
-      letterSpacing: '0.05em',
+      fontSize: '10px',
+      fontWeight: '500',
+      letterSpacing: '0.04em',
       textTransform: 'uppercase',
       cursor: 'pointer',
       transition: 'background 0.15s ease, border-color 0.15s ease',
@@ -528,7 +831,16 @@
   };
 
   const RATE_REVIEW_LEGACY_LABELS = ['acknowledge', 'stop review'];
-  const isBatchAssistEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist);
+  const BATCH_ASSIST_TOGGLE_KEY = 'fjTweakerBatchAssistToggle';
+  let batchAssistToggleEnabled = false;
+  const loadBatchAssistToggle = () => {
+    try {
+      return localStorage.getItem(BATCH_ASSIST_TOGGLE_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  };
+  const isBatchAssistEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist) && batchAssistToggleEnabled;
 
 
   const getSelectedReasonLabelsByRow = (rowIndex) => {
@@ -930,9 +1242,9 @@
     };
 
     const skipButton = createRateReviewPrimaryButton('Skip Rate', {
-      background: '#123d73',
-      hover: '#185092',
-      border: '#1f5fb3'
+      background: '#1b3559',
+      hover: '#24426b',
+      border: '#2b4a75'
     });
     skipButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -941,9 +1253,9 @@
     });
 
     const approveButton = createRateReviewPrimaryButton('Approve Rate', {
-      background: '#0f4b1d',
-      hover: '#146329',
-      border: '#1c7f36'
+      background: '#1a3a22',
+      hover: '#21462a',
+      border: '#2b5d35'
     });
     approveButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -962,18 +1274,18 @@
     approveNoteButton.type = 'button';
     approveNoteButton.tabIndex = -1;
     approveNoteButton.setAttribute('aria-label', 'Approve with note');
-    approveNoteButton.dataset.fjfeBaseBackground = '#0f4b1d';
-    approveNoteButton.dataset.fjfeBaseBorder = '#1c7f36';
-    approveNoteButton.dataset.fjfeHoverBackground = '#146329';
+    approveNoteButton.dataset.fjfeBaseBackground = '#1a3a22';
+    approveNoteButton.dataset.fjfeBaseBorder = '#2b5d35';
+    approveNoteButton.dataset.fjfeHoverBackground = '#21462a';
     approveNoteButton.dataset.fjfeLockedHighlight = '0';
     Object.assign(approveNoteButton.style, {
       width: '38px',
       height: '38px',
       minWidth: '38px',
       minHeight: '38px',
-      borderRadius: '999px',
-      border: '1px solid #1c7f36',
-      background: '#0f4b1d',
+      borderRadius: '4px',
+      border: '1px solid #2b5d35',
+      background: '#1a3a22',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -1017,6 +1329,16 @@
     });
 
     approveRow.append(approveButton, approveNoteButton);
+
+    const queueBannerRow = document.createElement('div');
+    queueBannerRow.dataset.fjfeQueueBannerRow = '1';
+    Object.assign(queueBannerRow.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      width: 'fit-content',
+      maxWidth: '100%'
+    });
     const syncApproveNoteButtonSize = () => {
       try {
         const rect = approveButton.getBoundingClientRect();
@@ -1049,17 +1371,17 @@
     });
 
     const approveNoteInput = document.createElement('textarea');
-    approveNoteInput.placeholder = 'Add approval note...';
+    approveNoteInput.placeholder = 'Insert note...';
     approveNoteInput.rows = 2;
     Object.assign(approveNoteInput.style, {
       width: '100%',
-      minHeight: '48px',
+      minHeight: '28px',
       resize: 'vertical',
       background: '#111',
       color: '#f6f6f6',
       borderRadius: '10px',
-      border: '1px solid #2d4d34',
-      padding: '8px 10px',
+      border: '1px solid #333',
+      padding: '5px 8px',
       fontSize: '13px',
       fontFamily: 'inherit'
     });
@@ -1089,9 +1411,9 @@
       justifyContent: 'flex-start'
     });
     const approveNoteDoneButton = createRateReviewPrimaryButton('Done', {
-      background: '#0f4b1d',
-      hover: '#146329',
-      border: '#1c7f36'
+      background: '#1a3a22',
+      hover: '#21462a',
+      border: '#2b5d35'
     });
     approveNoteDoneButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1129,6 +1451,9 @@
     approveNoteButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof collapseRateReviewReasons === 'function') {
+        collapseRateReviewReasons();
+      }
       setApproveNoteExpanded(!approveNoteExpanded);
       if (approveNoteExpanded) {
         approveNoteInput.focus();
@@ -1136,21 +1461,50 @@
     });
 
     const rejectButton = createRateReviewPrimaryButton('Reject Rate', {
-      background: '#5b1111',
-      hover: '#7b1717',
-      border: '#9c2020'
+      background: '#4a1414',
+      hover: '#5a1b1b',
+      border: '#7a2525'
     });
 
     const reasonsWrapper = document.createElement('div');
     Object.assign(reasonsWrapper.style, {
       display: 'none',
       flexDirection: 'column',
-      gap: '8px',
-      paddingTop: '6px',
+      gap: '6px',
+      paddingTop: '4px',
       marginBottom: '12px',
       width: '100%',
       maxWidth: '880px'
     });
+
+    const createInlineDivider = (label) => {
+      const divider = document.createElement('div');
+      Object.assign(divider.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%'
+      });
+      const text = document.createElement('div');
+      text.textContent = label;
+      Object.assign(text.style, {
+        fontSize: '8px',
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        color: '#c2c2c2',
+        fontWeight: '600'
+      });
+      const line = document.createElement('div');
+      Object.assign(line.style, {
+        flex: '1 1 auto',
+        height: '1px',
+        background: '#2b2b2b'
+      });
+      divider.append(text, line);
+      return divider;
+    };
+
+    reasonsWrapper.appendChild(createInlineDivider('Missed Rating'));
 
     const reasonButtons = [];
     const getReasonButtons = () => reasonButtons;
@@ -1160,7 +1514,7 @@
       Object.assign(row.style, {
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '6px',
+        gap: '4px',
         width: '100%',
         justifyContent: 'flex-start'
       });
@@ -1175,6 +1529,8 @@
     rateReviewReasonButtons = reasonButtons;
     rateReviewActionsWrapper = wrapper;
 
+    reasonsWrapper.appendChild(createInlineDivider('Rating Note'));
+
     const noteContainer = document.createElement('div');
     Object.assign(noteContainer.style, {
       display: 'flex',
@@ -1187,13 +1543,13 @@
     noteInput.rows = 2;
     Object.assign(noteInput.style, {
       width: '100%',
-      minHeight: '54px',
+      minHeight: '32px',
       resize: 'vertical',
       background: '#111',
       color: '#f6f6f6',
       borderRadius: '10px',
       border: '1px solid #333',
-      padding: '8px 10px',
+      padding: '5px 8px',
       fontSize: '13px',
       fontFamily: 'inherit'
     });
@@ -1226,9 +1582,9 @@
       marginTop: '2px'
     });
     const doneButton = createRateReviewPrimaryButton('Done', {
-      background: '#5b1111',
-      hover: '#7b1717',
-      border: '#9c2020'
+      background: '#4a1414',
+      hover: '#5a1b1b',
+      border: '#7a2525'
     });
     doneButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1262,13 +1618,40 @@
     rejectButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof collapseRateReviewApproveNote === 'function') {
+        collapseRateReviewApproveNote();
+      }
       setRejectExpanded(!rejectExpanded);
     });
 
-    wrapper.append(skipButton, approveRow, approveNoteWrapper, rejectButton, reasonsWrapper);
+    rateReviewPrimaryButtons = [skipButton, approveButton, rejectButton];
+    wrapper.append(skipButton, approveRow, rejectButton, queueBannerRow, approveNoteWrapper, reasonsWrapper);
     heading.appendChild(wrapper);
+    if (!window.fjfeSlickAnimateIn && !wrapper.dataset.fjfeBatchSlideIn) {
+      wrapper.dataset.fjfeBatchSlideIn = '1';
+      wrapper.style.opacity = '0';
+      wrapper.style.transform = 'translateX(12px)';
+      wrapper.style.transition = 'opacity 180ms ease, transform 200ms ease';
+      requestAnimationFrame(() => {
+        wrapper.style.opacity = '1';
+        wrapper.style.transform = 'translateX(0)';
+      });
+    }
+    if (window.fjfeSlickAnimateIn) {
+      window.fjfeSlickAnimateIn(wrapper);
+    } else if (window.fjTweakerModules?.slick?.openTweakerMenu) {
+      window.fjTweakerModules.slick.openTweakerMenu(wrapper);
+    }
     if (queueBannerElement) {
       positionQueueBanner(queueBannerElement);
+    }
+  };
+
+  const refreshBatchAssistEnhancements = () => {
+    if (isBatchAssistEnabled()) {
+      ensureRateReviewEnhancements();
+    } else {
+      removeRateReviewEnhancements();
     }
   };
 
@@ -1277,11 +1660,7 @@
     if (!detail || typeof detail.batchAssist === 'undefined') {
       return;
     }
-    if (detail.batchAssist) {
-      ensureRateReviewEnhancements();
-    } else {
-      removeRateReviewEnhancements();
-    }
+    refreshBatchAssistEnhancements();
   };
 
   const startRateReviewObserver = () => {
@@ -1587,10 +1966,20 @@
   }) || null;
 
   let queueBannerElement = null;
+  let rateReviewPrimaryButtons = [];
 
   const positionQueueBanner = (banner) => {
     if (!banner) {
       return;
+    }
+    if (rateReviewActionsWrapper && rateReviewActionsWrapper.querySelector) {
+      const bannerRow = rateReviewActionsWrapper.querySelector('[data-fjfe-queue-banner-row="1"]');
+      if (bannerRow) {
+        if (banner.parentElement !== bannerRow) {
+          bannerRow.appendChild(banner);
+        }
+        return;
+      }
     }
     const wrapper = rateReviewActionsWrapper;
     if (wrapper && wrapper.parentElement) {
@@ -1620,17 +2009,23 @@
     }
     const banner = document.createElement('div');
     Object.assign(banner.style, {
-      width: '100%',
-      padding: '10px 14px',
-      background: '#4b1515',
-      border: '1px solid #812222',
-      borderRadius: '8px',
-      color: '#ffe0e0',
+      width: 'auto',
+      minWidth: '240px',
+      padding: '8px 16px',
+      background: '#0f2b1c',
+      border: '1px solid #39ff9f',
+      borderRadius: '4px',
+      color: '#dfffea',
       fontWeight: '600',
+      fontSize: '15px',
+      fontFamily: "'Segoe UI', sans-serif",
       textAlign: 'center',
       marginTop: '6px',
-      marginBottom: '12px',
-      display: 'none'
+      marginBottom: '8px',
+      display: 'none',
+      alignSelf: 'flex-start',
+      boxShadow: '0 0 8px rgba(57, 255, 159, 0.55), 0 0 18px rgba(57, 255, 159, 0.35), inset 0 0 6px rgba(57, 255, 159, 0.3)',
+      textShadow: '0 0 6px rgba(57, 255, 159, 0.65)'
     });
     banner.textContent = '';
     queueBannerElement = banner;
@@ -1641,6 +2036,15 @@
   const showQueueBanner = (message) => {
     const banner = ensureQueueBannerElement();
     banner.textContent = message || '';
+    if (rateReviewPrimaryButtons.length) {
+      const widths = rateReviewPrimaryButtons
+        .map((btn) => btn.getBoundingClientRect?.().width || btn.offsetWidth || 0)
+        .filter((value) => Number.isFinite(value) && value > 0);
+      const maxWidth = widths.length ? Math.max(...widths) : 0;
+      banner.style.width = maxWidth > 0 ? `${Math.round(maxWidth)}px` : 'auto';
+    } else {
+      banner.style.width = 'auto';
+    }
     banner.style.display = 'block';
   };
 
@@ -1797,7 +2201,14 @@
           window.location.href = nextUrl;
         }
       } else {
-        if (actionType === RATE_QUEUE_ACTION.REJECT && typeof collapseRateReviewReasons === 'function') {
+        if (result?.success) {
+          if (typeof collapseRateReviewReasons === 'function') {
+            collapseRateReviewReasons();
+          }
+          if (typeof collapseRateReviewApproveNote === 'function') {
+            collapseRateReviewApproveNote();
+          }
+        } else if (actionType === RATE_QUEUE_ACTION.REJECT && typeof collapseRateReviewReasons === 'function') {
           collapseRateReviewReasons();
         }
         const bannerMessage = result?.success ? QUEUE_COMPLETE_MESSAGE : QUEUE_EMPTY_MESSAGE;
@@ -1835,7 +2246,9 @@
     };
   };
 
-  let featureEnabled = true;
+  let featureEnabled = false;
+  let settingEnabled = false;
+  let toggleEnabled = false;
   let counterValue = 0;
   let countEditsEnabled = false;
   let panel = null;
@@ -1905,9 +2318,6 @@
     rateCopyStatus.textContent = message || '';
     rateCopyStatus.style.color = colors[tone] || colors.info;
     rateCopyStatus.style.opacity = hasMessage ? '1' : '0';
-    rateCopyStatus.style.display = hasMessage ? 'block' : 'none';
-    rateCopyStatus.style.marginTop = hasMessage ? '4px' : '0';
-    rateCopyStatus.style.minHeight = hasMessage ? '18px' : '0';
     if (rateCopyStatusTimeout) {
       clearTimeout(rateCopyStatusTimeout);
       rateCopyStatusTimeout = null;
@@ -1916,9 +2326,6 @@
       rateCopyStatusTimeout = setTimeout(() => {
         if (rateCopyStatus) {
           rateCopyStatus.style.opacity = '0';
-          rateCopyStatus.style.display = 'none';
-          rateCopyStatus.style.marginTop = '0';
-          rateCopyStatus.style.minHeight = '0';
           rateCopyStatus.textContent = '';
         }
       }, 3600);
@@ -2521,11 +2928,12 @@
       textAlign: 'left',
       background: '#181818',
       border: '1px solid #262626',
+      borderLeft: '4px solid #262626',
       borderRadius: '6px',
       padding: '8px',
       color: '#f6f6f6',
       fontSize: '13px',
-      fontWeight: '600',
+      fontWeight: '400',
       lineHeight: '1.3',
       cursor: 'pointer',
       whiteSpace: 'normal',
@@ -2562,7 +2970,7 @@
         tag.textContent = label;
         Object.assign(tag.style, {
           fontSize: '12px',
-          fontWeight: '600',
+          fontWeight: '400',
           padding: '2px 6px',
           borderRadius: '4px',
           border: '1px solid #2f2f2f',
@@ -2885,7 +3293,7 @@
 
   // Default to enabled unless the settings object explicitly disables us
   const getSettingValue = () => {
-    const settings = window.fjTweakerSettings || {};
+    const settings = window.fjTweakerSettings || getStoredSettings();
     if (typeof settings[SETTING_KEY] === 'undefined') {
       return true;
     }
@@ -2939,7 +3347,7 @@
 
   // Helper for applying new values, optionally skipping persistence during init
   const setCounter = (value, shouldPersist = true) => {
-    counterValue = value;
+    counterValue = Math.max(0, Number(value) || 0);
     updateDisplay();
     if (shouldPersist) {
       persistCounter();
@@ -2969,7 +3377,10 @@
       return null;
     }
     const parsed = parseInt(trimmed, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    return parsed < 0 ? null : parsed;
   };
 
   // Visual feedback for invalid manual entries
@@ -3326,6 +3737,58 @@
     window.addEventListener('pointercancel', finishDrag);
   };
 
+  const applyButtonAnimations = (button) => {
+    if (!button || button.dataset.fjfeAnimBound) return;
+    button.dataset.fjfeAnimBound = '1';
+    button.style.transition = 'transform 120ms ease, filter 160ms ease, box-shadow 160ms ease';
+    button.style.transformOrigin = 'center';
+    const press = (event) => {
+      stopPropagation(event);
+      button.style.transform = 'scale(0.96)';
+    };
+    const release = (event) => {
+      stopPropagation(event);
+      button.style.transform = '';
+    };
+    button.addEventListener('pointerdown', press);
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+      button.addEventListener(evt, release);
+    });
+    button.addEventListener('mouseenter', () => {
+      button.style.filter = 'brightness(1.08)';
+    });
+    button.addEventListener('mouseleave', () => {
+      button.style.filter = '';
+    });
+  };
+
+  const ensureScrollbarStyles = () => {
+    if (document.getElementById(SCROLLBAR_STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = SCROLLBAR_STYLE_ID;
+    style.textContent = `
+      .fjfe-ratetrack-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #6a6a6a transparent;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar-thumb {
+        background: #6a6a6a;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+    `;
+    document.head?.appendChild(style);
+  };
+
   // Lazily constructs the floating panel UI plus its controls
   const ensurePanel = () => {
     if (panel) {
@@ -3342,7 +3805,7 @@
       top: 'auto',
       right: PANEL_MARGIN + 'px',
       width: '180px',
-      padding: '12px',
+      padding: '0 12px 12px 12px',
       background: '#0d0d0d',
       color: '#f6f6f6',
       border: '1px solid #333',
@@ -3367,21 +3830,31 @@
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottom: '1px solid #1f1f1f',
-      padding: '2px 0',
+      padding: '6px 0 4px 0',
+      minHeight: '26px',
       gap: '8px'
     });
 
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
       cursor: 'move',
-      fontSize: '11px',
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: '#a5a5a5',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      minHeight: '22px',
       userSelect: 'none',
-      flex: '1 1 auto'
+      flex: '0 0 auto'
     });
-    dragHandle.textContent = 'Drag';
+    const dragIcon = document.createElement('img');
+    dragIcon.src = getResourceUrl('icons/menu.png');
+    dragIcon.alt = '';
+    Object.assign(dragIcon.style, {
+      width: '20px',
+      height: '20px',
+      objectFit: 'contain',
+      opacity: '0.75'
+    });
+    dragHandle.append(dragIcon);
     dragHandle.addEventListener('pointerdown', startDrag);
 
     const copyButton = document.createElement('button');
@@ -3389,29 +3862,30 @@
     copyButton.tabIndex = -1;
     copyButton.setAttribute('aria-hidden', 'true');
     Object.assign(copyButton.style, {
-      width: '28px',
-      height: '28px',
+      width: '25px',
+      height: '25px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: '4px',
       border: '1px solid #143462',
-      background: '#12438a',
+      background: 'linear-gradient(180deg, #2f67c0 0%, #12438a 52%, #0c2f61 100%)',
       cursor: 'pointer',
       flex: '0 0 auto',
       padding: '2px'
     });
-    copyButton.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.35)';
-    copyButton.title = 'Copy rate snapshot (coming soon)';
+    copyButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    copyButton.title = 'Copy timecode';
     const copyIcon = document.createElement('img');
     copyIcon.src = getResourceUrl('icons/copy.png');
     copyIcon.alt = '';
     Object.assign(copyIcon.style, {
-      width: '18px',
-      height: '18px',
+      width: '17px',
+      height: '17px',
       objectFit: 'contain'
     });
     copyButton.appendChild(copyIcon);
+    applyButtonAnimations(copyButton);
     copyButton.addEventListener('pointerdown', stopPropagation);
     copyButton.addEventListener('click', async (event) => {
       stopPropagation(event);
@@ -3432,28 +3906,35 @@
 
     lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
-      fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      fontSize: '17px',
+      border: '1px solid #3a3a3a',
       borderRadius: '4px',
       cursor: 'pointer',
-      flex: '0 0 auto'
+      flex: '0 0 auto',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     });
+    applyButtonAnimations(lockButton);
+    lockButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
     const applyLockButtonUI = () => {
       if (!lockButton) return;
       if (panelLocked) {
-        lockButton.textContent = '🔒︎';
-        lockButton.style.background = '#142a14';
-        lockButton.style.color = '#66cc66';
-        lockButton.title = 'Locked to screen (toggle)';
-      } else {
         lockButton.textContent = '🔓︎';
-        lockButton.style.background = '#2a1515';
-        lockButton.style.color = '#dd6666';
-        lockButton.title = 'Moves with page (toggle)';
+        lockButton.style.background = 'linear-gradient(180deg, #5a5a5a 0%, #2d2d2d 55%, #1f1f1f 100%)';
+        lockButton.style.color = '#e0e0e0';
+        lockButton.style.borderColor = '#3a3a3a';
+        lockButton.title = 'Unlock position';
+      } else {
+        lockButton.textContent = '🔒︎';
+        lockButton.style.background = 'linear-gradient(180deg, #8c8c8c 0%, #6a6a6a 55%, #515151 100%)';
+        lockButton.style.color = '#1a1a1a';
+        lockButton.style.borderColor = '#7a7a7a';
+        lockButton.title = 'Lock position';
       }
     };
     lockButton.addEventListener('click', (e) => {
@@ -3485,25 +3966,29 @@
     panelLocked = loadPanelLocked();
     applyLockButtonUI();
 
-    header.append(dragHandle, copyButton, lockButton);
-    panel.append(header);
-
     const copyStatusEl = document.createElement('div');
     rateCopyStatus = copyStatusEl;
     Object.assign(copyStatusEl.style, {
-      width: '100%',
-      minHeight: '0',
+      flex: '1 1 auto',
+      minWidth: '0',
       textAlign: 'center',
-      fontSize: '11px',
+      fontSize: '9px',
       color: '#bdd6ff',
-      marginTop: '0',
       opacity: '0',
       transition: 'opacity 0.2s ease',
       pointerEvents: 'none',
-      display: 'none'
+      display: 'block',
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+      lineHeight: '1.1',
+      maxHeight: '24px',
+      overflow: 'hidden',
+      padding: '0 4px'
     });
     copyStatusEl.textContent = '';
-    panel.append(copyStatusEl);
+
+    header.append(dragHandle, copyStatusEl, copyButton, lockButton);
+    panel.append(header);
 
     const countWrapper = document.createElement('div');
     Object.assign(countWrapper.style, {
@@ -3517,8 +4002,9 @@
 
     countDisplay = document.createElement('div');
     Object.assign(countDisplay.style, {
-      fontSize: '32px',
+      fontSize: '48px',
       fontWeight: '700',
+      fontFamily: "'Segoe UI Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif",
       lineHeight: '1',
       textAlign: 'center',
       cursor: 'pointer',
@@ -3539,8 +4025,9 @@
     Object.assign(countInput.style, {
       display: 'none',
       width: '100%',
-      fontSize: '32px',
+      fontSize: '48px',
       fontWeight: '700',
+      fontFamily: "'Segoe UI Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif",
       lineHeight: '1',
       textAlign: 'center',
       background: 'rgba(0, 0, 0, 0)',
@@ -3572,6 +4059,20 @@
     countWrapper.append(countDisplay, countInput);
     panel.append(countWrapper);
 
+    const trackedRatesLabel = document.createElement('div');
+    trackedRatesLabel.textContent = 'TRACKED RATES';
+    Object.assign(trackedRatesLabel.style, {
+      fontSize: '9px',
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      color: '#9a9a9a',
+      marginTop: '-4px',
+      marginBottom: '2px',
+      textAlign: 'center',
+      width: '100%'
+    });
+    panel.append(trackedRatesLabel);
+
     const adjustRow = document.createElement('div');
     adjustRow.style.display = 'flex';
     adjustRow.style.gap = '10px';
@@ -3587,10 +4088,11 @@
         fontWeight: '600',
         color: '#f8f8f8',
         background: '#1c1c1c',
-        border: '1px solid #2f2f2f',
+        border: '1px solid #3a3a3a',
         borderRadius: '4px',
         cursor: 'pointer'
       });
+      applyButtonAnimations(button);
       button.addEventListener('click', stopPropagation);
       return button;
     };
@@ -3612,28 +4114,105 @@
     resetButton = document.createElement('button');
     resetButton.textContent = 'Reset';
     Object.assign(resetButton.style, {
-      width: '100%',
-      padding: '6px 8px',
+      width: '80%',
+      padding: '5px 8px',
       fontSize: '14px',
-      fontWeight: '600',
+      fontWeight: '500',
       color: '#ffaa00',
       background: '#161616',
-      border: '1px solid #332200',
+      border: '2px solid #332200',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      alignSelf: 'center',
+      marginTop: '4px',
+      marginBottom: '-4px'
+    });
+    applyButtonAnimations(resetButton);
+    const resetConfirmWrapper = document.createElement('div');
+    Object.assign(resetConfirmWrapper.style, {
+      width: '100%',
+      display: 'none',
+      gap: '8px',
+      marginTop: '4px',
+      marginBottom: '-4px'
+    });
+
+    const resetConfirmButton = document.createElement('button');
+    resetConfirmButton.textContent = 'Reset';
+    Object.assign(resetConfirmButton.style, {
+      flex: '1 1 0',
+      padding: '6px 8px',
+      fontSize: '13px',
+      fontWeight: '600',
+      color: '#ffdddd',
+      background: '#3c1414',
+      border: '1px solid #6e1b1b',
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(resetConfirmButton);
+
+    const resetCancelButton = document.createElement('button');
+    resetCancelButton.textContent = "Don't Reset";
+    Object.assign(resetCancelButton.style, {
+      flex: '1 1 0',
+      padding: '6px 8px',
+      fontSize: '13px',
+      fontWeight: '600',
+      color: '#dcdcdc',
+      background: '#1c1c1c',
+      border: '1px solid #2f2f2f',
+      borderRadius: '4px',
+      cursor: 'pointer'
+    });
+    applyButtonAnimations(resetCancelButton);
+
+    resetConfirmWrapper.append(resetConfirmButton, resetCancelButton);
+
+    let resetConfirmVisible = false;
+    const setResetConfirmVisible = (visible) => {
+      resetConfirmVisible = Boolean(visible);
+      resetButton.style.display = resetConfirmVisible ? 'none' : 'block';
+      resetConfirmWrapper.style.display = resetConfirmVisible ? 'flex' : 'none';
+    };
+
     resetButton.addEventListener('click', (event) => {
       stopPropagation(event);
+      event.preventDefault();
+      if (!resetConfirmVisible) {
+        setResetConfirmVisible(true);
+      }
+    });
+
+    resetConfirmButton.addEventListener('click', (event) => {
+      stopPropagation(event);
+      event.preventDefault();
       resetCounter();
       clearHistoryEntries();
       setHistoryDropdownOpen(false);
+      setResetConfirmVisible(false);
     });
 
-    panel.append(resetButton);
+    resetCancelButton.addEventListener('click', (event) => {
+      stopPropagation(event);
+      event.preventDefault();
+      setResetConfirmVisible(false);
+    });
+
+    panel.append(resetButton, resetConfirmWrapper);
+
+    const resetHistoryDivider = document.createElement('div');
+    Object.assign(resetHistoryDivider.style, {
+      width: '100%',
+      height: '1px',
+      background: '#232323',
+      margin: '1px 0 0 0'
+    });
+    panel.append(resetHistoryDivider);
 
     historySection = document.createElement('div');
     historySection.style.width = '100%';
-    historySection.style.marginTop = '8px';
+    historySection.style.marginTop = '1px';
     historySection.style.position = 'relative';
     historySection.style.alignSelf = 'stretch';
 
@@ -3643,27 +4222,28 @@
     Object.assign(historyButton.style, {
       width: '100%',
       margin: '0',
-      height: '36px',
-      border: 'none',
+      height: '32px',
+      border: '1px solid #4a4a7a',
       borderRadius: '6px',
-      padding: '0 10px',
+      padding: '0 8px',
       cursor: 'pointer',
       boxShadow: '0 2px 6px #0006',
       outline: 'none',
-      background: '#61afff',
+      background: '#242436',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: '0px'
     });
+    applyButtonAnimations(historyButton);
 
     const makeHistoryArrowIcon = () => {
       const img = document.createElement('img');
       const src = chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL('icons/down_icon.png') : 'icons/down_icon.png';
       img.src = src;
       Object.assign(img.style, {
-        width: '24px',
-        height: '24px',
+        width: '12px',
+        height: '12px',
         objectFit: 'contain',
         pointerEvents: 'none',
         userSelect: 'none',
@@ -3674,14 +4254,16 @@
 
     const historyArrowLeft = makeHistoryArrowIcon();
     const historyArrowRight = makeHistoryArrowIcon();
+    historyArrowLeft.style.marginRight = '2px';
+    historyArrowRight.style.marginLeft = '2px';
 
     const historyLabel = document.createElement('span');
     historyLabel.textContent = 'HISTORY';
     Object.assign(historyLabel.style, {
-      fontWeight: '800',
-      letterSpacing: '0.18em',
-      fontSize: '11px',
-      color: '#191919',
+      fontWeight: '600',
+      letterSpacing: '0.12em',
+      fontSize: '10px',
+      color: '#d9d9e6',
       pointerEvents: 'none',
       userSelect: 'none',
       flex: '1 1 auto',
@@ -3693,23 +4275,8 @@
 
     historyButton.append(historyArrowLeft, historyLabel, historyArrowRight);
 
-    const pressHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = 'scale(0.96)';
-    };
-    const releaseHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = '';
-    };
-
-    historyButton.addEventListener('pointerdown', pressHistoryButton);
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
-      historyButton.addEventListener(type, releaseHistoryButton);
-    });
-
     historyButton.addEventListener('click', (event) => {
       stopPropagation(event);
-      releaseHistoryButton(event);
       toggleHistoryDropdown();
     });
 
@@ -3752,7 +4319,10 @@
       height: `${HISTORY_DROPDOWN_PADDING_TOP}px`
     });
 
+    ensureScrollbarStyles();
+
     const historyContentWrapper = document.createElement('div');
+    historyContentWrapper.className = 'fjfe-ratetrack-scroll';
     Object.assign(historyContentWrapper.style, {
       maxHeight: String(HISTORY_VISIBLE_COUNT * 64) + 'px',
       overflowY: 'auto',
@@ -4016,7 +4586,22 @@
 
   // Turns the whole feature on/off and hooks all relevant event sources
   const applySetting = (enabled) => {
-    featureEnabled = enabled;
+    settingEnabled = Boolean(enabled);
+
+    if (settingEnabled) {
+      ensureAssistButton();
+      bindAssistRefresh();
+    } else {
+      removeAssistButton();
+    }
+
+    const nextActive = settingEnabled && toggleEnabled;
+    if (nextActive === featureEnabled) {
+      updatePanelVisibility();
+      return;
+    }
+
+    featureEnabled = nextActive;
 
     ensurePanel();
     updatePanelVisibility();
@@ -4115,7 +4700,8 @@
       return;
     }
 
-    ensureRateReviewEnhancements();
+    batchAssistToggleEnabled = loadBatchAssistToggle();
+    refreshBatchAssistEnhancements();
     startRateReviewObserver();
 
     loadHistoryEntriesFromStorage();
@@ -4127,8 +4713,28 @@
       setCounter(loaded, false);
     })();
     setCountEditsEnabled(loadCountEditsPreference(), false);
+    toggleEnabled = loadToggleEnabled();
     applySetting(getSettingValue());
     document.addEventListener('fjTweakerSettingsChanged', handleSettingsChanged);
+    window.addEventListener('fjTweakerBatchAssistToggle', (event) => {
+      const detail = event?.detail;
+      if (!detail || typeof detail.enabled === 'undefined') {
+        return;
+      }
+      batchAssistToggleEnabled = Boolean(detail.enabled);
+      refreshBatchAssistEnhancements();
+    });
+    window.addEventListener('storage', (event) => {
+      if (event.key === TOGGLE_STORAGE_KEY) {
+        toggleEnabled = event.newValue === '1';
+        setAssistButtonActive(toggleEnabled);
+        applySetting(settingEnabled);
+      }
+      if (event.key === BATCH_ASSIST_TOGGLE_KEY) {
+        batchAssistToggleEnabled = event.newValue === '1';
+        refreshBatchAssistEnhancements();
+      }
+    });
   };
 
   if (!window.fjTweakerModules) {

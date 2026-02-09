@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "permissions": [
     "storage",
     "contextMenus"
@@ -38,8 +38,10 @@
         "content/farm/farmset.js",
         "content/framegif.js",
         "content/ratetrack.js",
+        "content/radar.js",
         "content/hunt.js",
         "content/batchassist.js",
+        "content/revassist.js",
         "content/sccustom.js",
         "content/userpop.js",
         "content/nextmove.js",
@@ -49,6 +51,8 @@
         "content/flagchk.js",
         "content/walcorn.js",
         "content/warn.js",
+        "content/ufjp/mobicon.js",
+        "content/ufjp/nukeref.js",
         "content/funnyjunkModifier.js",
         "content/repost_clicker/rcinfo.js",
         "content/repost_clicker/rcsettings.js",

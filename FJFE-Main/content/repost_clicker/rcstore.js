@@ -17,9 +17,264 @@
     { id: 'clickt15', name: 'FunnyJunk 2',         basePrice: 500000000000000000000000000000000n, unlk: 10000000000000000000000000000000n, tt: 'An exact duplicate of the site, your reposts directly connected between the two. May God have mercy on your soul.' }
   ];
 
+  const ALT_DEFS = [
+    { id: 'altt1',  name: 'Ultimate Scripts',             basePrice: 15000000,           tt: 'Self-writing, self-expanding, self-redefining.', currency: 'alts', producerId: 'script', inc: 200 },
+    { id: 'altt2',  name: 'Ultimate Group Chats',         basePrice: 1920000000,         tt: 'A chat for everyone.', currency: 'alts', producerId: 'groupChat', inc: 200 },
+    { id: 'altt3',  name: 'Ultimate Workshops',           basePrice: 32805000000,        tt: 'Content retooled.', currency: 'alts', producerId: 'workshop', inc: 200 },
+    { id: 'altt4',  name: 'Ultimate Studios',             basePrice: 245760000000,       tt: 'No TV, only content.', currency: 'alts', producerId: 'studio', inc: 200 },
+    { id: 'altt5',  name: 'Ultimate Recycling Centers',   basePrice: 1171875000000,      tt: 'Everything can be anything.', currency: 'alts', producerId: 'recyclingCenter', inc: 200 },
+    { id: 'altt6',  name: 'Ultimate Digsites',            basePrice: 4199040000000,      tt: 'Ancient ancients.', currency: 'alts', producerId: 'digsite', inc: 200 },
+    { id: 'altt7',  name: 'Ultimate Office Buildings',    basePrice: 12353145000000,     tt: 'Corporate hellscape made real.', currency: 'alts', producerId: 'officeBuilding', inc: 200 },
+    { id: 'altt8',  name: 'Ultimate Content Farms',       basePrice: 31457280000000,     tt: 'Year-round.', currency: 'alts', producerId: 'contentFarm', inc: 200 },
+    { id: 'altt9',  name: 'Ultimate Botnets',             basePrice: 71744535000000,     tt: 'Every computer.', currency: 'alts', producerId: 'botnet', inc: 200 },
+    { id: 'altt10', name: 'Ultimate Spaceport',           basePrice: 150000000000000,    tt: 'Block out the sun.', currency: 'alts', producerId: 'spaceport', inc: 200 },
+    { id: 'altt11', name: 'Ultimate Ritual Circles',      basePrice: 292307565000000,    tt: 'Rituals the size of continents.', currency: 'alts', producerId: 'ritualCircle', inc: 200 },
+    { id: 'altt12', name: 'Ultimate Memecatchers',        basePrice: 537477120000000,    tt: 'All thought is content.', currency: 'alts', producerId: 'memecatcher', inc: 200 },
+    { id: 'altt13', name: 'Ultimate Quantum Harmonizers', basePrice: 941227755000000,    tt: 'Content is unknowable.', currency: 'alts', producerId: 'quantumHarmonizer', inc: 200 },
+    { id: 'altt14', name: 'Ultimate Time Forges',         basePrice: 1581202560000000,   tt: 'Ouroboros as content.', currency: 'alts', producerId: 'timeForge', inc: 200 },
+    { id: 'altt15', name: 'Ultimate Wormholes',           basePrice: 2562890625000000,   tt: 'Collapse the solar system.', currency: 'alts', producerId: 'wormhole', inc: 200 },
+    { id: 'altt16', name: 'Ultimate Pocket Dimensions',   basePrice: 4026531840000000,   tt: 'Recursive, now.', currency: 'alts', producerId: 'pocketDimension', inc: 200 },
+    { id: 'altt17', name: 'Ultimate AGI Shitposters',     basePrice: 6155080095000000,   tt: 'What do you dream about?', currency: 'alts', producerId: 'agiShitposter', inc: 200 },
+    { id: 'altt18', name: 'Ultimate Reality Shapers',     basePrice: 9183300480000000n,  tt: 'Nothing is content.', currency: 'alts', producerId: 'realityShaper', inc: 200 },
+    { id: 'altt19', name: 'Ultimate Dyson Spheres',       basePrice: 13408076085000000n, tt: 'No light. All memes.', currency: 'alts', producerId: 'dysonSphere', inc: 200 },
+    { id: 'altt20', name: 'Ultimate Multiverses',         basePrice: 19200000000000000n, tt: 'Filled with cookies, for some reason.', currency: 'alts', producerId: 'multiverse', inc: 200 },
+    { id: 'slott1', name: 'Slot Machine',                 basePrice: 7,           mainText: 'Unlocks the slot machine.', tt: 'A slot machine, to boost your production!', currency: 'alts' },
+    { id: 'slott2', name: 'Better Items',                 basePrice: 77,          mainText: 'Increases your chance for a good result from the slot machine by 5%.', tt: 'You bribe Admin for these?', currency: 'alts' },
+    { id: 'slott3', name: 'Slower Clocks',                basePrice: 777,         mainText: 'Slot machine boosts last 10% longer.', tt: 'You have the time?', currency: 'alts' },
+    { id: 'slott4', name: 'Adblock',                      basePrice: 77777,       mainText: 'Bad results from the slot machine are 10% shorter.', tt: 'Blocked, blocked, blocked. None of you are free of sin.', currency: 'alts' },
+    { id: 'slott5', name: 'Game Theory',                  basePrice: 7777777,     mainText: 'Lets you bank up to 5 rolls.', tt: "But that's just a theory!", currency: 'alts' },
+    { id: 'slott6', name: 'Daylight Savings',             basePrice: 777777777,   mainText: 'Brings the free spin timer down to 3 minutes.', tt: 'To your advantage, for once.', currency: 'alts' },
+    { id: 'slott7', name: 'Greased Palms',                basePrice: 77777777777, mainText: 'Doubles the chances of getting a super result from the slot machine.', tt: 'You sly dog, you.', currency: 'alts' },
+    { id: 'mut1', name: 'LOLCat Binder',                  basePrice: 25, mainText: 'Unlocks a collection of LOLCats.', tt: 'The internet runs on cats, if you think about it.', currency: 'alts' },
+    { id: 'mut2', name: 'Social Media',                   basePrice: 25, mainText: 'Unlocks a collection of Gen Alpha memes.', tt: 'Your funeral.', currency: 'alts' },
+    { id: 'mut3', name: 'Facebook',                       basePrice: 25, mainText: 'Unlocks a collection of Facebook memes.', tt: 'There will be minions at some point.', currency: 'alts' },
+    { id: 'mut4', name: 'Photo Album',                    basePrice: 25, mainText: 'Unlocks a collection of Tragedies.', tt: 'Ah, memories...', currency: 'alts' },
+    { id: 'mut5', name: 'CD Case',                        basePrice: 333000000000, mainText: 'Unlocks a collection of Video Games.', tt: 'Vidya?', currency: 'alts' },
+    { id: 'mut6', name: 'Google Maps',                    basePrice: 333000000000, mainText: 'Unlocks a collection of Foreign memes.', tt: 'Smuggled from their country of origin.', currency: 'alts' },
+    { id: 'mut7', name: 'Funnyjunk.com',                  basePrice: 333000000000, mainText: 'Unlocks a collection of FunnyJunk exclusives.', tt: ':D', currency: 'alts' },
+    { id: 'met1', name: 'Watermarks',                     basePrice: 3, mainText: 'Increases RPS by +10%.', tt: 'Now, everyone will know where your memes come from!', currency: 'alts' },
+    { id: 'met2', name: 'Overclock',                      basePrice: 1000000000, mainText: 'Increases RPS by +5%. Boosts all producers by +1%.', tt: "What's this button do?", currency: 'alts' },
+    { id: 'met3', name: 'Negotiations',                   basePrice: 100000, mainText: 'Producers are 1% cheaper.', tt: 'You can haggle. You know you want to.', currency: 'alts' },
+    { id: 'met4', name: 'Makeshift Renovations',          basePrice: 100000, mainText: 'Upgrades are 1% cheaper.', tt: 'Hope this part was optional.', currency: 'alts' },
+    { id: 'met5', name: 'Ancient Temples',                basePrice: 400000, mainText: 'Meme upgrades are 5x cheaper.', tt: 'Meme acquisition is at an all-time high!', currency: 'alts' },
+    { id: 'met6', name: 'Script Kiddie',                  basePrice: 50, mainText: 'Upon prestige, you are given 10 free Scripts.', tt: 'Where did you get these?', currency: 'alts' },
+    { id: 'met7', name: 'Friendly Networking',            basePrice: 5000, mainText: 'Upon prestige, you are given 5 free Group Chats.', tt: "Well you're chatty.", currency: 'alts' },
+    { id: 'met8', name: 'Double-Click',                   basePrice: 55555, mainText: 'Clicking gives 10% more thumbs.', tt: 'Wait, what?', currency: 'alts' },
+    { id: 'met9', name: 'WD-40',                          basePrice: 555555555, mainText: 'Clicking gives 50% more thumbs.', tt: 'Is this good for your mouse?', currency: 'alts' },
+    { id: 'met10', name: 'Ambidextrous',                  basePrice: 55555555555, mainText: 'Clicking gives 50% more thumbs.', tt: 'You can just learn that?', currency: 'alts' },
+    { id: 'met11', name: 'Ratchet Straps',                basePrice: 555555, mainText: 'All upgrades are 10% cheaper.', tt: "Oh yeah, that's not going anywhere.", currency: 'alts' },
+  ];
+
+      const MEME_TYPE_DEFS = [
+    { id: 'mbt1',   name: 'LOLCats', basePrice: 1000000, tt: 'The backbone of the internet, if you think about it.' },
+    { id: 'mbt2',   name: 'Rickroll', basePrice: 5000000, tt: 'Everyone is a victim.' },
+    { id: 'mbt3',   name: 'Technoviking', basePrice: 10000000, tt: 'There were not enough memes of this guy.' },
+    { id: 'mbt4',   name: 'Chocolate Rain', basePrice: 50000000, tt: 'The music kind, not the...other kind.' },
+    { id: 'mbt5',   name: 'Pedobear', basePrice: 100000000, tt: 'The internet really was different back then.' },
+    { id: 'mbt6',   name: 'I Like Turtles', basePrice: 100000000, tt: 'Wonder if he still does?' },
+    { id: 'mbt7',   name: 'Dramatic Chipmunk', basePrice: 100000000, tt: 'Long dead, yet the memory remains.' },
+    { id: 'mbt8',   name: 'All your Base', basePrice: 100000000, tt: '...are belong to us.' },
+    { id: 'mbt9',   name: 'ROFLCopter', basePrice: 100000000, tt: 'Soi soi soi soi...' },
+    { id: 'mbt10',  name: 'U Liek Mudkips', basePrice: 100000000, tt: 'Just not of the husky variety.' },
+    { id: 'mbt11',  name: 'Lol, Internet', basePrice: 500000000, tt: 'Serious business.' },
+    { id: 'mbt12',  name: 'This is Sparta!', basePrice: 500000000, tt: 'And then what happened.' },
+    { id: 'mbt13',  name: 'Advice Dog', basePrice: 5000000000, tt: 'Good advice? Sometimes.' },
+    { id: 'mbt14',  name: 'Epic Fail', basePrice: 10000000000, tt: 'There was a guy who did this a lot.' },
+    { id: 'mbt15',  name: '2 Girls 1 Cup', basePrice: 50000000000, tt: 'This was everywhere then it was nowhere. Wild.' },
+    { id: 'mbt16',  name: 'Disaster Girl', basePrice: 100000000000, tt: 'Probably caused 9/11.' },
+    { id: 'mbt17',  name: "You're Doing it Wrong", basePrice: 100000000000, tt: 'Nothing right, nothing wrong?' },
+    { id: 'mbt18',  name: 'Leekspin', basePrice: 500000000000, tt: 'The song never leaves your head.' },
+    { id: 'mbt19',  name: 'Yo Dawg', basePrice: 1000000000000, tt: 'YO DAWG' },
+    { id: 'mbt20',  name: 'Milhouse', basePrice: 5000000000000, tt: 'STILL NOT A MEME' },
+    { id: 'mbt21',  name: 'Afro Ninja', basePrice: 10000000000000, tt: 'Nevaseen.' },
+    { id: 'mbt22',  name: 'Barrel Roll', basePrice: 50000000000000, tt: 'Do it.' },
+    { id: 'mbt23',  name: 'Domo', basePrice: 100000000000000, tt: 'DOMO' },
+    { id: 'mbt24',  name: 'Over 9000', basePrice: 500000000000000, tt: 'And your power level?' },
+    { id: 'mbt25',  name: 'COMBO BREAKER', basePrice: 500000000000000, tt: 'C-C-C-C-C-C-C-C-C-' },
+    { id: 'mbt26',  name: 'Rage Comics', basePrice: 1000000000000000, tt: 'FFFFFFFFFUUUUUUUUUUUUUU' },
+    { id: 'mbt27',  name: 'David After Dentist', basePrice: 1000000000000000, tt: 'Toof? Teef?' },
+    { id: 'mbt28',  name: 'Numa Numa', basePrice: 10000000000000000n, tt: 'The man put his heart and soul into that performance.' },
+    { id: 'mbt29',  name: 'I See What You Did There', basePrice: 10000000000000000n, tt: 'I see it...' },
+    { id: 'mbt30',  name: 'Shoop Da Whoop', basePrice: 50000000000000000n, tt: 'DOCTOR OCTAGONAPUS BWAAAA' },
+    { id: 'mbt31',  name: 'Wombo Combo', basePrice: 50000000000000000n, tt: 'If you know it, you know it.' },
+    { id: 'mbt32',  name: 'Weegee', basePrice: 100000000000000000n, tt: 'Straight from STALKER.' },
+    { id: 'mbt33',  name: 'Courage Wolf', basePrice: 500000000000000000n, tt: 'Inside you...' },
+    { id: 'mbt34',  name: 'Sonic Says', basePrice: 1000000000000000000n, tt: 'I forget most of his lessons.' },
+    { id: 'mbt35',  name: 'Gentlemen', basePrice: 5000000000000000000n, tt: 'This is it, this is the Spy.' },
+    { id: 'mbt36',  name: 'When You See It', basePrice: 10000000000000000000n, tt: "You'll shit bricks." },
+    { id: 'mbt37',  name: 'Trollface', basePrice: 50000000000000000000n, tt: 'Problem?' },
+    { id: 'mbt38',  name: 'In Soviet Russia', basePrice: 100000000000000000000n, tt: 'What a backwards place it was.' },
+    { id: 'mbt39',  name: 'Pants Status', basePrice: 500000000000000000000n, tt: 'Shat.' },
+    { id: 'mbt40',  name: 'Hampster Dance', basePrice: 1000000000000000000000n, tt: 'That stupid song...' },
+    { id: 'mbt41',  name: 'What is Love?', basePrice: 5000000000000000000000n, tt: "BABY DON'T HURT ME" },
+    { id: 'mbt42',  name: 'Philosoraptor', basePrice: 10000000000000000000000n, tt: "That's his foot, not his hand." },
+    { id: 'mbt43',  name: 'Epic Face', basePrice: 50000000000000000000000n, tt: ':D' },
+    { id: 'mbt44',  name: 'A Winner is You', basePrice: 100000000000000000000000n, tt: 'BABA is WINNER' },
+    { id: 'mbt45',  name: 'Zalgo', basePrice: 500000000000000000000000n, tt: 'If I put the text here, the game will crash.' },
+    { id: 'mbt46',  name: 'Rich Raven', basePrice: 1000000000000000000000000n, tt: 'One of the less common animal memes.' },
+    { id: 'mbt47',  name: 'Slowpoke', basePrice: 5000000000000000000000000n, tt: 'They hit the pentagon.' },
+    { id: 'mbt48',  name: 'Pokemans', basePrice: 10000000000000000000000000n, tt: 'Let me show you them!' },
+    { id: 'mbt49',  name: 'Charlie Bit my Finger', basePrice: 50000000000000000000000000n, tt: 'Devastating news.' },
+    { id: 'mbt50',  name: "Pool's Closed", basePrice: 100000000000000000000000000n, tt: 'Due to stingrAIDS.' },
+    { id: 'mbt51',  name: 'Series of Tubes', basePrice: 500000000000000000000000000n, tt: "That's what it is!" },
+    { id: 'mbt52',  name: 'Feels Good Man', basePrice: 1000000000000000000000000000n, tt: 'So innocent, so naive...' },
+    { id: 'mbt53',  name: 'One Does Not Simply', basePrice: 5000000000000000000000000000n, tt: 'And then he did!' },
+    { id: 'mbt54',  name: "It's a Trap!", basePrice: 10000000000000000000000000000n, tt: 'The meaning has...shifted...over the years.' },
+    { id: 'mbt55',  name: 'Depression Dog', basePrice: 50000000000000000000000000000n, tt: 'Another less common animal meme.' },
+    { id: 'mbt56',  name: 'Keyboard Cat', basePrice: 100000000000000000000000000000n, tt: 'His tunes? Amazing. His fit? Astounding.' },
+    { id: 'mbt57',  name: 'You Have My Sword', basePrice: 500000000000000000000000000000n, tt: '...Give it back.' },
+    { id: 'mbt58',  name: "Newfags Can't Triforce", basePrice: 1000000000000000000000000000000n, tt: 'What, you want me to show you one? Do it yourself...or are you scared?' },
+    { id: 'mbt59',  name: 'Za Warudo', basePrice: 5000000000000000000000000000000n, tt: '[screaming]' },
+    { id: 'mbt60',  name: 'What What, in the Butt', basePrice: 10000000000000000000000000000000n, tt: 'I said what what, in the butt!' },
+    { id: 'mbt61',  name: 'Cupcake Dog', basePrice: 50000000000000000000000000000000n, tt: 'He looks so...horrified.' },
+    { id: 'mbt62',  name: 'Your Argument is Invalid', basePrice: 100000000000000000000000000000000n, tt: 'Your debate skills are terrible.' },
+    { id: 'mbt63',  name: 'An Hero', basePrice: 500000000000000000000000000000000n, tt: 'Pull the trigger.' },
+    { id: 'mbt64',  name: 'Peanut Butter Jelly Time', basePrice: 1000000000000000000000000000000000n, tt: 'Was good until that one guy got involved.' },
+    { id: 'mbt65',  name: 'ShamWow', basePrice: 5000000000000000000000000000000000n, tt: 'Wow!' },
+    { id: 'mbt66',  name: 'Leeroy Jenkins', basePrice: 10000000000000000000000000000000000n, tt: 'You gotta yell it.' },
+    { id: 'mbt67',  name: 'I am Disappoint', basePrice: 50000000000000000000000000000000000n, tt: 'Son...' },
+    { id: 'mbt68',  name: "It's a Feature", basePrice: 100000000000000000000000000000000000n, tt: 'Standard industry practice.' },
+    { id: 'mbt69',  name: 'Falcon Punch', basePrice: 500000000000000000000000000000000000n, tt: 'FALCON, PAWNCH' },
+    { id: 'mbt70',  name: 'Flying Spaghetti Monster', basePrice: 1000000000000000000000000000000000000n, tt: 'Pastafarianism is the religion.' },
+    { id: 'mbt71',  name: 'PINGAS', basePrice: 5000000000000000000000000000000000000n, tt: 'PINGAS' },
+    { id: 'mbt72',  name: 'Spongmonkeys', basePrice: 10000000000000000000000000000000000000n, tt: 'WE LIKE THE MOON!' },
+    { id: 'mbt73',  name: 'Gold Membership', basePrice: 50000000000000000000000000000000000000n, tt: 'This upgrade requires a FunnyJunk Gold membership.' },
+    { id: 'mbt74',  name: 'Gendo Pose', basePrice: 100000000000000000000000000000000000000n, tt: 'Shinji...' },
+    { id: 'mbt75',  name: 'Dat Ass', basePrice: 500000000000000000000000000000000000000n, tt: 'Mmm yea.' },
+    { id: 'mbt76',  name: 'Caramelldansen', basePrice: 1000000000000000000000000000000000000000n, tt: 'It is THE song.' },
+    { id: 'mbt77',  name: 'Just as Planned', basePrice: 3000000000000000000000000000000000000000n, tt: 'All according to keikaku.' },
+    { id: 'mbt78',  name: 'Chuck Norris', basePrice: 10000000000000000000000000000000000000000n, tt: 'Unstoppable force AND immovable object.' },
+    { id: 'mbt79',  name: 'Do Not Want', basePrice: 30000000000000000000000000000000000000000n, tt: 'Do want?' },
+    { id: 'mbt80',  name: 'Copypasta', basePrice: 30000000000000000000000000000000000000000n, tt: 'What the fuck did you just fucking say about me, you little bitch?' },
+    { id: 'mbt81',  name: 'Battletoads', basePrice: 100000000000000000000000000000000000000000n, tt: 'Ask your local GameStop about it today!' },
+    { id: 'mbt82',  name: 'Divide by Zero', basePrice: 300000000000000000000000000000000000000000n, tt: 'Black hole created.' },
+    { id: 'mbt83',  name: 'Candlejack', basePrice: 1000000000000000000000000000000000000000000n, tt: "I don't get this one, what's the issue with candleja" },
+    { id: 'mbt84',  name: 'The Game', basePrice: 3000000000000000000000000000000000000000000n, tt: 'You just lost.' },
+    { id: 'mbt85',  name: 'Kill It With Fire', basePrice: 10000000000000000000000000000000000000000000n, tt: 'Spiders.' },
+    { id: 'mbt86',  name: 'Hypnotoad', basePrice: 30000000000000000000000000000000000000000000n, tt: 'ALL GLORY TO THE HYPNO-TOAD' },
+    { id: 'mbt87',  name: 'No U', basePrice: 30000000000000000000000000000000000000000000n, tt: 'The original Uno reverse.' },
+    { id: 'mbt88',  name: 'Konami Code', basePrice: 100000000000000000000000000000000000000000000n, tt: 'In so few things nowadays. Sad.' },
+    { id: 'mbt89',  name: 'Rule 34', basePrice: 300000000000000000000000000000000000000000000n, tt: 'If it exists...' },
+    { id: 'mbt90',  name: 'Bananaphone', basePrice: 1000000000000000000000000000000000000000000000n, tt: 'Doo doo doo...' },
+    { id: 'mbt91',  name: 'Socially Awkward Penguin', basePrice: 3000000000000000000000000000000000000000000000n, tt: 'Red vs blue.' },
+    { id: 'mbt92',  name: 'Youtube Poop', basePrice: 10000000000000000000000000000000000000000000000n, tt: 'A true test of mental fortitude.' },
+    { id: 'mbt93',  name: 'In Ur Base', basePrice: 30000000000000000000000000000000000000000000000n, tt: 'Stealin ur shit' },
+    { id: 'mbt94',  name: 'Yakety Sax', basePrice: 30000000000000000000000000000000000000000000000n, tt: 'Copyrighted, apparently.' },
+    { id: 'mbt95',  name: 'Party Hard', basePrice: 100000000000000000000000000000000000000000000000n, tt: 'PARTY HARD' },
+    { id: 'mbt96',  name: 'At First I Was Like', basePrice: 300000000000000000000000000000000000000000000000n, tt: 'But then, I was like...' },
+    { id: 'mbt97',  name: 'WHO WAS PHONE?', basePrice: 1000000000000000000000000000000000000000000000000n, tt: 'MAN HOOK HAND DOOR CAR DOOR' },
+    { id: 'mbt98',  name: 'Cool Story, Bro', basePrice: 1000000000000000000000000000000000000000000000000n, tt: '[thumbs up]' },
+    { id: 'mbt99',  name: 'A Cat is Fine Too', basePrice: 3000000000000000000000000000000000000000000000000n, tt: 'Wait, dude, no, I WAS JOKING, NO' },
+    { id: 'mbt100', name: 'You Are a Pirate', basePrice: 10000000000000000000000000000000000000000000000000n, tt: 'YAR HAR FIDDLE DEE DEE' },
+    { id: 'mbt101', name: 'Badger Badger Badger', basePrice: 30000000000000000000000000000000000000000000000000n, tt: 'Mushroom, mushroom!' },
+    { id: 'mbt102', name: 'Gummy Bear Song', basePrice: 100000000000000000000000000000000000000000000000000n, tt: 'Horrendous.' },
+    { id: 'mbt103', name: 'Sneezing Baby Panda', basePrice: 300000000000000000000000000000000000000000000000000n, tt: 'The original cute video.' },
+    { id: 'mbt104', name: 'Hatsune Miku', basePrice: 1000000000000000000000000000000000000000000000000000n, tt: 'In your wi-fi.' },
+    { id: 'mbt105', name: 'Objection!', basePrice: 3000000000000000000000000000000000000000000000000000n, tt: 'Take that!' },
+    { id: 'mbt106', name: '1337', basePrice: 10000000000000000000000000000000000000000000000000000n, tt: 'H311 y3@h.' },
+    { id: 'mbt107', name: 'Demotivational Posters', basePrice: 30000000000000000000000000000000000000000000000000000n, tt: ':(' },
+    { id: 'mbt108', name: 'Bunchie', basePrice: 100000000000000000000000000000000000000000000000000000n, tt: 'What even was this thing?' },
+    { id: 'mbt109', name: 'Dickbutt', basePrice: 300000000000000000000000000000000000000000000000000000n, tt: 'Hm.' },
+    { id: 'mbt110', name: 'Serious Cat', basePrice: 1000000000000000000000000000000000000000000000000000000n, tt: 'For serious business.' },
+    { id: 'mbt111', name: 'Look More Like', basePrice: 3000000000000000000000000000000000000000000000000000000n, tt: 'Has anyone really been far even as decided to use even go want to do look mroe like?' },
+    { id: 'mbt112', name: 'Evolution of Dance', basePrice: 10000000000000000000000000000000000000000000000000000000n, tt: 'Fractal.' },
+    { id: 'mbt113', name: 'WTF Boom', basePrice: 30000000000000000000000000000000000000000000000000000000n, tt: 'WHAT THE FU-' },
+    { id: 'mbt114', name: 'Download more RAM', basePrice: 100000000000000000000000000000000000000000000000000000000n, tt: "It's that easy!" },
+    { id: 'mbt115', name: 'Goatse', basePrice: 300000000000000000000000000000000000000000000000000000000n, tt: 'Ugh.' },
+    { id: 'mbt116', name: 'Blue Waffle', basePrice: 1000000000000000000000000000000000000000000000000000000000n, tt: 'Eugh.' },
+    { id: 'mbt117', name: 'Lemon Party', basePrice: 3000000000000000000000000000000000000000000000000000000000n, tt: 'Urgh.' },
+    { id: 'mbt118', name: 'Meatspin', basePrice: 10000000000000000000000000000000000000000000000000000000000n, tt: 'Blech.' },
+    { id: 'mbt119', name: 'Pain Olympics', basePrice: 30000000000000000000000000000000000000000000000000000000000n, tt: 'DEAR GOD WHY' },
+    { id: 'mbt120', name: 'Facepalm', basePrice: 100000000000000000000000000000000000000000000000000000000000n, tt: 'Sorry, Picard.' },
+    { id: 'mbt121', name: 'Dick in a Box', basePrice: 300000000000000000000000000000000000000000000000000000000000n, tt: 'Catchy song.' },
+    { id: 'mbt122', name: 'Fight the Powah', basePrice: 300000000000000000000000000000000000000000000000000000000000n, tt: 'Good on ya, /v/.' },
+    { id: 'mbt123', name: 'MOAR', basePrice: 1000000000000000000000000000000000000000000000000000000000000n, tt: 'MOAR' },
+    { id: 'mbt124', name: 'Giygas', basePrice: 3000000000000000000000000000000000000000000000000000000000000n, tt: 'Terrifying.' },
+    { id: 'mbt125', name: 'PWNED', basePrice: 10000000000000000000000000000000000000000000000000000000000000n, tt: 'Have you been?' },
+    { id: 'mbt126', name: 'Will it Blend', basePrice: 30000000000000000000000000000000000000000000000000000000000000n, tt: 'Before the hydraulic press...' },
+    { id: 'mbt127', name: 'Bacon', basePrice: 100000000000000000000000000000000000000000000000000000000000000n, tt: 'Push button, receive bacon.' },
+    { id: 'mbt128', name: 'Caturday', basePrice: 300000000000000000000000000000000000000000000000000000000000000n, tt: "It's Caturday." },
+    { id: 'mbt129', name: 'Creepypasta', basePrice: 1000000000000000000000000000000000000000000000000000000000000000n, tt: 'These used to be scary, at least a little.' },
+    { id: 'mbt130', name: 'Success Kid', basePrice: 3000000000000000000000000000000000000000000000000000000000000000n, tt: 'Victory.' },
+    { id: 'mbt131', name: 'Surprise Buttsecks', basePrice: 10000000000000000000000000000000000000000000000000000000000000000n, tt: 'It could happen to anyone...at any time...' },
+    { id: 'mbt132', name: 'Lurk Moar', basePrice: 30000000000000000000000000000000000000000000000000000000000000000n, tt: 'But not you. You are fine.' },
+    { id: 'mbt133', name: 'Wilhelm Scream', basePrice: 100000000000000000000000000000000000000000000000000000000000000000n, tt: 'In every movie ever, forever.' },
+    { id: 'mbt134', name: 'Internet Hate Machine', basePrice: 300000000000000000000000000000000000000000000000000000000000000000n, tt: 'I mean, yeah, it do be like that.' },
+    { id: 'mbt135', name: 'Wat', basePrice: 1000000000000000000000000000000000000000000000000000000000000000000n, tt: 'Wat.' },
+    { id: 'mbt136', name: "They're Eating Her!", basePrice: 3000000000000000000000000000000000000000000000000000000000000000000n, tt: "And then they're gonna eat me! Oh my goooooooooooooooooooooooood!" },
+    { id: 'mbt137', name: 'Tits or GTFO', basePrice: 10000000000000000000000000000000000000000000000000000000000000000000n, tt: 'Well? Which one?' },
+    { id: 'mbt138', name: "Pics or it Didn't Happen", basePrice: 30000000000000000000000000000000000000000000000000000000000000000000n, tt: 'Unfortunately...no longer true.' },
+    { id: 'mbt139', name: 'Sauce', basePrice: 100000000000000000000000000000000000000000000000000000000000000000000n, tt: 'Please.' },
+    { id: 'mbt140', name: 'Forced Memes', basePrice: 300000000000000000000000000000000000000000000000000000000000000000000n, tt: 'The worst kind.' },
+    { id: 'mbt141', name: 'Clippy', basePrice: 1000000000000000000000000000000000000000000000000000000000000000000000n, tt: 'Please come back...' },
+    { id: 'mbt142', name: 'Nyan Cat', basePrice: 3000000000000000000000000000000000000000000000000000000000000000000000n, tt: 'The meme of memes.' },
+    { id: 'lct1', name: 'Ceiling Cat', basePrice: 100000000000000, tt: 'Yin...' },
+    { id: 'lct2', name: 'Basement Cat', basePrice: 100000000000000, tt: '...Yang.' },
+    { id: 'lct3', name: 'Long Cat', basePrice: 100000000000000, tt: 'Cat? Ferret? Snake?' },
+    { id: 'lct4', name: 'Monorail Cat', basePrice: 100000000000000, tt: 'Late.' },
+    { id: 'lct5', name: 'Business Cat', basePrice: 100000000000000, tt: 'Very serious.' },
+    { id: 'lct6', name: 'Grumpy Cat', basePrice: 100000000000000, tt: 'Arguably the most famous lolcat.' },
+    { id: 'gat1', name: 'Skibidi Toilet', basePrice: 10000000000000000n, tt: 'I was going to put the song here but my body refused.' },
+    { id: 'gat2', name: 'Skull Emoji', basePrice: 10000000000000000n, tt: 'BRO JUST...BRO...BRO JUST SAID...BRO...' },
+    { id: 'gat3', name: 'Fanum Tax', basePrice: 10000000000000000n, tt: 'Yoink.' },
+    { id: 'gat4', name: 'Only in Ohio', basePrice: 10000000000000000n, tt: 'It exists this time at least.' },
+    { id: 'gat5', name: 'Grimace Shake', basePrice: 5000000000000000, tt: 'Ded.' },
+    { id: 'gat6', name: 'Rizz', basePrice: 5000000000000000, tt: 'You have none of this.' },
+    { id: 'gat7', name: 'Mewing', basePrice: 5000000000000000, tt: 'If you did this, suicide.' },
+    { id: 'gat8', name: 'Caught in 4K', basePrice: 5000000000000000, tt: 'Too many Ks.' },
+    { id: 'gat9', name: 'Corecore', basePrice: 5000000000000000, tt: 'Sensory overload, basically.' },
+    { id: 'gat10', name: 'Liminal Space', basePrice: 5000000000000000000000n, tt: "OH MY GOD IT'S JUST LIKE THE BACKROOMS" },
+    { id: 'gat11', name: 'Cap', basePrice: 5000000000000000000000n, tt: 'Forward or back?' },
+    { id: 'gat12', name: 'Goofy Ahh', basePrice: 5000000000000000000000000n, tt: 'Eugenics immediately.' },
+    { id: 'gat13', name: 'Lightskin Stare', basePrice: 5000000000000000000000000000n, tt: 'You ever done this?' },
+    { id: 'gat14', name: 'NPC Behavior', basePrice: 5000000000000000000000000000000n, tt: 'Normies.' },
+    { id: 'gat15', name: 'Gyatt', basePrice: 5000000000000000000000000000000000n, tt: 'There is none here.' },
+    { id: 'gat16', name: 'BFFR', basePrice: 5000000000000000000000000000000000000n, tt: 'Really?' },
+    { id: 'gat17', name: '67', basePrice: 5000000000000000000000000000000000000000n, tt: 'Power word: rage.' },
+    { id: 'fbt1', name: 'Thin Blue Line', basePrice: 10000, tt: 'Crossed.' },
+    { id: 'fbt2', name: 'Back in My Day', basePrice: 10000000, tt: 'WE WALKED UPHILL TO SCHOOL, BOTH WAYS' },
+    { id: 'fbt3', name: "Wine O'Clock", basePrice: 10000000000, tt: 'Always, apparently.' },
+    { id: 'fbt4', name: 'Coffee', basePrice: 10000000000000, tt: "Don't talk to be before I've had it." },
+    { id: 'fbt5', name: 'Wife Bad', basePrice: 10000000000000000n, tt: 'HEEHEEHOHOHAHA' },
+    { id: 'fbt6', name: 'Sarcastic Cats', basePrice: 10000000000000000000n, tt: 'Like lolcats, but...incorrect.' },
+    { id: 'fbt7', name: 'Just Saying', basePrice: 10000000000000000000000n, tt: 'Only just.' },
+    { id: 'fbt8', name: 'Kids These Days', basePrice: 10000000000000000000000000n, tt: 'Pain.' },
+    { id: 'fbt9', name: 'Minions', basePrice: 10000000000000000000000000000n, tt: 'You knew they were gonna be here.' },
+    { id: 'tgt1', name: 'Chernobyl', basePrice: 100000000000000000000000n, tt: 'Worse than?' },
+    { id: 'tgt2', name: 'Pearl Harbor', basePrice: 500000000000000000000000n, tt: 'Never forgetti.' },
+    { id: 'tgt3', name: 'COVID-19', basePrice: 1000000000000000000000000n, tt: 'You have any toilet paper?' },
+    { id: 'tgt4', name: 'Holocaust', basePrice: 5000000000000000000000000n, tt: 'Real?' },
+    { id: 'tgt5', name: '9/11', basePrice: 10000000000000000000000000n, tt: 'Passportanium.' },
+    { id: 'vgt1', name: 'Git Gud', basePrice: 100000000000000000000000000000000000n, tt: 'Godspeed, Chosen Undead.' },
+    { id: 'vgt2', name: 'Alt+F4', basePrice: 10000000000000000000000000000000000000n, tt: 'Activates cheats!' },
+    { id: 'vgt3', name: 'Snake? Snake!', basePrice: 1000000000000000000000000000000000000000n, tt: 'SNAAAAAAAAAAAKE!' },
+    { id: 'vgt4', name: 'Skill 100', basePrice: 100000000000000000000000000000000000000000n, tt: 'Sneak, Speech, whatever.' },
+    { id: 'vgt5', name: 'Arrow to the Knee', basePrice: 10000000000000000000000000000000000000000000n, tt: 'I used to be a reposter like you...' },
+    { id: 'vgt6', name: 'It Just Works', basePrice: 1000000000000000000000000000000000000000000000n, tt: 'Describes this extension, really.' },
+    { id: 'vgt7', name: 'The Cake is a Lie', basePrice: 100000000000000000000000000000000000000000000000n, tt: 'This meme was not possible to escape.' },
+    { id: 'fgt1', name: 'Polandball', basePrice: 10000000000000000000000000000000000n, tt: 'Can into space?' },
+    { id: 'fgt2', name: 'Bokete', basePrice: 1000000000000000000000000000000000000n, tt: 'Bokete!' },
+    { id: 'fgt3', name: 'Gaki no Tsukai', basePrice: 100000000000000000000000000000000000000n, tt: 'Get whacked in the knee, try not to set off the harmonica.' },
+    { id: 'fgt4', name: 'Smuggled Memes', basePrice: 10000000000000000000000000000000000000000n, tt: 'Those Chinese ones, you know the ones.' },
+    { id: 'fgt5', name: 'Zhdun', basePrice: 1000000000000000000000000000000000000000000n, tt: 'I can wait.' },
+    { id: 'fgt6', name: 'Ayuwoki', basePrice: 100000000000000000000000000000000000000000000n, tt: 'Genuinely horrifying.' },
+    { id: 'fgt7', name: 'El Risitas', basePrice: 10000000000000000000000000000000000000000000000n, tt: 'May he laugh in peace.' },
+    { id: 'fjt1', name: 'OC Creators', basePrice: 10000000000000000000000000000000n, tt: 'We had these, once.' },
+    { id: 'fjt2', name: 'Catboyfriend', basePrice: 1000000000000000000000000000000000n, tt: 'Not of the armpit variety.' },
+    { id: 'fjt3', name: 'The Raccoon', basePrice: 100000000000000000000000000000000000n, tt: 'He likes garbage.' },
+    { id: 'fjt4', name: 'Names', basePrice: 10000000000000000000000000000000000000n, tt: 'White, Blue, or Piss, take your pick.' },
+    { id: 'fjt5', name: 'Item Game', basePrice: 1000000000000000000000000000000000000000n, tt: 'This was a big thing, way back when.' },
+    { id: 'fjt6', name: 'The Goose', basePrice: 100000000000000000000000000000000000000000n, tt: 'Honk.' },
+    { id: 'fjt7', name: 'The Wedding', basePrice: 10000000000000000000000000000000000000000000n, tt: 'The cat and the robot, unlawfully married!' },
+    { id: 'fjt8', name: 'WinRAR', basePrice: 1000000000000000000000000000000000000000000000n, tt: 'Single-handedly keeping them afloat.' },
+    { id: 'fjt9', name: 'Satoasami', basePrice: 100000000000000000000000000000000000000000000000n, tt: 'Greatest shame.' },
+    { id: 'spt1', name: 'German Jokes', basePrice: 100, tt: 'This is...this is nothing. Why is this nothing so funny?' },
+    { id: 'spt2', name: 'Dick Jokes', basePrice: 1000000000000, tt: 'The absolute core of humor. Always has been, always will be.' },
+  ];
+
   const PRODUCTION_DEFS = [
     { id: 'scriptt1',  name: 'Autolaunch',           basePrice: 100,                                inc: 537.45,  tt: "By setting your scripts to launch on startup, you're able to be even lazier!" },
-    { id: 'scriptt2',  name: 'More Lines',           basePrice: 500,                                inc: 634.2,  tt: "If a program has more lines that means it's better, obviously." },
+    { id: 'scriptt2',  name: 'More Lines',           basePrice: 500,                                inc: 634.2,   tt: "If a program has more lines that means it's better, obviously." },
     { id: 'scriptt3',  name: 'More Settings',        basePrice: 10000,                              inc: 748.35,  tt: "Now you can turn up settings that didn't even exist before!" },
     { id: 'scriptt4',  name: 'Color 0a',             basePrice: 1000000,                            inc: 883.1,   tt: "Green text with a black background? Oh yeah, it's hacker time." },
     { id: 'scriptt5',  name: 'Download RAM',         basePrice: 10000000,                           inc: 1042.05, tt: 'By downloading more RAM, you can boost your scripts even further! Wait, hold on, where did all these popups come from?' },
@@ -299,13 +554,13 @@
     { id: 'realityShapert6',  name: 'Bigger and Better',  basePrice: 6000000000000000000000000000000n,                                 inc: 1416.8,  tt: 'Bigger machines, better memes!' },
     { id: 'realityShapert7',  name: 'Origami',            basePrice: 6000000000000000000000000000000000n,                              inc: 1731.15, tt: 'We figured, why are memes only two dimensional? Why not add a third? Anyway, the FBI is investigating, act natural.' },
     { id: 'realityShapert8',  name: 'Ominous Glow',       basePrice: 6000000000000000000000000000000000000n,                           inc: 2059.3,  tt: "We're not sure why it's glowing. We're not certain why it's helping. We're not going to question it. Wear a lead vest though." },
-    { id: 'realityShapert9',  name: 'Background Noise',   basePrice: 6000000000000000000000000000000000000000n,                        inc: 2400.05, tt: 'Turns out we were including background radiation in our folding process. We can now filter it out and dump it a nearby stream.' },
+    { id: 'realityShapert9',  name: 'Background Noise',   basePrice: 6000000000000000000000000000000000000000n,                        inc: 2400.05, tt: 'Turns out we were including background radiation in our folding process. We can now filter it out and dump it in a nearby stream.' },
     { id: 'realityShapert10', name: 'Star Scooping',      basePrice: 6000000000000000000000000000000000000000000n,                     inc: 2752.35, tt: 'Stars are DENSE! Lots of reality there to steal!' },
     { id: 'realityShapert11', name: 'Light and Dark',     basePrice: 60000000000000000000000000000000000000000000000n,                 inc: 3115.4,  tt: "Dark mode memes! Why didn't we ever think of this?!" },
     { id: 'realityShapert12', name: 'Good Cause',         basePrice: 600000000000000000000000000000000000000000000000000n,             inc: 3488.55, tt: 'Charity tax breaks. Need I say more?' },
     { id: 'realityShapert13', name: 'Hire Admin',         basePrice: 6000000000000000000000000000000000000000000000000000000n,         inc: 3871.1,  tt: "An element of true unpredictability is exactly what we need here." },
     { id: 'realityShapert14', name: 'Galactic Folding',   basePrice: 60000000000000000000000000000000000000000000000000000000000n,     inc: 4262.6,  tt: 'Hey, I can see the milky way from here! Wait...' },
-    { id: 'realityShapert15', name: 'Meme Reality',       basePrice: 600000000000000000000000000000000000000000000000000000000000000n, inc: 4662.55, tt: "You know, if we're making memes out of reality, when why can't we do the opposite?" },
+    { id: 'realityShapert15', name: 'Meme Reality',       basePrice: 600000000000000000000000000000000000000000000000000000000000000n, inc: 4662.55, tt: "You know, if we're making memes out of reality, then why can't we do the opposite?" },
 
     { id: 'dysonSpheret1',  name: 'Stronger Structures',  basePrice: 19000000000000000000000000n,                                        inc: 109.45,  tt: 'Turns out, stars generate a lot of gravity. Ditching the Chinesium corrects this issue.' },
     { id: 'dysonSpheret2',  name: 'Mirrors',              basePrice: 95000000000000000000000000n,                                        inc: 288.8,   tt: "If we fill the gaps between solar cells with mirrors, we won't lose any potential solar energy!" },
@@ -317,7 +572,7 @@
     { id: 'dysonSpheret8',  name: 'Even more efficiency', basePrice: 950000000000000000000000000000000000000n,                           inc: 2011.3,  tt: 'Good news everyone! the engineers came up with new solar cell technology using excited isotopic materials! MORE POWER.' },
     { id: 'dysonSpheret9',  name: 'Stellar network',      basePrice: 950000000000000000000000000000000000000000n,                        inc: 2371.9,  tt: 'Some of our spheres are producing more than is needed, if we beam the excess power to other spheres we project neglible loss from transport.' },
     { id: 'dysonSpheret10', name: 'Solar Rave',           basePrice: 950000000000000000000000000000000000000000000n,                     inc: 2748.85, tt: 'Those lasers we keep beaming around ended up causing a minor nation-spanning rave. People died. Lots of content!' },
-    { id: 'dysonSpheret11', name: 'Virgin Sacrifice',     basePrice: 9500000000000000000000000000000000000000000000000n,                 inc: 3141.25, tt: "Some of the worshipping crew ended up forming a cult, started performing sacrificed. I guess it's boosting efficiency? Meh, if it works." },
+    { id: 'dysonSpheret11', name: 'Virgin Sacrifice',     basePrice: 9500000000000000000000000000000000000000000000000n,                 inc: 3141.25, tt: "Some of the worshipping crew ended up forming a cult, started performing sacrifices. I guess it's boosting efficiency? Meh, if it works." },
     { id: 'dysonSpheret12', name: 'Bottled Stars',        basePrice: 95000000000000000000000000000000000000000000000000000n,             inc: 3548.2,  tt: 'We liquified a star! Please do not question it! This makes for WAY easier power handling!' },
     { id: 'dysonSpheret13', name: 'Reignition',           basePrice: 950000000000000000000000000000000000000000000000000000000n,         inc: 3968.95, tt: 'After figuring out how to make a star portable, collapsing two stars together to conjoin their mass was inevitable. Double star is the next double rainbow, we figure.' },
     { id: 'dysonSpheret14', name: 'The Big One',          basePrice: 9500000000000000000000000000000000000000000000000000000000000n,     inc: 4402.85, tt: 'How many stars can we combine before something terrible happens?' },
@@ -361,6 +616,154 @@
   const state = {
     host: null,
   };
+  const SCROLLBAR_STYLE_ID = 'fjfe-clicker-scrollbar-style';
+  function ensureClickerScrollbarStyles(){
+    try {
+      if (document.getElementById(SCROLLBAR_STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = SCROLLBAR_STYLE_ID;
+      style.textContent = `
+        .fjfe-clicker-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #6a6a6a transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .fjfe-clicker-scroll::-webkit-scrollbar-thumb {
+          background: #6a6a6a;
+          border-radius: 6px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+      `;
+      document.head && document.head.appendChild(style);
+    } catch(_) {}
+  }
+
+  const ALTS_SPENT_KEY = 'fjfeStats_altsSpent';
+  const ALTS_ALL_TIME_KEY = 'fjfeStats_thumbsAllTime';
+  const ALTS_MULT_KEY_PREFIX = 'fjTweakerStoreAltMultiplier_';
+
+  function loadBigIntSafe(key){
+    try {
+      const s = localStorage.getItem(key);
+      if (!s) return 0n;
+      if (s === 'Infinity') return 0n;
+      return BigInt(s);
+    } catch(_) { return 0n; }
+  }
+  function setBigIntSafe(key, v){
+    try {
+      const bi = (typeof v === 'bigint') ? v : 0n;
+      localStorage.setItem(key, (bi < 0n ? 0n : bi).toString());
+    } catch(_) {}
+  }
+
+  function calcAltsTotal(allTimeThumbs){
+    try {
+      if (typeof allTimeThumbs !== 'bigint') return 0n;
+      const safeAllTime = allTimeThumbs < 0n ? 0n : allTimeThumbs;
+      const T = 1000000000000n;
+      const floorCbrt = (x) => {
+        if (x <= 0n) return 0n;
+        let lo = 0n, hi = 1n;
+        while (hi*hi*hi <= x) hi <<= 1n;
+        while (hi - lo > 1n) {
+          const mid = (lo + hi) >> 1n;
+          const m3 = mid*mid*mid;
+          if (m3 <= x) lo = mid; else hi = mid;
+        }
+        return lo;
+      };
+      return floorCbrt(safeAllTime / T);
+    } catch(_) { return 0n; }
+  }
+
+  function getAltsTotal(){
+    const allTime = loadBigIntSafe(ALTS_ALL_TIME_KEY);
+    return calcAltsTotal(allTime);
+  }
+  function getAltsSpent(){
+    return loadBigIntSafe(ALTS_SPENT_KEY);
+  }
+  function getAltsAvailable(){
+    const total = getAltsTotal();
+    const spent = getAltsSpent();
+    return total > spent ? (total - spent) : 0n;
+  }
+  function getMetaClickBonusPct() {
+    let pct = 0;
+    if (isUpgradePurchased('met8')) pct += 10;
+    if (isUpgradePurchased('met9')) pct += 50;
+    if (isUpgradePurchased('met10')) pct += 50;
+    return pct;
+  }
+  function applyDiscountToPrice(price, factor) {
+    try {
+      const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+      if (typeof price === 'bigint') {
+        const scale = 10000n;
+        const scaled = BigInt(Math.max(0, Math.floor(safeFactor * Number(scale))));
+        return (price * scaled) / scale;
+      }
+      const num = Number(price);
+      if (!Number.isFinite(num) || num <= 0) return 0;
+      return num * safeFactor;
+    } catch(_) { return price; }
+  }
+  function getUpgradeDiscountFactor(upgrade) {
+    let factor = 1;
+    const isAlt = upgrade && upgrade.currency === 'alts';
+    const id = upgrade && upgrade.id ? String(upgrade.id) : '';
+    if (isUpgradePurchased('met11')) factor *= 0.9;
+    if (!isAlt && isUpgradePurchased('met4')) factor *= 0.99;
+    if (/^(mbt|lct|gat|fbt|tgt|vgt|fgt|fjt|spt)\d+$/.test(id) && isUpgradePurchased('met5')) {
+      factor *= 0.2;
+    }
+    return factor;
+  }
+  function getEffectiveUpgradePrice(upgrade) {
+    if (!upgrade) return 0;
+    return applyDiscountToPrice(upgrade.basePrice, getUpgradeDiscountFactor(upgrade));
+  }
+  function getAltCost(upgrade){
+    try {
+      const raw = getEffectiveUpgradePrice(upgrade);
+      const bi = (typeof raw === 'bigint') ? raw : BigInt(Math.floor(Number(raw) || 0));
+      if (bi <= 0n) return 0n;
+      return bi;
+    } catch(_) { return 0n; }
+  }
+  function canAffordAltUpgrade(upgrade){
+    try {
+      const cost = getAltCost(upgrade);
+      return getAltsAvailable() >= cost;
+    } catch(_) { return false; }
+  }
+  function canUnlockAltUpgrade(upgrade){
+    try {
+      const cost = getAltCost(upgrade);
+      if (cost <= 0n) return true;
+      const threshold = cost / 2n;
+      return getAltsAvailable() >= threshold;
+    } catch(_) { return false; }
+  }
+  function spendAltCost(cost){
+    try {
+      if (typeof cost !== 'bigint' || cost <= 0n) return true;
+      const total = getAltsTotal();
+      const spent = getAltsSpent();
+      const available = total > spent ? (total - spent) : 0n;
+      if (available < cost) return false;
+      setBigIntSafe(ALTS_SPENT_KEY, spent + cost);
+      return true;
+    } catch(_) { return false; }
+  }
   
   function isClickUpgradePurchased(upgradeId) {
     try { return localStorage.getItem(`fjTweakerStoreUpgrade_${upgradeId}`) === '1'; } catch(_) { return false; }
@@ -372,6 +775,47 @@
       const v = parseInt(raw, 10);
       return Number.isFinite(v) && v > 0 ? v : 0;
     } catch(_) { return 0; }
+  }
+  function getThumbsGeneratedTotal() {
+    try {
+      const raw = localStorage.getItem('fjfeStats_thumbsGeneratedTotal');
+      const v = parseInt(raw, 10);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch(_) { return 0; }
+  }
+  function canUnlockMemeType(def) {
+    try {
+      const price = getEffectiveUpgradePrice(def);
+      const generated = getThumbsGeneratedTotal();
+      if (typeof price === 'bigint') {
+        const threshold = price / 20n;
+        return BigInt(Math.max(0, Math.floor(generated))) >= threshold;
+      }
+      const p = Number(price) || 0;
+      return generated >= Math.floor(p * 0.05);
+    } catch(_) { return false; }
+  }
+
+  function getTimesPrestiged() {
+    try {
+      const raw = localStorage.getItem('fjfeStats_timesPrestiged');
+      const v = parseInt(raw, 10);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch(_) { return 0; }
+  }
+
+  function isMemeTypeGroupUnlocked(def) {
+    const id = def && def.id ? String(def.id) : '';
+    if (/^mbt\d+$/.test(id)) return true;
+    if (/^spt\d+$/.test(id)) return getTimesPrestiged() > 0;
+    if (/^lct\d+$/.test(id)) return isUpgradePurchased('mut1');
+    if (/^gat\d+$/.test(id)) return isUpgradePurchased('mut2');
+    if (/^fbt\d+$/.test(id)) return isUpgradePurchased('mut3');
+    if (/^tgt\d+$/.test(id)) return isUpgradePurchased('mut4');
+    if (/^vgt\d+$/.test(id)) return isUpgradePurchased('mut5');
+    if (/^fgt\d+$/.test(id)) return isUpgradePurchased('mut6');
+    if (/^fjt\d+$/.test(id)) return isUpgradePurchased('mut7');
+    return true;
   }
   function isClickUpgradeUnlocked(def) {
     try {
@@ -410,13 +854,106 @@
     return out;
   }
 
+  function getMemeTypePercentFromId(upgradeId){
+    const match = (upgradeId || '').match(/^mbt(\d+)$/);
+    if (!match) return 0;
+    const idx = parseInt(match[1], 10);
+    if (!Number.isFinite(idx) || idx <= 0) return 0;
+    if (idx <= 4) return 1;
+    if (idx <= 29) return 2;
+    if (idx <= 35) return 3;
+    if (idx <= 71) return 4;
+    return 5;
+  }
+
+  function getExtraMemeTypePercentFromId(upgradeId){
+    if (/^lct\d+$/.test(upgradeId)) return 2;
+    if (/^gat\d+$/.test(upgradeId)) return 3;
+    if (/^fbt\d+$/.test(upgradeId)) return 3;
+    if (/^tgt\d+$/.test(upgradeId)) return 4;
+    if (/^vgt\d+$/.test(upgradeId)) return 4;
+    if (/^fgt\d+$/.test(upgradeId)) return 4;
+    if (/^fjt\d+$/.test(upgradeId)) return 5;
+    if (/^spt\d+$/.test(upgradeId)) return 10;
+    return 0;
+  }
+
+  function fitOverlayText(overlay, card){
+    try {
+      const cardW = card.clientWidth || card.offsetWidth || parseInt(card.style.width, 10) || 60;
+      const cardH = card.clientHeight || card.offsetHeight || parseInt(card.style.height, 10) || 60;
+      const maxSize = Math.max(0, Math.min(cardW, cardH) - 6);
+      let size = Math.max(12, Math.floor(maxSize * 0.9));
+      overlay.style.boxSizing = 'border-box';
+      overlay.style.maxWidth = maxSize + 'px';
+      overlay.style.maxHeight = maxSize + 'px';
+      overlay.style.lineHeight = '1';
+      const textEl = overlay.firstElementChild || overlay;
+      textEl.style.lineHeight = '1';
+
+      const text = textEl.textContent || '';
+      let ctx = fitOverlayText._ctx;
+      if (!ctx) {
+        const canvas = document.createElement('canvas');
+        ctx = canvas.getContext('2d');
+        fitOverlayText._ctx = ctx;
+      }
+      const fontFamily = (overlay.style.fontFamily || 'sans-serif');
+      const fontWeight = (overlay.style.fontWeight || '900');
+      const measureWidth = (fontSize) => {
+        if (!ctx) return 0;
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        return ctx.measureText(text).width;
+      };
+
+      overlay.style.fontSize = size + 'px';
+      while ((measureWidth(size) > maxSize || textEl.scrollHeight > maxSize) && size > 10) {
+        size -= 2;
+        overlay.style.fontSize = size + 'px';
+      }
+    } catch(_) {}
+  }
+
   function getUpgradeIconPathById(upgradeId){
+    if (/^mbt\d+$/.test(upgradeId)) return 'icons/clicker/meme.png';
+    if (/^met\d+$/.test(upgradeId)) return 'icons/clicker/extraup.png';
+    if (upgradeId === 'mut1') return 'icons/clicker/lolcat.png';
+    if (upgradeId === 'mut2') return 'icons/clicker/alpha.png';
+    if (upgradeId === 'mut3') return 'icons/clicker/facebook.png';
+    if (upgradeId === 'mut4') return 'icons/clicker/tragedy.png';
+    if (upgradeId === 'mut5') return 'icons/clicker/vidya.png';
+    if (upgradeId === 'mut6') return 'icons/clicker/foreign.png';
+    if (upgradeId === 'mut7') return 'icons/clicker/fj.png';
+    if (/^lct\d+$/.test(upgradeId)) return 'icons/clicker/lolcat.png';
+    if (/^gat\d+$/.test(upgradeId)) return 'icons/clicker/alpha.png';
+    if (/^fbt\d+$/.test(upgradeId)) return 'icons/clicker/facebook.png';
+    if (/^tgt\d+$/.test(upgradeId)) return 'icons/clicker/tragedy.png';
+    if (/^vgt\d+$/.test(upgradeId)) return 'icons/clicker/vidya.png';
+    if (/^fgt\d+$/.test(upgradeId)) return 'icons/clicker/foreign.png';
+    if (/^fjt\d+$/.test(upgradeId)) return 'icons/clicker/fj.png';
+    if (/^spt\d+$/.test(upgradeId)) return 'icons/clicker/special.png';
+    if (/^slott\d+$/.test(upgradeId)) return 'icons/clicker/spin.png';
     
     if (/^clickt\d+$/.test(upgradeId)) return 'icons/clicker/upgrades/clickup.png';
     const parsed = extractProducerIdFromUpgradeId(upgradeId);
     if (parsed && parsed.producerId) return `icons/clicker/upgrades/${parsed.producerId}up.png`;
     
     return 'icons/clicker/upgrades/clickup.png';
+  }
+
+  function getProductionIconPathByProducerId(producerId){
+    const baseName = (getProducerName(producerId) || producerId || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_');
+    return `icons/clicker/production/${baseName}.png`;
+  }
+
+  function getUpgradeIconPath(upgrade){
+    if (upgrade && upgrade.icon) return upgrade.icon;
+    if (upgrade && upgrade.currency === 'alts' && upgrade.producerId) {
+      return getProductionIconPathByProducerId(upgrade.producerId);
+    }
+    return getUpgradeIconPathById(upgrade.id);
   }
 
   function isUpgradePurchased(upgradeId) {
@@ -486,6 +1023,11 @@
     } catch (_) { return false; }
   }
 
+  function canAffordUpgrade(upgrade){
+    if (upgrade && upgrade.currency === 'alts') return canAffordAltUpgrade(upgrade);
+    return canAffordPrice(getEffectiveUpgradePrice(upgrade));
+  }
+
   function setMoney(v) {
     try {
       const tools = window.fjfeClickerNumbers;
@@ -514,7 +1056,7 @@
       if (!Number.isFinite(v) || v <= 0) return 0;
       
       
-      if (v <= 10 || v < 200) return Math.max(0, (v - 1) * 100);
+      if (v <= 10) return Math.max(0, v * 100);
       
       return v;
     } catch (_) { return 0; }
@@ -530,22 +1072,49 @@
     } catch (_) {}
   }
 
+  function addProducerAltMultiplier(producerId, factorValue) {
+    try {
+      const raw = localStorage.getItem(ALTS_MULT_KEY_PREFIX + producerId);
+      const current = parseFloat(raw);
+      const next = Number(factorValue);
+      const safeNext = Number.isFinite(next) && next > 0 ? next : 1;
+      const safeCurrent = Number.isFinite(current) && current > 0 ? current : 1;
+      const finalVal = Math.max(safeCurrent, safeNext);
+      localStorage.setItem(ALTS_MULT_KEY_PREFIX + producerId, String(finalVal));
+    } catch (_) {}
+  }
+
+  function reapplyAltUpgradeMultipliers() {
+    try {
+      ALT_DEFS.forEach(def => {
+        if (!def || def.currency !== 'alts' || !def.producerId || typeof def.inc !== 'number') return;
+        if (isUpgradePurchased(def.id)) addProducerAltMultiplier(def.producerId, 3);
+      });
+    } catch(_) {}
+  }
+
   function purchaseUpgrade(upgrade) {
-    const price = upgrade.basePrice;
-    
+    const price = (upgrade && upgrade.currency === 'alts') ? upgrade.basePrice : getEffectiveUpgradePrice(upgrade);
+    const isAlt = upgrade && upgrade.currency === 'alts';
+
     const storage = window.fjfeNumbersStorage;
     const money = getMoneyScaledState();
     const priceScaled = priceToScaled(price);
-    const affordable = canAffordPrice(price);
+    const affordable = isAlt ? canAffordAltUpgrade(upgrade) : canAffordPrice(price);
     if (!affordable) {
       console.log('Not enough money to purchase upgrade:', upgrade.name);
       try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {}
       return false;
     }
 
-    
     try {
-      if (money.infinite) {
+      if (isAlt) {
+        const cost = getAltCost(upgrade);
+        if (!spendAltCost(cost)) {
+          try { if (window.fjfeAudio) window.fjfeAudio.play('deny'); } catch(_) {}
+          return false;
+        }
+      } else if (money.infinite) {
         
       } else if (storage && typeof storage.writeRaw === 'function') {
         let next = money.scaled - (priceScaled > 0n ? priceScaled : 0n);
@@ -562,6 +1131,13 @@
 
     
   markUpgradePurchased(upgrade.id);
+  try {
+    if (upgrade.id === 'met8' || upgrade.id === 'met9' || upgrade.id === 'met10') {
+      if (window.fjfeStats && typeof window.fjfeStats.setClickBonusPercent === 'function') {
+        window.fjfeStats.setClickBonusPercent(getMetaClickBonusPct());
+      }
+    }
+  } catch(_) {}
   try { if (window.fjfeAudio) window.fjfeAudio.play('upgrade'); } catch(_) {}
 
   
@@ -570,8 +1146,13 @@
     
     if (typeof upgrade.inc === 'number') {
       const parsed = extractProducerIdFromUpgradeId(upgrade.id);
-      if (parsed) {
-        addProducerMultiplier(parsed.producerId, upgrade.inc);
+      const producerId = upgrade.producerId || (parsed ? parsed.producerId : null);
+      if (producerId) {
+        if (upgrade && upgrade.currency === 'alts') {
+          addProducerAltMultiplier(producerId, 3);
+        } else {
+          addProducerMultiplier(producerId, upgrade.inc);
+        }
       }
     }
 
@@ -694,14 +1275,23 @@
     return PRODUCER_NAMES[producerId] || producerId;
   }
 
+  function getEffectiveIncreasePercent(producerId, inc) {
+    if (!Number.isFinite(inc) || inc <= 0) return 0;
+    let currentPct = getProducerMultiplierPercent(producerId);
+    if (!Number.isFinite(currentPct) || currentPct <= 0) currentPct = 100;
+    if (currentPct < 100) currentPct = 100;
+    return (inc / currentPct) * 100;
+  }
+
   function buildCard(upgrade) {
     const card = document.createElement('div');
     card.dataset.upgradeId = upgrade.id;
+    const isAlt = upgrade && upgrade.currency === 'alts';
     Object.assign(card.style, {
       flex: '0 0 auto',
       width: '60px',
       height: '60px',
-      border: '4px solid #48017f',
+      border: isAlt ? '4px solid #f2ead6' : '4px solid #48017f',
       borderRadius: '0',
       background: '#151515',
       display: 'flex',
@@ -715,8 +1305,10 @@
     try { card.setAttribute('unselectable','on'); } catch(_) {}
     try { card.onselectstart = () => false; } catch(_) {}
 
-  const formattedPrice = formatPrice(upgrade.basePrice);
-  const iconPath = getUpgradeIconPathById(upgrade.id);
+  const formattedPrice = (upgrade && upgrade.currency === 'alts')
+    ? formatPrice(getAltCost(upgrade))
+    : formatPrice(getEffectiveUpgradePrice(upgrade));
+  const iconPath = getUpgradeIconPath(upgrade);
     const iconSrc = chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL(iconPath) : iconPath;
 
     
@@ -745,7 +1337,8 @@
       const tier = parsed ? parsed.tier : 0;
       if (tier > 0) {
         const overlay = document.createElement('div');
-        overlay.textContent = toRoman(tier);
+        const overlayText = document.createElement('span');
+        overlayText.textContent = toRoman(tier);
         Object.assign(overlay.style, {
           position: 'absolute',
           left: '0', top: '0', width: '100%', height: '100%',
@@ -754,25 +1347,46 @@
           textShadow: '0 1px 2px rgba(0,0,0,0.7)',
           opacity: '0.85',
           pointerEvents: 'none',
+          padding: '2px',
+          whiteSpace: 'nowrap',
         });
+        Object.assign(overlayText.style, {
+          display: 'inline-block',
+          whiteSpace: 'nowrap',
+          lineHeight: '1',
+        });
+        overlay.appendChild(overlayText);
         card.appendChild(overlay);
+        fitOverlayText(overlay, card);
       }
     } catch(_) {}
     
     
     let topLine = '';
     let midLine = '';
-    if (upgrade.id && /^clickt\d+$/.test(upgrade.id)) {
+    if (upgrade && upgrade.mainText) {
+      topLine = String(upgrade.mainText);
+    } else if (upgrade.id && /^clickt\d+$/.test(upgrade.id)) {
       
       topLine = '+5% of RPS on click.';
+    } else if (upgrade.id && /^mbt\d+$/.test(upgrade.id)) {
+      const pct = getMemeTypePercentFromId(upgrade.id);
+      topLine = pct > 0 ? `Increases RPS by +${pct}%.` : '';
+    } else if (upgrade.id && /^(lct|gat|fbt|tgt|vgt|fgt|fjt|spt)\d+$/.test(upgrade.id)) {
+      const pct = getExtraMemeTypePercentFromId(upgrade.id);
+      topLine = pct > 0 ? `Increases RPS by +${pct}%.` : '';
     } else if (typeof upgrade.inc === 'number') {
       const parsed = extractProducerIdFromUpgradeId(upgrade.id);
-      if (parsed) {
-        const producerName = getProducerName(parsed.producerId);
-        const percentageText = formatPercentage(upgrade.inc);
+      const producerId = upgrade.producerId || (parsed ? parsed.producerId : null);
+      if (producerId) {
+        const producerName = getProducerName(producerId);
+        const effectiveInc = getEffectiveIncreasePercent(producerId, upgrade.inc);
+        const percentageText = (upgrade && upgrade.currency === 'alts')
+          ? formatPercentage(upgrade.inc)
+          : formatPercentage(effectiveInc);
         topLine = `Increases ${producerName} production by ${percentageText}.`;
         
-        if (parsed.producerId === 'script') {
+        if (producerId === 'script' && !(upgrade && upgrade.currency === 'alts')) {
           midLine = 'x2 clicking efficiency.';
         }
       }
@@ -788,6 +1402,8 @@
           imageSrc: iconImg && iconImg.src ? iconImg.src : iconSrc,
           name: upgrade.name,
           cost: formattedPrice,
+          costIcon: (upgrade && upgrade.currency === 'alts') ? 'icons/clicker/alts.png' : undefined,
+          costColor: (upgrade && upgrade.currency === 'alts') ? '#5bb8ff' : undefined,
           bodyTop: topLine,
           bodyMid: midLine || undefined,
           bodyTT: ttLine,
@@ -810,7 +1426,7 @@
     try {
       card._syncAffordability = function() {
         try {
-          const canAfford = canAffordPrice(upgrade.basePrice);
+          const canAfford = canAffordUpgrade(upgrade);
           card.style.opacity = canAfford ? '1' : '0.6';
           card.style.cursor = canAfford ? 'pointer' : 'not-allowed';
         } catch(_) {}
@@ -823,9 +1439,43 @@
 
   function render() {
     if (!state.host) return;
+    let prevScrollLeft = 0;
+    try {
+      const prevScroll = state.host.querySelector('[data-role="fjfe-store-scroll"]');
+      if (prevScroll) prevScrollLeft = prevScroll.scrollLeft || 0;
+      else if (Number.isFinite(state.scrollLeft)) prevScrollLeft = state.scrollLeft;
+    } catch(_) {}
     state.host.innerHTML = '';
 
+    ensureClickerScrollbarStyles();
+
+    const headerRow = document.createElement('div');
+    Object.assign(headerRow.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      padding: '0 0 6px 0',
+      width: '100%',
+      boxSizing: 'border-box',
+    });
+
+    const buyAllBtn = document.createElement('button');
+    buyAllBtn.textContent = 'Buy All';
+    Object.assign(buyAllBtn.style, {
+      background: '#2a2a2a',
+      color: '#fff',
+      border: '1px solid #444',
+      borderRadius: '6px',
+      padding: '2px 8px',
+      fontWeight: '800',
+      fontSize: '11px',
+      cursor: 'pointer',
+      userSelect: 'none',
+    });
+    headerRow.appendChild(buyAllBtn);
+
     const scrollRow = document.createElement('div');
+    scrollRow.classList.add('fjfe-clicker-scroll');
     scrollRow.setAttribute('data-role', 'fjfe-store-scroll');
     Object.assign(scrollRow.style, {
       display: 'flex',
@@ -840,21 +1490,84 @@
       alignItems: 'flex-start',
       userSelect: 'none',
     });
-    
-    
+
+    const normalUpgrades = [];
+    const altUpgrades = [];
     try {
       CLICK_DEFS
         .filter(def => !isUpgradePurchased(def.id) && isClickUpgradeUnlocked(def))
         .forEach(def => {
-          scrollRow.appendChild(buildCard({ id: def.id, name: def.name, basePrice: def.basePrice, tt: def.tt }));
+          normalUpgrades.push({ id: def.id, name: def.name, basePrice: def.basePrice, tt: def.tt });
         });
     } catch(_) {}
-    const unlockedUpgrades = getUnlockedProductionUpgrades();
-    unlockedUpgrades.forEach((upgrade) => {
-      scrollRow.appendChild(buildCard(upgrade));
+    try {
+      MEME_TYPE_DEFS
+        .filter(def => !isUpgradePurchased(def.id) && canUnlockMemeType(def) && isMemeTypeGroupUnlocked(def))
+        .forEach(def => {
+          normalUpgrades.push(def);
+        });
+    } catch(_) {}
+    try {
+      const unlockedUpgrades = getUnlockedProductionUpgrades();
+      unlockedUpgrades.forEach((upgrade) => {
+        normalUpgrades.push(upgrade);
+      });
+    } catch(_) {}
+    try {
+      ALT_DEFS
+        .filter(def => {
+          if (!def || isUpgradePurchased(def.id)) return false;
+          if (!canUnlockAltUpgrade(def)) return false;
+          if (def.id && def.id !== 'slott1' && /^slott\d+$/.test(def.id)) {
+            return isUpgradePurchased('slott1');
+          }
+          return true;
+        })
+        .forEach(def => {
+          altUpgrades.push(def);
+        });
+    } catch(_) {}
+
+    const normalAffordable = normalUpgrades.filter(up => canAffordUpgrade(up));
+    const altAffordable = altUpgrades.filter(up => canAffordUpgrade(up));
+    const normalUnaffordable = normalUpgrades.filter(up => !canAffordUpgrade(up));
+    const altUnaffordable = altUpgrades.filter(up => !canAffordUpgrade(up));
+
+    const ordered = normalAffordable
+      .concat(altAffordable, normalUnaffordable, altUnaffordable);
+
+    const showBuyAll = normalAffordable.length >= 10;
+    headerRow.style.display = showBuyAll ? 'flex' : 'none';
+    state.host.appendChild(headerRow);
+
+    ordered.forEach(def => {
+      scrollRow.appendChild(buildCard(def));
+    });
+
+    buyAllBtn.addEventListener('click', () => {
+      try {
+        let bought = 0;
+        for (const def of ordered) {
+          if (def && def.currency === 'alts') continue;
+          if (!def || isUpgradePurchased(def.id)) continue;
+          if (!canAffordUpgrade(def)) continue;
+          if (purchaseUpgrade(def)) bought += 1;
+        }
+        if (bought > 0) {
+          try { if (window.fjfeAudio) window.fjfeAudio.play('upgrade'); } catch(_) {}
+        }
+      } catch(_) {}
     });
     
     state.host.appendChild(scrollRow);
+    try {
+      scrollRow.scrollLeft = prevScrollLeft;
+    } catch(_) {}
+    try {
+      scrollRow.addEventListener('scroll', () => {
+        state.scrollLeft = scrollRow.scrollLeft || 0;
+      });
+    } catch(_) {}
   }
 
   function init(opts) {
@@ -882,8 +1595,10 @@
     try {
       
       const clicks = CLICK_DEFS.map(d => ({ id:d.id, name:d.name, tt:d.tt }));
+      const alts = ALT_DEFS.map(d => ({ id:d.id, name:d.name, tt:d.tt, producerId:d.producerId, currency:d.currency }));
+      const memes = MEME_TYPE_DEFS.map(d => ({ id:d.id, name:d.name, tt:d.tt, icon:d.icon }));
       const prods = PRODUCTION_DEFS.map(d => ({ id:d.id, name:d.name, tt:d.tt, inc:d.inc }));
-      return clicks.concat(prods);
+      return clicks.concat(alts, memes, prods);
     } catch(_) { return []; }
   };
 
@@ -896,6 +1611,7 @@
     getPermanentUpgrades,
     getAllUpgradeDefs,
     getProducerName,
+    reapplyAltUpgradeMultipliers,
   });
   window.fjfeRcStore = exportObj;
 

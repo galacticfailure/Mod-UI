@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "FJFE Student",
+  "description": "Student-focused subset of FJFE modules.",
+  "version": "1.1.1",
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://funnyjunk.com/*",
+    "https://*.funnyjunk.com/*",
+    "https://fjme.me/*",
+    "https://*.fjme.me/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://funnyjunk.com/*"
+      ],
+      "js": [
+        "content/apichk.js",
+        "content/info.js",
+        "content/modjs.js",
+        "content/ratetrack.js",
+        "content/rclick.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "FJFE Student"
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*"
+      ],
+      "matches": [
+        "https://funnyjunk.com/*",
+        "https://fjme.me/*"
+      ]
+    }
+  ]
+}
