@@ -511,10 +511,15 @@
     reset(){ try { Object.values(K).forEach(k => { localStorage.removeItem(k); }); } catch(_) {} },
     prestigeReset(){
       try {
+        try {
+          if (window.fjfeRcStore && typeof window.fjfeRcStore.restoreAltUpgradesFromState === 'function') {
+            window.fjfeRcStore.restoreAltUpgradesFromState();
+          }
+        } catch(_) {}
         const grantScripts = localStorage.getItem('fjTweakerStoreUpgrade_met6') === '1';
         const grantGroupChats = localStorage.getItem('fjTweakerStoreUpgrade_met7') === '1';
         
-        const keepAllTime = loadInt(K.THUMBS_ALL_TIME, 0);
+        const keepAllTime = loadBigInt(K.THUMBS_ALL_TIME);
         const keepTimesClicked = loadInt(K.TIMES_CLICKED, 0);
         const keepTimesPrestiged = loadInt(K.TIMES_PRESTIGED, 0);
         const keepPrestigeBonus = loadInt(K.PRESTIGE_BONUS_PCT, 0);
@@ -524,7 +529,7 @@
         Object.values(K).forEach(k => { localStorage.removeItem(k); });
 
         
-        setInt(K.THUMBS_ALL_TIME, keepAllTime);
+        setBigInt(K.THUMBS_ALL_TIME, keepAllTime);
         setInt(K.TIMES_CLICKED, keepTimesClicked);
         setInt(K.TIMES_PRESTIGED, keepTimesPrestiged);
         setInt(K.PRESTIGE_BONUS_PCT, keepPrestigeBonus);
@@ -544,8 +549,10 @@
         try {
           const keys = Object.keys(localStorage);
           keys.forEach(k => {
-            if (k.startsWith('fjTweakerStoreUpgrade_') && !k.startsWith('fjTweakerStoreUpgrade_altt')) {
-              localStorage.removeItem(k);
+            if (k.startsWith('fjTweakerStoreUpgrade_')) {
+              const id = k.slice('fjTweakerStoreUpgrade_'.length);
+              const isAltUpgrade = /^altt\d+$/.test(id) || /^slott\d+$/.test(id) || /^mut\d+$/.test(id) || /^met\d+$/.test(id);
+              if (!isAltUpgrade) localStorage.removeItem(k);
             }
             if (k.startsWith('fjTweakerStoreMultiplier_')) localStorage.removeItem(k);
           });
@@ -554,6 +561,11 @@
         try {
           if (window.fjfeRcStore && typeof window.fjfeRcStore.reapplyAltUpgradeMultipliers === 'function') {
             window.fjfeRcStore.reapplyAltUpgradeMultipliers();
+          }
+        } catch(_) {}
+        try {
+          if (window.fjfeRcStore && typeof window.fjfeRcStore.reapplyAltUpgradeEffects === 'function') {
+            window.fjfeRcStore.reapplyAltUpgradeEffects();
           }
         } catch(_) {}
 
@@ -568,6 +580,17 @@
         try {
           if (grantScripts) localStorage.setItem('fjTweakerUpgradeNum_script', '10');
           if (grantGroupChats) localStorage.setItem('fjTweakerUpgradeNum_groupChat', '5');
+        } catch(_) {}
+        try { if (window.fjfeRcProd && typeof window.fjfeRcProd.refresh === 'function') window.fjfeRcProd.refresh(); } catch(_) {}
+
+        try {
+          const expected = (window.fjfeRcStore && typeof window.fjfeRcStore.computeAltSpentFromUpgrades === 'function')
+            ? window.fjfeRcStore.computeAltSpentFromUpgrades()
+            : 0n;
+          const progress = calcAltsProgress(keepAllTime);
+          const total = (progress && typeof progress.alts === 'bigint') ? progress.alts : 0n;
+          const corrected = expected > total ? total : expected;
+          if (typeof corrected === 'bigint') setBigInt(K.ALTS_SPENT, corrected);
         } catch(_) {}
 
         

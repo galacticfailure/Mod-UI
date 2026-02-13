@@ -980,6 +980,31 @@
       list.appendChild(row);
     })();
 
+    (function addRefreshAltsButton(){
+      const btn = document.createElement('button');
+      btn.textContent = 'Refresh alts';
+      Object.assign(btn.style, {
+        marginLeft: '2px',
+        padding: '3px 8px',
+        fontSize: '11px',
+        fontWeight: '700',
+        color: '#fff',
+        background: '#2a2a2a',
+        border: '1px solid #444',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        userSelect: 'none',
+      });
+      btn.addEventListener('click', ()=>{
+        try {
+          if (window.fjfeRcStore && typeof window.fjfeRcStore.refreshAltState === 'function') {
+            window.fjfeRcStore.refreshAltState();
+          }
+        } catch(_) {}
+      });
+      list.appendChild(btn);
+    })();
+
     let banConfirmPending = false;
     const banEvade = buildIconButton('icons/clicker/prestige.png', 'Ban Evade', {
       onClick: () => {

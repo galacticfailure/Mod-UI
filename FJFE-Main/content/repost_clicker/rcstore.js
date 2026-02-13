@@ -648,6 +648,7 @@
   const ALTS_SPENT_KEY = 'fjfeStats_altsSpent';
   const ALTS_ALL_TIME_KEY = 'fjfeStats_thumbsAllTime';
   const ALTS_MULT_KEY_PREFIX = 'fjTweakerStoreAltMultiplier_';
+  const ALT_UPGRADE_BACKUP_KEY = 'fjfeAltUpgradeBackup';
 
   function loadBigIntSafe(key){
     try {
@@ -693,7 +694,7 @@
   }
   function getAltsAvailable(){
     const total = getAltsTotal();
-    const spent = getAltsSpent();
+    const spent = computeAltSpentFromUpgrades();
     return total > spent ? (total - spent) : 0n;
   }
   function getMetaClickBonusPct() {
@@ -716,6 +717,17 @@
       return num * safeFactor;
     } catch(_) { return price; }
   }
+  function toBigIntSafe(value) {
+    try {
+      if (typeof value === 'bigint') return value;
+      if (typeof value === 'number') {
+        if (!Number.isFinite(value)) return 0n;
+        return BigInt(Math.floor(value));
+      }
+      if (typeof value === 'string' && value.length) return BigInt(value);
+    } catch(_) {}
+    return 0n;
+  }
   function getUpgradeDiscountFactor(upgrade) {
     let factor = 1;
     const isAlt = upgrade && upgrade.currency === 'alts';
@@ -734,7 +746,7 @@
   function getAltCost(upgrade){
     try {
       const raw = getEffectiveUpgradePrice(upgrade);
-      const bi = (typeof raw === 'bigint') ? raw : BigInt(Math.floor(Number(raw) || 0));
+      const bi = toBigIntSafe(raw);
       if (bi <= 0n) return 0n;
       return bi;
     } catch(_) { return 0n; }
@@ -755,12 +767,13 @@
   }
   function spendAltCost(cost){
     try {
-      if (typeof cost !== 'bigint' || cost <= 0n) return true;
+      const bi = toBigIntSafe(cost);
+      if (bi <= 0n) return true;
       const total = getAltsTotal();
       const spent = getAltsSpent();
       const available = total > spent ? (total - spent) : 0n;
-      if (available < cost) return false;
-      setBigIntSafe(ALTS_SPENT_KEY, spent + cost);
+      if (available < bi) return false;
+      setBigIntSafe(ALTS_SPENT_KEY, spent + bi);
       return true;
     } catch(_) { return false; }
   }
@@ -970,6 +983,27 @@
       localStorage.setItem(`fjTweakerStoreUpgrade_${upgradeId}`, '1');
     } catch (_) {}
   }
+  function loadAltUpgradeBackup() {
+    try {
+      const raw = localStorage.getItem(ALT_UPGRADE_BACKUP_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(id => typeof id === 'string' && id.length);
+    } catch(_) { return []; }
+  }
+  function saveAltUpgradeBackup(list) {
+    try { localStorage.setItem(ALT_UPGRADE_BACKUP_KEY, JSON.stringify(list)); } catch(_) {}
+  }
+  function addAltUpgradeToBackup(upgradeId) {
+    if (!upgradeId) return;
+    try {
+      const list = loadAltUpgradeBackup();
+      if (!list.includes(upgradeId)) {
+        list.push(upgradeId);
+        saveAltUpgradeBackup(list);
+      }
+    } catch(_) {}
+  }
 
   function getMoney() {
     try {
@@ -1092,6 +1126,100 @@
       });
     } catch(_) {}
   }
+  function reapplyAltUpgradeEffects() {
+    try { reapplyAltUpgradeMultipliers(); } catch(_) {}
+    try {
+      if (window.fjfeStats && typeof window.fjfeStats.setClickBonusPercent === 'function') {
+        window.fjfeStats.setClickBonusPercent(getMetaClickBonusPct());
+      }
+    } catch(_) {}
+  }
+  function computeAltSpentFromUpgrades() {
+    let spent = 0n;
+    try {
+      ALT_DEFS.forEach(def => {
+        if (!def || def.currency !== 'alts' || !isUpgradePurchased(def.id)) return;
+        const cost = getAltCost(def);
+        if (typeof cost === 'bigint' && cost > 0n) spent += cost;
+      });
+    } catch(_) {}
+    return spent;
+  }
+  function reconcileAltSpentState() {
+    try {
+      const total = getAltsTotal();
+      const expected = computeAltSpentFromUpgrades();
+      const next = expected > total ? total : expected;
+      const current = getAltsSpent();
+      if (typeof next === 'bigint' && current !== next) {
+        setBigIntSafe(ALTS_SPENT_KEY, next);
+      }
+    } catch(_) {}
+  }
+  function refreshAltState() {
+    try { restoreAltUpgradesFromState(); } catch(_) {}
+    try { reapplyAltUpgradeEffects(); } catch(_) {}
+    try { reconcileAltSpentState(); } catch(_) {}
+    try { if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors(); } catch(_) {}
+    try { if (typeof window.fjfeRefreshStoreAffordability === 'function') window.fjfeRefreshStoreAffordability(); } catch(_) {}
+    try { if (window.fjfeRcStats && typeof window.fjfeRcStats.refreshPurchasedGrid === 'function') window.fjfeRcStats.refreshPurchasedGrid(); } catch(_) {}
+  }
+  function restoreAltUpgradesFromState() {
+    try {
+      const backup = loadAltUpgradeBackup();
+      backup.forEach(id => { if (!isUpgradePurchased(id)) markUpgradePurchased(id); });
+    } catch(_) {}
+    try {
+      ALT_DEFS.forEach(def => {
+        if (!def || def.currency !== 'alts' || !def.producerId) return;
+        const raw = localStorage.getItem(ALTS_MULT_KEY_PREFIX + def.producerId);
+        const val = parseFloat(raw);
+        if (Number.isFinite(val) && val > 1 && !isUpgradePurchased(def.id)) {
+          markUpgradePurchased(def.id);
+        }
+      });
+    } catch(_) {}
+    try {
+      const slotKeys = [
+        'fjfeSlotNextFreeSpinAt',
+        'fjfeSlotFreeSpinBank',
+        'fjfeSlotRpsMult',
+        'fjfeSlotRpsMultUntil',
+        'fjfeSlotRpsPctMult',
+        'fjfeSlotRpsPctMultUntil',
+        'fjfeSlotClickMult',
+        'fjfeSlotClickMultUntil',
+        'fjfeSlotResultText',
+        'fjfeSlotResultType',
+        'fjfeSlotResultUntil'
+      ];
+      const hasSlotState = slotKeys.some(k => localStorage.getItem(k));
+      const hasSlotUpgrade = ALT_DEFS.some(def => def && /^slott\d+$/.test(def.id) && isUpgradePurchased(def.id));
+      if ((hasSlotState || hasSlotUpgrade) && !isUpgradePurchased('slott1')) {
+        markUpgradePurchased('slott1');
+      }
+    } catch(_) {}
+    try {
+      const sets = [
+        { mut: 'mut1', prefix: 'lct', count: 6 },
+        { mut: 'mut2', prefix: 'gat', count: 17 },
+        { mut: 'mut3', prefix: 'fbt', count: 9 },
+        { mut: 'mut4', prefix: 'tgt', count: 5 },
+        { mut: 'mut5', prefix: 'vgt', count: 7 },
+        { mut: 'mut6', prefix: 'fgt', count: 7 },
+        { mut: 'mut7', prefix: 'fjt', count: 9 },
+      ];
+      sets.forEach(set => {
+        if (isUpgradePurchased(set.mut)) return;
+        for (let i = 1; i <= set.count; i++) {
+          if (isUpgradePurchased(set.prefix + i)) {
+            markUpgradePurchased(set.mut);
+            break;
+          }
+        }
+      });
+    } catch(_) {}
+  }
 
   function purchaseUpgrade(upgrade) {
     const price = (upgrade && upgrade.currency === 'alts') ? upgrade.basePrice : getEffectiveUpgradePrice(upgrade);
@@ -1131,6 +1259,7 @@
 
     
   markUpgradePurchased(upgrade.id);
+  if (isAlt) addAltUpgradeToBackup(upgrade.id);
   try {
     if (upgrade.id === 'met8' || upgrade.id === 'met9' || upgrade.id === 'met10') {
       if (window.fjfeStats && typeof window.fjfeStats.setClickBonusPercent === 'function') {
@@ -1605,6 +1734,12 @@
   
   try { window.fjfeStoreAllUpgradeDefs = getAllUpgradeDefs(); } catch(_) {}
 
+  try {
+    restoreAltUpgradesFromState();
+    reapplyAltUpgradeEffects();
+    reconcileAltSpentState();
+  } catch(_) {}
+
   const exportObj = Object.assign(window.fjfeRcStore || {}, {
     init,
     refresh,
@@ -1612,6 +1747,11 @@
     getAllUpgradeDefs,
     getProducerName,
     reapplyAltUpgradeMultipliers,
+    reapplyAltUpgradeEffects,
+    restoreAltUpgradesFromState,
+    computeAltSpentFromUpgrades,
+    reconcileAltSpentState,
+    refreshAltState,
   });
   window.fjfeRcStore = exportObj;
 
