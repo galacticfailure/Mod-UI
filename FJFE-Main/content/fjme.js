@@ -423,6 +423,12 @@
       }
       const detectedEntry = detectedMap.get(entry.url);
       const nextEntry = { ...entry };
+      if (!nextEntry.rateId && detectedEntry?.rateId) {
+        nextEntry.rateId = detectedEntry.rateId;
+      }
+      if ((!nextEntry.title || nextEntry.title === FALLBACK_QUEUE_TITLE) && detectedEntry?.title) {
+        nextEntry.title = detectedEntry.title;
+      }
       if (detectedEntry?.status === QUEUE_STATUS.ACKNOWLEDGED) {
         nextEntry.status = QUEUE_STATUS.ACKNOWLEDGED;
         delete nextEntry.rejectDetails;

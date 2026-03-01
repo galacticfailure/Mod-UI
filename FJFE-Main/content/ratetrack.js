@@ -1730,6 +1730,22 @@
     }
   };
 
+  const normalizeRateId = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const normalized = Math.abs(Math.trunc(value));
+      return normalized ? String(normalized) : '';
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return '';
+      }
+      const match = trimmed.match(/\d+/);
+      return match ? match[0] : '';
+    }
+    return '';
+  };
+
   const sanitizeRejectSummarySegments = (segments) => {
     if (!Array.isArray(segments)) {
       return [];
@@ -1882,9 +1898,13 @@
       const approveNote = typeof entry.approveNote === 'string' ? entry.approveNote.trim() : '';
       const rejectDetails = sanitizeQueueRejectDetails(entry.rejectDetails);
       const rateActionAdded = Boolean(entry.rateActionAdded);
+      const rateId = normalizeRateId(entry.rateId);
       const normalizedEntry = { url, title: title || QUEUE_FALLBACK_TITLE, status };
       if (rateActionAdded) {
         normalizedEntry.rateActionAdded = true;
+      }
+      if (rateId) {
+        normalizedEntry.rateId = rateId;
       }
       if (approveNote && status === QUEUE_STATUS.APPROVED) {
         normalizedEntry.approveNote = approveNote;
