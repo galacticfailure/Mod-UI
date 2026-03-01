@@ -348,8 +348,25 @@
         const toURL = (p)=> (chrome.runtime && chrome.runtime.getURL) ? chrome.runtime.getURL(p) : p;
         
         let iconPath;
+        const mutIconMap = {
+          mut1: 'icons/clicker/lolcat.png',
+          mut2: 'icons/clicker/alpha.png',
+          mut3: 'icons/clicker/facebook.png',
+          mut4: 'icons/clicker/tragedy.png',
+          mut5: 'icons/clicker/vidya.png',
+          mut6: 'icons/clicker/foreign.png',
+          mut7: 'icons/clicker/fj.png',
+        };
         if (def.icon) {
           iconPath = def.icon;
+        } else if (mutIconMap[def.id]) {
+          iconPath = mutIconMap[def.id];
+        } else if (/^met\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/alts.png';
+        } else if (/^timet\d+$/.test(def.id)) {
+          iconPath = 'icons/clicker/time.png';
+        } else if (/^amntt\d+$/.test(def.id)) {
+          iconPath = def.id === 'amntt1' ? 'icons/clicker/offline.png' : 'icons/clicker/amount.png';
         } else if (/^mbt\d+$/.test(def.id)) {
           iconPath = 'icons/clicker/meme.png';
         } else if (/^lct\d+$/.test(def.id)) {
@@ -458,6 +475,20 @@
               topLine = `Increases ${producerName} production by ${fmtPct(def.inc)}.`;
               if (producerId === 'script') midLine = 'x2 clicking efficiency.';
             }
+            if (def.mainText) {
+              const mainText = String(def.mainText);
+              const isAltProducerUpgrade = def.currency === 'alts' && !!def.producerId;
+              if (isAltProducerUpgrade) {
+                if (topLine && topLine !== mainText && !midLine) {
+                  midLine = topLine;
+                }
+                topLine = mainText;
+              } else if (!topLine) {
+                topLine = mainText;
+              } else if (!midLine && topLine !== mainText) {
+                midLine = mainText;
+              }
+            }
             const ttLine = def.tt ? String(def.tt) : '';
             const imageSrc = img && img.src ? img.src : '';
             window.fjfeRcInfo.show({ imageSrc, name, hideCost:true, bodyTop: topLine, bodyMid: midLine || undefined, bodyTT: ttLine });
@@ -477,6 +508,7 @@
   window.fjfeStats = {
     addClick(deltaThumbs){
       try {
+        try { localStorage.setItem('fjfeClickerLastActiveTs', String(Date.now())); } catch(_) {}
         const inc = Math.max(0, Math.floor(deltaThumbs||0));
         setInt(K.TIMES_CLICKED, loadInt(K.TIMES_CLICKED,0)+1);
         setInt(K.THUMBS_PER_CLICK_LAST, inc);
@@ -489,6 +521,7 @@
     },
     addPassive(deltaThumbs){
       try {
+        try { localStorage.setItem('fjfeClickerLastActiveTs', String(Date.now())); } catch(_) {}
         const inc = Math.max(0, Math.floor(deltaThumbs||0));
         setInt(K.THUMBS_GENERATED_TOTAL, loadInt(K.THUMBS_GENERATED_TOTAL,0)+inc);
         const allBi = loadBigInt(K.THUMBS_ALL_TIME) + BigInt(inc);
@@ -498,6 +531,7 @@
     
     addPassiveScaledBig(deltaScaled){
       try {
+        try { localStorage.setItem('fjfeClickerLastActiveTs', String(Date.now())); } catch(_) {}
         if (typeof deltaScaled !== 'bigint') return;
         if (deltaScaled <= 0n) return;
         const whole = deltaScaled / 10n;
@@ -511,6 +545,9 @@
     reset(){ try { Object.values(K).forEach(k => { localStorage.removeItem(k); }); } catch(_) {} },
     prestigeReset(){
       try {
+        try { window.fjfeClickerResetToken = (window.fjfeClickerResetToken || 0) + 1; } catch(_) {}
+        try { localStorage.removeItem('fjfeOfflineGainPending'); } catch(_) {}
+        try { localStorage.setItem('fjfeClickerLastActiveTs', String(Date.now())); } catch(_) {}
         try {
           if (window.fjfeRcStore && typeof window.fjfeRcStore.restoreAltUpgradesFromState === 'function') {
             window.fjfeRcStore.restoreAltUpgradesFromState();
@@ -551,7 +588,7 @@
           keys.forEach(k => {
             if (k.startsWith('fjTweakerStoreUpgrade_')) {
               const id = k.slice('fjTweakerStoreUpgrade_'.length);
-              const isAltUpgrade = /^altt\d+$/.test(id) || /^slott\d+$/.test(id) || /^mut\d+$/.test(id) || /^met\d+$/.test(id);
+              const isAltUpgrade = /^altt\d+$/.test(id) || /^slott\d+$/.test(id) || /^mut\d+$/.test(id) || /^met\d+$/.test(id) || /^timet\d+$/.test(id) || /^amntt\d+$/.test(id);
               if (!isAltUpgrade) localStorage.removeItem(k);
             }
             if (k.startsWith('fjTweakerStoreMultiplier_')) localStorage.removeItem(k);

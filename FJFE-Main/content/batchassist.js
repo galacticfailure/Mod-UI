@@ -515,9 +515,14 @@
       ? parsed[0] === 'OK'
       : typeof bodyText === 'string' && bodyText.trim().replace(/"/g, '').toUpperCase() === 'OK';
     if (success) {
-      return { ok: true };
+      return {
+        ok: true,
+        status: response.status,
+        bodyText,
+        parsed
+      };
     }
-    return { ok: false, bodyText };
+    return { ok: false, status: response.status, bodyText, parsed };
   };
 
   const normalizeQueueUrl = (value) => {
@@ -1561,9 +1566,20 @@
       skippedRateActionAdded: 0,
       skippedMissingRateId: 0,
       skippedDuplicateRateId: 0,
+      skippedStatusMismatch: 0,
       added: 0
     };
     queueLinks.forEach((entry, index) => {
+      const status = entry?.status || QUEUE_STATUS.PENDING;
+      if (status !== QUEUE_STATUS.APPROVED) {
+        stats.skippedStatusMismatch += 1;
+        console.debug('[BatchAssist] collectRateIdTargets skip: non-approved status', {
+          index,
+          url: entry?.url,
+          status
+        });
+        return;
+      }
       if (entry?.rateActionAdded) {
         stats.skippedRateActionAdded += 1;
         console.debug('[BatchAssist] collectRateIdTargets skip: rateActionAdded', {
@@ -1595,11 +1611,101 @@
         return;
       }
       seen.add(rateId);
-      targets.push({ rateId, index, url: typeof entry?.url === 'string' ? entry.url : '' });
+      targets.push({
+        rateId,
+        index,
+        url: typeof entry?.url === 'string' ? entry.url : '',
+        title: typeof entry?.title === 'string' ? entry.title : '',
+        status,
+        approveNote: typeof entry?.approveNote === 'string' ? entry.approveNote : ''
+      });
       stats.added += 1;
     });
     console.debug('[BatchAssist] collectRateIdTargets summary.', stats);
     return targets;
+  };
+
+  const logVerboseAcknowledgeSuccess = ({
+    rateId,
+    url,
+    title,
+    status,
+    approveNote,
+    index,
+    total,
+    elapsedMs,
+    result,
+    token,
+    successCount,
+    failureCount
+  }) => {
+    const now = new Date();
+    const tokenPreview = token ? `${token.slice(0, 4)}...${token.slice(-4)}` : '';
+    const bodyPreview = typeof result?.bodyText === 'string'
+      ? result.bodyText.slice(0, 500)
+      : '';
+
+    console.groupCollapsed(`✅ [BatchAssist][Ack Success ${index}/${total}] rateId=${rateId}`);
+    console.info('[BatchAssist] Acknowledge success summary', {
+      timestampIso: now.toISOString(),
+      timestampLocal: now.toLocaleString(),
+      step: `${index}/${total}`,
+      progressPercent: Math.round((index / Math.max(1, total)) * 100),
+      elapsedMs,
+      rateId,
+      url,
+      title,
+      originalStatus: status,
+      resultingStatus: QUEUE_STATUS.ACKNOWLEDGED,
+      approveNote: approveNote || null,
+      responseStatus: result?.status ?? null,
+      responseOk: Boolean(result?.ok),
+      responseRateLimited: Boolean(result?.rateLimited),
+      responseHasParsed: result?.parsed !== null && typeof result?.parsed !== 'undefined',
+      responseParsedType: result?.parsed === null ? 'null' : typeof result?.parsed,
+      tokenPresent: Boolean(token),
+      tokenLength: token ? token.length : 0,
+      tokenPreview,
+      runningTotals: {
+        successCount,
+        failureCount,
+        attempted: index,
+        remaining: Math.max(0, total - index)
+      }
+    });
+    console.debug('[BatchAssist] Raw acknowledge response body (trimmed)', bodyPreview);
+    console.debug('[BatchAssist] Parsed acknowledge response payload', result?.parsed ?? null);
+    console.table([
+      {
+        metric: 'rateId',
+        value: rateId
+      },
+      {
+        metric: 'url',
+        value: url || '(missing)'
+      },
+      {
+        metric: 'title',
+        value: title || '(untitled)'
+      },
+      {
+        metric: 'elapsedMs',
+        value: elapsedMs
+      },
+      {
+        metric: 'httpStatus',
+        value: result?.status ?? '(none)'
+      },
+      {
+        metric: 'queueIndex',
+        value: `${index}/${total}`
+      },
+      {
+        metric: 'tokenLength',
+        value: token ? token.length : 0
+      }
+    ]);
+    console.groupEnd();
   };
 
   const buildQueueErrorClipboardPayload = () => {
@@ -2643,7 +2749,7 @@
         console.warn('[BatchAssist] Acknowledge aborted: no rate IDs found.', {
           queueSample: Array.isArray(queueLinks) ? queueLinks.slice(0, 3) : null
         });
-        setTransientNoteMessage('No rate IDs available to acknowledge.', 3600);
+        setTransientNoteMessage('No approved rates available to acknowledge.', 3600);
         return;
       }
       acknowledgeInProgress = true;
@@ -2656,9 +2762,16 @@
       let successCount = 0;
       let failureCount = 0;
       let rateLimited = false;
+      const successfulRateIds = new Set();
 
       for (let index = 0; index < targets.length; index += 1) {
-        const { rateId, url } = targets[index];
+        const {
+          rateId,
+          url,
+          title,
+          status,
+          approveNote
+        } = targets[index];
         ackProgressMessage = `Acknowledging ${index + 1}/${targets.length}...`;
         updateNoteForState();
         console.debug('[BatchAssist] Acknowledge attempt starting.', {
@@ -2670,14 +2783,41 @@
         const startedAt = Date.now();
         const result = await sendAcknowledgeRequest(rateId, token);
         const elapsedMs = Date.now() - startedAt;
+        console.info('[BatchAssist] Acknowledge response received.', {
+          index: index + 1,
+          total: targets.length,
+          rateId,
+          url,
+          status: result.status,
+          ok: result.ok,
+          rateLimited: result.rateLimited,
+          bodyText: result.bodyText,
+          parsed: result.parsed,
+          elapsedMs
+        });
         if (result.ok) {
           successCount += 1;
+          successfulRateIds.add(rateId);
           console.debug('[BatchAssist] Acknowledge attempt succeeded.', {
             index: index + 1,
             total: targets.length,
             rateId,
             url,
             elapsedMs
+          });
+          logVerboseAcknowledgeSuccess({
+            rateId,
+            url,
+            title,
+            status,
+            approveNote,
+            index: index + 1,
+            total: targets.length,
+            elapsedMs,
+            result,
+            token,
+            successCount,
+            failureCount
           });
         } else if (result.rateLimited) {
           rateLimited = true;
@@ -2728,14 +2868,18 @@
         rateLimited
       });
 
-      if (queueLinks.length) {
+      if (queueLinks.length && successfulRateIds.size) {
         const nextLinks = queueLinks.map((entry) => {
           if (!entry) {
             return entry;
           }
-          const nextEntry = { ...entry, status: QUEUE_STATUS.ACKNOWLEDGED };
-          delete nextEntry.rejectDetails;
-          return nextEntry;
+          const normalizedRateId = normalizeRateId(entry.rateId);
+          if (entry.status === QUEUE_STATUS.APPROVED && normalizedRateId && successfulRateIds.has(normalizedRateId)) {
+            const nextEntry = { ...entry, status: QUEUE_STATUS.ACKNOWLEDGED };
+            delete nextEntry.rejectDetails;
+            return nextEntry;
+          }
+          return entry;
         });
         setQueueLinks(nextLinks, { persist: true });
       }

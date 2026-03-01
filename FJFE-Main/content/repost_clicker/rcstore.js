@@ -18,26 +18,26 @@
   ];
 
   const ALT_DEFS = [
-    { id: 'altt1',  name: 'Ultimate Scripts',             basePrice: 15000000,           tt: 'Self-writing, self-expanding, self-redefining.', currency: 'alts', producerId: 'script', inc: 200 },
-    { id: 'altt2',  name: 'Ultimate Group Chats',         basePrice: 1920000000,         tt: 'A chat for everyone.', currency: 'alts', producerId: 'groupChat', inc: 200 },
-    { id: 'altt3',  name: 'Ultimate Workshops',           basePrice: 32805000000,        tt: 'Content retooled.', currency: 'alts', producerId: 'workshop', inc: 200 },
-    { id: 'altt4',  name: 'Ultimate Studios',             basePrice: 245760000000,       tt: 'No TV, only content.', currency: 'alts', producerId: 'studio', inc: 200 },
-    { id: 'altt5',  name: 'Ultimate Recycling Centers',   basePrice: 1171875000000,      tt: 'Everything can be anything.', currency: 'alts', producerId: 'recyclingCenter', inc: 200 },
-    { id: 'altt6',  name: 'Ultimate Digsites',            basePrice: 4199040000000,      tt: 'Ancient ancients.', currency: 'alts', producerId: 'digsite', inc: 200 },
-    { id: 'altt7',  name: 'Ultimate Office Buildings',    basePrice: 12353145000000,     tt: 'Corporate hellscape made real.', currency: 'alts', producerId: 'officeBuilding', inc: 200 },
-    { id: 'altt8',  name: 'Ultimate Content Farms',       basePrice: 31457280000000,     tt: 'Year-round.', currency: 'alts', producerId: 'contentFarm', inc: 200 },
-    { id: 'altt9',  name: 'Ultimate Botnets',             basePrice: 71744535000000,     tt: 'Every computer.', currency: 'alts', producerId: 'botnet', inc: 200 },
-    { id: 'altt10', name: 'Ultimate Spaceport',           basePrice: 150000000000000,    tt: 'Block out the sun.', currency: 'alts', producerId: 'spaceport', inc: 200 },
-    { id: 'altt11', name: 'Ultimate Ritual Circles',      basePrice: 292307565000000,    tt: 'Rituals the size of continents.', currency: 'alts', producerId: 'ritualCircle', inc: 200 },
-    { id: 'altt12', name: 'Ultimate Memecatchers',        basePrice: 537477120000000,    tt: 'All thought is content.', currency: 'alts', producerId: 'memecatcher', inc: 200 },
-    { id: 'altt13', name: 'Ultimate Quantum Harmonizers', basePrice: 941227755000000,    tt: 'Content is unknowable.', currency: 'alts', producerId: 'quantumHarmonizer', inc: 200 },
-    { id: 'altt14', name: 'Ultimate Time Forges',         basePrice: 1581202560000000,   tt: 'Ouroboros as content.', currency: 'alts', producerId: 'timeForge', inc: 200 },
-    { id: 'altt15', name: 'Ultimate Wormholes',           basePrice: 2562890625000000,   tt: 'Collapse the solar system.', currency: 'alts', producerId: 'wormhole', inc: 200 },
-    { id: 'altt16', name: 'Ultimate Pocket Dimensions',   basePrice: 4026531840000000,   tt: 'Recursive, now.', currency: 'alts', producerId: 'pocketDimension', inc: 200 },
-    { id: 'altt17', name: 'Ultimate AGI Shitposters',     basePrice: 6155080095000000,   tt: 'What do you dream about?', currency: 'alts', producerId: 'agiShitposter', inc: 200 },
-    { id: 'altt18', name: 'Ultimate Reality Shapers',     basePrice: 9183300480000000n,  tt: 'Nothing is content.', currency: 'alts', producerId: 'realityShaper', inc: 200 },
-    { id: 'altt19', name: 'Ultimate Dyson Spheres',       basePrice: 13408076085000000n, tt: 'No light. All memes.', currency: 'alts', producerId: 'dysonSphere', inc: 200 },
-    { id: 'altt20', name: 'Ultimate Multiverses',         basePrice: 19200000000000000n, tt: 'Filled with cookies, for some reason.', currency: 'alts', producerId: 'multiverse', inc: 200 },
+    { id: 'altt1',  name: 'Ultimate Scripts',             basePrice: 15000000,           mainText: 'Normal Script upgrades give an extra +250% production.', tt: 'Self-writing, self-expanding, self-redefining.', currency: 'alts', producerId: 'script', inc: 200 },
+    { id: 'altt2',  name: 'Ultimate Group Chats',         basePrice: 1920000000,         mainText: 'Normal Group Chat upgrades give an extra +50% production.', tt: 'A chat for everyone.', currency: 'alts', producerId: 'groupChat', inc: 200 },
+    { id: 'altt3',  name: 'Ultimate Workshops',           basePrice: 32805000000,        mainText: 'Normal Workshop upgrades give an extra +180% production.', tt: 'Content retooled.', currency: 'alts', producerId: 'workshop', inc: 200 },
+    { id: 'altt4',  name: 'Ultimate Studios',             basePrice: 245760000000,       mainText: 'Normal Studio upgrades give an extra +170% production.', tt: 'No TV, only content.', currency: 'alts', producerId: 'studio', inc: 200 },
+    { id: 'altt5',  name: 'Ultimate Recycling Centers',   basePrice: 1171875000000,      mainText: 'Normal Recycling Center upgrades give an extra +160% production.', tt: 'Everything can be anything.', currency: 'alts', producerId: 'recyclingCenter', inc: 200 },
+    { id: 'altt6',  name: 'Ultimate Digsites',            basePrice: 4199040000000,      mainText: 'Normal Digsite upgrades give an extra +150% production.', tt: 'Ancient ancients.', currency: 'alts', producerId: 'digsite', inc: 200 },
+    { id: 'altt7',  name: 'Ultimate Office Buildings',    basePrice: 12353145000000,     mainText: 'Normal Office Building upgrades give an extra +140% production.', tt: 'Corporate hellscape made real.', currency: 'alts', producerId: 'officeBuilding', inc: 200 },
+    { id: 'altt8',  name: 'Ultimate Content Farms',       basePrice: 31457280000000,     mainText: 'Normal Content Farm upgrades give an extra +130% production.', tt: 'Year-round.', currency: 'alts', producerId: 'contentFarm', inc: 200 },
+    { id: 'altt9',  name: 'Ultimate Botnets',             basePrice: 71744535000000,     mainText: 'Normal Botnet upgrades give an extra +120% production.', tt: 'Every computer.', currency: 'alts', producerId: 'botnet', inc: 200 },
+    { id: 'altt10', name: 'Ultimate Spaceport',           basePrice: 150000000000000,    mainText: 'Normal Spaceport upgrades give an extra +110% production.', tt: 'Block out the sun.', currency: 'alts', producerId: 'spaceport', inc: 200 },
+    { id: 'altt11', name: 'Ultimate Ritual Circles',      basePrice: 292307565000000,    mainText: 'Normal Ritual Circle upgrades give an extra +100% production.', tt: 'Rituals the size of continents.', currency: 'alts', producerId: 'ritualCircle', inc: 200 },
+    { id: 'altt12', name: 'Ultimate Memecatchers',        basePrice: 537477120000000,    mainText: 'Normal Memecatcher upgrades give an extra +90% production.', tt: 'All thought is content.', currency: 'alts', producerId: 'memecatcher', inc: 200 },
+    { id: 'altt13', name: 'Ultimate Quantum Harmonizers', basePrice: 941227755000000,    mainText: 'Normal Quantum Harmonizer upgrades give an extra +80% production.', tt: 'Content is unknowable.', currency: 'alts', producerId: 'quantumHarmonizer', inc: 200 },
+    { id: 'altt14', name: 'Ultimate Time Forges',         basePrice: 1581202560000000,   mainText: 'Normal Time Forge upgrades give an extra +70% production.', tt: 'Ouroboros as content.', currency: 'alts', producerId: 'timeForge', inc: 200 },
+    { id: 'altt15', name: 'Ultimate Wormholes',           basePrice: 2562890625000000,   mainText: 'Normal Wormhole upgrades give an extra +60% production.', tt: 'Collapse the solar system.', currency: 'alts', producerId: 'wormhole', inc: 200 },
+    { id: 'altt16', name: 'Ultimate Pocket Dimensions',   basePrice: 4026531840000000,   mainText: 'Normal Pocket Dimension upgrades give an extra +50% production.', tt: 'Recursive, now.', currency: 'alts', producerId: 'pocketDimension', inc: 200 },
+    { id: 'altt17', name: 'Ultimate AGI Shitposters',     basePrice: 6155080095000000,   mainText: 'Normal AGI Shitposter upgrades give an extra +40% production.', tt: 'What do you dream about?', currency: 'alts', producerId: 'agiShitposter', inc: 200 },
+    { id: 'altt18', name: 'Ultimate Reality Shapers',     basePrice: 9183300480000000n,  mainText: 'Normal Reality Shaper upgrades give an extra +30% production.', tt: 'Nothing is content.', currency: 'alts', producerId: 'realityShaper', inc: 200 },
+    { id: 'altt19', name: 'Ultimate Dyson Spheres',       basePrice: 13408076085000000n, mainText: 'Normal Dyson Sphere upgrades give an extra +20% production.', tt: 'No light. All memes.', currency: 'alts', producerId: 'dysonSphere', inc: 200 },
+    { id: 'altt20', name: 'Ultimate Multiverses',         basePrice: 19200000000000000n, mainText: 'Normal Multiverse upgrades give an extra +10% production.', tt: 'Filled with cookies, for some reason.', currency: 'alts', producerId: 'multiverse', inc: 200 },
     { id: 'slott1', name: 'Slot Machine',                 basePrice: 7,           mainText: 'Unlocks the slot machine.', tt: 'A slot machine, to boost your production!', currency: 'alts' },
     { id: 'slott2', name: 'Better Items',                 basePrice: 77,          mainText: 'Increases your chance for a good result from the slot machine by 5%.', tt: 'You bribe Admin for these?', currency: 'alts' },
     { id: 'slott3', name: 'Slower Clocks',                basePrice: 777,         mainText: 'Slot machine boosts last 10% longer.', tt: 'You have the time?', currency: 'alts' },
@@ -63,7 +63,45 @@
     { id: 'met9', name: 'WD-40',                          basePrice: 555555555, mainText: 'Clicking gives 50% more thumbs.', tt: 'Is this good for your mouse?', currency: 'alts' },
     { id: 'met10', name: 'Ambidextrous',                  basePrice: 55555555555, mainText: 'Clicking gives 50% more thumbs.', tt: 'You can just learn that?', currency: 'alts' },
     { id: 'met11', name: 'Ratchet Straps',                basePrice: 555555, mainText: 'All upgrades are 10% cheaper.', tt: "Oh yeah, that's not going anywhere.", currency: 'alts' },
+    { id: 'timet1', name: 'Job Summary',                  basePrice: 10,     mainText: 'Your offline income is extended to 2 hours.', tt: 'There, now you can step away.', currency: 'alts' },
+    { id: 'timet2', name: 'Sticky Notes',                 basePrice: 50,     mainText: 'Your offline income is extended to 4 hours.', tt: 'They just kinda accumulate.', currency: 'alts' },
+    { id: 'timet3', name: 'Timetables',                   basePrice: 350,    mainText: 'Your offline income is extended to 8 hours.', tt: 'Schedules are important! Or...so they say.', currency: 'alts' },
+    { id: 'timet4', name: 'Instruction Manual',           basePrice: 2500,   mainText: 'Your offline income is extended to 16 hours.', tt: 'More of a booklet, but whatever.', currency: 'alts' },
+    { id: 'timet5', name: 'Orientation',                  basePrice: 17000,  mainText: 'Your offline income is extended to 32 hours.', tt: 'Employee safety should be a top priority! Should be.', currency: 'alts' },
+    { id: 'timet6', name: 'Supervisors',                  basePrice: 117000, mainText: 'Your offline income is extended to 64 hours.', tt: 'Micromanagement is key to employee retention.', currency: 'alts' },
+    { id: 'timet7', name: 'HR',                           basePrice: 823000, mainText: 'Your offline income is extended to 128 hours.', tt: 'The best department of any company.', currency: 'alts' },
+    { id: 'amntt1', name: 'Intern',                       basePrice: 1,      mainText: 'You will keep gaining thumbs at 5% of your RPS up to 1 hour after the game is closed. Beyond that, reduced by 90%.', tt: 'Finally.', currency: 'alts' },
+    { id: 'amntt2', name: 'Volunteers',                   basePrice: 10,     mainText: 'You gain thumbs at 15% of your RPS while offline.', tt: 'They were promised college credit, of course.', currency: 'alts' },
+    { id: 'amntt3', name: 'Exposure',                     basePrice: 50,     mainText: 'You gain thumbs at 25% of your RPS while offline.', tt: 'Paid soon!', currency: 'alts' },
+    { id: 'amntt4', name: 'Unpaid Overtime',              basePrice: 350,    mainText: 'You gain thumbs at 35% of your RPS while offline.', tt: 'Hey, rules are rules.', currency: 'alts' },
+    { id: 'amntt5', name: 'Trial Shifts',                 basePrice: 2500,   mainText: 'You gain thumbs at 45% of your RPS while offline.', tt: 'Shifty. Heh.', currency: 'alts' },
+    { id: 'amntt6', name: 'Immigrants',                   basePrice: 17000,  mainText: 'You gain thumbs at 55% of your RPS while offline.', tt: "There's no reason to import people for this. You're just an agent of chaos.", currency: 'alts' },
+    { id: 'amntt7', name: 'Overseas Outsourcing',         basePrice: 117000, mainText: 'You gain thumbs at 65% of your RPS while offline.', tt: 'China.', currency: 'alts' },
+    { id: 'amntt8', name: 'Child Labor',                  basePrice: 823000, mainText: 'You gain thumbs at 75% of your RPS while offline.', tt: 'What? It worked back then, it works now.', currency: 'alts' },
   ];
+
+  const ALT_UPGRADE_BONUS_BY_PRODUCER = {
+    script: { id: 'altt1', bonus: 250 },
+    groupChat: { id: 'altt2', bonus: 50 },
+    workshop: { id: 'altt3', bonus: 180 },
+    studio: { id: 'altt4', bonus: 170 },
+    recyclingCenter: { id: 'altt5', bonus: 160 },
+    digsite: { id: 'altt6', bonus: 150 },
+    officeBuilding: { id: 'altt7', bonus: 140 },
+    contentFarm: { id: 'altt8', bonus: 130 },
+    botnet: { id: 'altt9', bonus: 120 },
+    spaceport: { id: 'altt10', bonus: 110 },
+    ritualCircle: { id: 'altt11', bonus: 100 },
+    memecatcher: { id: 'altt12', bonus: 90 },
+    quantumHarmonizer: { id: 'altt13', bonus: 80 },
+    timeForge: { id: 'altt14', bonus: 70 },
+    wormhole: { id: 'altt15', bonus: 60 },
+    pocketDimension: { id: 'altt16', bonus: 50 },
+    agiShitposter: { id: 'altt17', bonus: 40 },
+    realityShaper: { id: 'altt18', bonus: 30 },
+    dysonSphere: { id: 'altt19', bonus: 20 },
+    multiverse: { id: 'altt20', bonus: 10 },
+  };
 
       const MEME_TYPE_DEFS = [
     { id: 'mbt1',   name: 'LOLCats', basePrice: 1000000, tt: 'The backbone of the internet, if you think about it.' },
@@ -759,6 +797,7 @@
   }
   function canUnlockAltUpgrade(upgrade){
     try {
+      if (upgrade && upgrade.id === 'amntt1') return true;
       const cost = getAltCost(upgrade);
       if (cost <= 0n) return true;
       const threshold = cost / 2n;
@@ -930,6 +969,9 @@
   function getUpgradeIconPathById(upgradeId){
     if (/^mbt\d+$/.test(upgradeId)) return 'icons/clicker/meme.png';
     if (/^met\d+$/.test(upgradeId)) return 'icons/clicker/extraup.png';
+    if (upgradeId === 'amntt1') return 'icons/clicker/offline.png';
+    if (/^amntt\d+$/.test(upgradeId)) return 'icons/clicker/amount.png';
+    if (/^timet\d+$/.test(upgradeId)) return 'icons/clicker/time.png';
     if (upgradeId === 'mut1') return 'icons/clicker/lolcat.png';
     if (upgradeId === 'mut2') return 'icons/clicker/alpha.png';
     if (upgradeId === 'mut3') return 'icons/clicker/facebook.png';
@@ -1122,6 +1164,7 @@
     try {
       ALT_DEFS.forEach(def => {
         if (!def || def.currency !== 'alts' || !def.producerId || typeof def.inc !== 'number') return;
+        if (/^altt\d+$/.test(def.id)) return;
         if (isUpgradePurchased(def.id)) addProducerAltMultiplier(def.producerId, 3);
       });
     } catch(_) {}
@@ -1159,6 +1202,7 @@
   function refreshAltState() {
     try { restoreAltUpgradesFromState(); } catch(_) {}
     try { reapplyAltUpgradeEffects(); } catch(_) {}
+    try { recomputeAllProducerMultipliersFromUpgrades(); } catch(_) {}
     try { reconcileAltSpentState(); } catch(_) {}
     try { if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors(); } catch(_) {}
     try { if (typeof window.fjfeRefreshStoreAffordability === 'function') window.fjfeRefreshStoreAffordability(); } catch(_) {}
@@ -1267,6 +1311,11 @@
       }
     }
   } catch(_) {}
+  try {
+    if (upgrade.id === 'amntt1') {
+      localStorage.setItem('fjfeOfflineEnabled', '1');
+    }
+  } catch(_) {}
   try { if (window.fjfeAudio) window.fjfeAudio.play('upgrade'); } catch(_) {}
 
   
@@ -1278,9 +1327,13 @@
       const producerId = upgrade.producerId || (parsed ? parsed.producerId : null);
       if (producerId) {
         if (upgrade && upgrade.currency === 'alts') {
-          addProducerAltMultiplier(producerId, 3);
+          if (/^altt\d+$/.test(upgrade.id)) {
+            recomputeProducerMultiplierFromUpgrades(producerId);
+          } else {
+            addProducerAltMultiplier(producerId, 3);
+          }
         } else {
-          addProducerMultiplier(producerId, upgrade.inc);
+          recomputeProducerMultiplierFromUpgrades(producerId);
         }
       }
     }
@@ -1404,6 +1457,55 @@
     return PRODUCER_NAMES[producerId] || producerId;
   }
 
+  function getAltUpgradeBonusPercent(producerId) {
+    try {
+      const entry = ALT_UPGRADE_BONUS_BY_PRODUCER[producerId];
+      if (!entry) return 0;
+      return isUpgradePurchased(entry.id) ? entry.bonus : 0;
+    } catch(_) { return 0; }
+  }
+
+  function getEffectiveUpgradeIncForProducer(producerId, inc, isAltUpgrade) {
+    if (!Number.isFinite(inc) || inc <= 0) return 0;
+    if (!producerId || isAltUpgrade) return inc;
+    const bonus = getAltUpgradeBonusPercent(producerId);
+    return inc + (Number.isFinite(bonus) ? bonus : 0);
+  }
+
+  function recomputeProducerMultiplierFromUpgrades(producerId) {
+    try {
+      if (!producerId) return;
+      const bonus = getAltUpgradeBonusPercent(producerId);
+      let total = 0;
+      PRODUCTION_DEFS.forEach(def => {
+        if (!def) return;
+        const parsed = extractProducerIdFromUpgradeId(def.id);
+        if (!parsed || parsed.producerId !== producerId) return;
+        if (!isUpgradePurchased(def.id)) return;
+        const inc = Number(def.inc);
+        if (!Number.isFinite(inc) || inc <= 0) return;
+        total += inc + (Number.isFinite(bonus) ? bonus : 0);
+      });
+      if (total > 0) {
+        localStorage.setItem(`fjTweakerStoreMultiplier_${producerId}`, String(total));
+      } else {
+        localStorage.removeItem(`fjTweakerStoreMultiplier_${producerId}`);
+      }
+      localStorage.removeItem(ALTS_MULT_KEY_PREFIX + producerId);
+    } catch(_) {}
+  }
+
+  function recomputeAllProducerMultipliersFromUpgrades() {
+    try {
+      const ids = new Set();
+      PRODUCTION_DEFS.forEach(def => {
+        const parsed = extractProducerIdFromUpgradeId(def.id);
+        if (parsed && parsed.producerId) ids.add(parsed.producerId);
+      });
+      ids.forEach((producerId) => recomputeProducerMultiplierFromUpgrades(producerId));
+    } catch(_) {}
+  }
+
   function getEffectiveIncreasePercent(producerId, inc) {
     if (!Number.isFinite(inc) || inc <= 0) return 0;
     let currentPct = getProducerMultiplierPercent(producerId);
@@ -1509,7 +1611,8 @@
       const producerId = upgrade.producerId || (parsed ? parsed.producerId : null);
       if (producerId) {
         const producerName = getProducerName(producerId);
-        const effectiveInc = getEffectiveIncreasePercent(producerId, upgrade.inc);
+        const effectiveUpgradeInc = getEffectiveUpgradeIncForProducer(producerId, upgrade.inc, upgrade && upgrade.currency === 'alts');
+        const effectiveInc = getEffectiveIncreasePercent(producerId, effectiveUpgradeInc);
         const percentageText = (upgrade && upgrade.currency === 'alts')
           ? formatPercentage(upgrade.inc)
           : formatPercentage(effectiveInc);
@@ -1646,7 +1749,25 @@
       ALT_DEFS
         .filter(def => {
           if (!def || isUpgradePurchased(def.id)) return false;
-          if (!canUnlockAltUpgrade(def)) return false;
+          if (def.id === 'amntt1') {
+            return true;
+          }
+          if (def.id && /^amntt\d+$/.test(def.id)) {
+            const idx = parseInt(def.id.replace('amntt',''), 10) || 0;
+            const prevId = `amntt${idx - 1}`;
+            if (!isUpgradePurchased(prevId)) return false;
+            if (!canUnlockAltUpgrade(def)) return false;
+          } else if (def.id && /^timet\d+$/.test(def.id)) {
+            if (!isUpgradePurchased('amntt1')) return false;
+            const idx = parseInt(def.id.replace('timet',''), 10) || 0;
+            if (idx > 1) {
+              const prevId = `timet${idx - 1}`;
+              if (!isUpgradePurchased(prevId)) return false;
+            }
+            if (!canUnlockAltUpgrade(def)) return false;
+          } else {
+            if (!canUnlockAltUpgrade(def)) return false;
+          }
           if (def.id && def.id !== 'slott1' && /^slott\d+$/.test(def.id)) {
             return isUpgradePurchased('slott1');
           }
@@ -1737,6 +1858,7 @@
   try {
     restoreAltUpgradesFromState();
     reapplyAltUpgradeEffects();
+    recomputeAllProducerMultipliersFromUpgrades();
     reconcileAltSpentState();
   } catch(_) {}
 

@@ -427,9 +427,198 @@
             return false;
         }
 
+        function hasRecentLeader() {
+            try {
+                const now = Date.now();
+                const raw = localStorage.getItem('fjfePassiveLeader');
+                let leader = null; try { leader = raw ? JSON.parse(raw) : null; } catch(_) { leader = null; }
+                if (!leader || !leader.id) return false;
+                return (now - (leader.ts || 0)) <= 3000;
+            } catch(_) { return false; }
+        }
+
+        function getOfflineAmountPct() {
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt8') === '1') return 75;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt7') === '1') return 65;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt6') === '1') return 55;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt5') === '1') return 45;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt4') === '1') return 35;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt3') === '1') return 25;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt2') === '1') return 15;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_amntt1') === '1') return 5;
+            return 0;
+        }
+
+        function getOfflineHours() {
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet7') === '1') return 128;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet6') === '1') return 64;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet5') === '1') return 32;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet4') === '1') return 16;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet3') === '1') return 8;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet2') === '1') return 4;
+            if (localStorage.getItem('fjTweakerStoreUpgrade_timet1') === '1') return 2;
+            return 1;
+        }
+
+        function getSlotRpsMultipliers() {
+            try {
+                const readTimedMult = (key)=>{
+                    const untilRaw = localStorage.getItem(key + 'Until');
+                    const until = parseInt(untilRaw || '0', 10);
+                    if (Number.isFinite(until) && until > 0 && Date.now() > until) {
+                        localStorage.removeItem(key);
+                        localStorage.removeItem(key + 'Until');
+                        return 1;
+                    }
+                    const raw = localStorage.getItem(key);
+                    const v = parseFloat(raw);
+                    return (Number.isFinite(v) && v > 0) ? v : 1;
+                };
+                return {
+                    mult: readTimedMult('fjfeSlotRpsMult'),
+                    pctMult: readTimedMult('fjfeSlotRpsPctMult')
+                };
+            } catch(_) { return { mult: 1, pctMult: 1 }; }
+        }
+
+        let offlineRetryCount = 0;
+        let offlineLeaderRetryCount = 0;
+        function applyOfflineEarningsOnce() {
+            try {
+                const log = (msg, data) => {
+                    try {
+                        if (data !== undefined) console.log('[fjfe-offline]', msg, data);
+                        else console.log('[fjfe-offline]', msg);
+                    } catch(_) {}
+                };
+                const getLeaderInfo = () => {
+                    try {
+                        const raw = localStorage.getItem('fjfePassiveLeader');
+                        return raw ? JSON.parse(raw) : null;
+                    } catch(_) { return null; }
+                };
+                const readFlags = (ids) => {
+                    const out = {};
+                    for (const id of ids) {
+                        try { out[id] = localStorage.getItem(`fjTweakerStoreUpgrade_${id}`) === '1'; } catch(_) { out[id] = false; }
+                    }
+                    return out;
+                };
+                const amnttIds = ['amntt1','amntt2','amntt3','amntt4','amntt5','amntt6','amntt7','amntt8'];
+                const timetIds = ['timet1','timet2','timet3','timet4','timet5','timet6','timet7'];
+                const amnttFlags = readFlags(amnttIds);
+                const timetFlags = readFlags(timetIds);
+                if (localStorage.getItem('fjTweakerStoreUpgrade_amntt1') !== '1') {
+                    log('skip: amntt1 not owned', { amnttFlags, timetFlags });
+                    return;
+                }
+                const leaderInfo = getLeaderInfo();
+                const leaderAge = leaderInfo ? (Date.now() - (leaderInfo.ts || 0)) : Infinity;
+                if (leaderInfo && leaderInfo.id && leaderAge <= 3000 && leaderInfo.id !== TAB_ID) {
+                    log('skip: active tab detected', leaderInfo);
+                    if (offlineLeaderRetryCount < 3) {
+                        offlineLeaderRetryCount += 1;
+                        setTimeout(applyOfflineEarningsOnce, 3500);
+                    }
+                    return;
+                }
+                const lastRaw = localStorage.getItem('fjfeClickerLastActiveTs');
+                const last = parseInt(lastRaw || '0', 10);
+                if (!Number.isFinite(last) || last <= 0) { log('skip: no last active timestamp', lastRaw); return; }
+                const now = Date.now();
+                const elapsedMs = Math.max(0, now - last);
+                if (elapsedMs <= 0) { log('skip: elapsed <= 0', elapsedMs); return; }
+                const pct = getOfflineAmountPct();
+                if (!(pct > 0)) { log('skip: offline pct <= 0', amnttFlags); return; }
+                const hours = getOfflineHours();
+                if (hours <= 1) { log('info: no timet upgrades detected', timetFlags); }
+                const maxMs = Math.max(0, hours) * 3600000;
+                const firstMs = Math.min(elapsedMs, maxMs);
+                const secondMs = Math.max(0, elapsedMs - firstMs);
+
+                log('inputs', { elapsedMs, pct, hours, firstMs, secondMs });
+
+                const totalRps = (window.fjfeRcProd && typeof window.fjfeRcProd.getTotalRps === 'function') ? window.fjfeRcProd.getTotalRps() : 0;
+                const mults = getSlotRpsMultipliers();
+                const slotFactor = (Number.isFinite(mults.mult) && mults.mult > 0 ? mults.mult : 1) * (Number.isFinite(mults.pctMult) && mults.pctMult > 0 ? mults.pctMult : 1);
+                const baseRps = (Number.isFinite(totalRps) && totalRps > 0) ? (totalRps / slotFactor) : 0;
+                log('rps', { totalRps, slotFactor, baseRps });
+                if (!(Number.isFinite(baseRps) && baseRps > 0)) {
+                    if (offlineRetryCount < 5) {
+                        offlineRetryCount += 1;
+                        log('retry: baseRps not ready', offlineRetryCount);
+                        setTimeout(applyOfflineEarningsOnce, 1000);
+                    } else {
+                        log('skip: baseRps still not ready');
+                    }
+                    return;
+                }
+
+                const baseRate = baseRps * (pct / 100);
+                const tailRate = baseRate * 0.1;
+                const gained = (baseRate * (firstMs / 1000)) + (tailRate * (secondMs / 1000));
+                if (!Number.isFinite(gained) || gained <= 0) { log('skip: gained <= 0', gained); return; }
+                log('gained', gained);
+
+                try {
+                    if (elapsedMs >= 60000) {
+                        localStorage.setItem('fjfeOfflineGainPending', String(gained));
+                    }
+                } catch(_) {}
+
+                const storage = window.fjfeNumbersStorage;
+                let displayVal = 0;
+                if (storage) {
+                    const st = storage.readRaw();
+                    log('storage before', st);
+                    if (!st.infinite) {
+                        const addScaled = BigInt(Math.floor(Math.max(0, gained) * 10));
+                        const nextScaled = st.scaled + addScaled;
+                        storage.writeRaw({ infinite:false, scaled: nextScaled });
+                        displayVal = storage.toDisplayNumber({ infinite:false, scaled: nextScaled });
+                        log('storage after', { scaled: nextScaled, displayVal });
+                    } else {
+                        log('skip: storage infinite, offline gain ignored');
+                        return;
+                    }
+                } else {
+                    const raw = localStorage.getItem('fjTweakerClickerCount');
+                    const curNum = parseFloat(raw || '0');
+                    const nextNum = Math.max(0, (Number.isFinite(curNum) ? curNum : 0) + gained);
+                    localStorage.setItem('fjTweakerClickerCount', String(Math.floor(nextNum)));
+                    displayVal = nextNum;
+                    log('storage fallback', { raw, nextNum, displayVal });
+                }
+                const disp = document.getElementById('fjfe-clicker-count-v2');
+                if (disp) {
+                    const tools = window.fjfeClickerNumbers;
+                    disp.textContent = (tools && tools.formatCounter) ? tools.formatCounter(displayVal) : formatCompact(displayVal);
+                } else {
+                    log('info: display element missing');
+                    setTimeout(() => {
+                        try {
+                            if (window.fjfeRcMain && typeof window.fjfeRcMain.refresh === 'function') {
+                                window.fjfeRcMain.refresh();
+                            }
+                        } catch(_) {}
+                    }, 1000);
+                }
+                try { if (window.fjfeStats) window.fjfeStats.addPassive(gained); } catch(_) {}
+                try { updateMaxThumbs(Number(displayVal || 0)); } catch(_) {}
+                try { if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors(); } catch(_) {}
+                try { if (typeof window.fjfeRefreshStoreAffordability === 'function') window.fjfeRefreshStoreAffordability(); } catch(_) {}
+                try { localStorage.setItem('fjfeClickerLastActiveTs', String(now)); } catch(_) {}
+            } catch(_) {}
+        }
+
+        function getResetToken() {
+            try { return window.fjfeClickerResetToken || 0; } catch(_) { return 0; }
+        }
+
         function passiveTickOnce() {
             if (!(window.fjTweakerSettings && window.fjTweakerSettings.clicker2)) return;
             try {
+                const resetToken = getResetToken();
                 
                 if (!tryBecomeLeader() && !heartbeatIfLeader()) {
                     return;
@@ -444,6 +633,7 @@
                 }
                 const rpsScaled = BigInt(Math.floor(Math.max(0, rpsInt) * 10));
                 if (rpsScaled > 0n) {
+                    if (getResetToken() !== resetToken) return;
                     const nextScaled = curState.scaled + rpsScaled;
                     if (storage) storage.writeRaw({ infinite: false, scaled: nextScaled });
                     const disp = document.getElementById('fjfe-clicker-count-v2');
@@ -476,6 +666,7 @@
     
     
     if (window.fjTweakerSettings && window.fjTweakerSettings.clicker2) {
+        setTimeout(applyOfflineEarningsOnce, 500);
         startPassiveEngine();
     }
 
@@ -980,6 +1171,8 @@
             transform: 'translate(-50%, -50%)',
             zIndex: 2,
         });
+        repostBtn.dataset.defaultText = 'REPOST';
+        repostBtn.style.transition = 'transform 0.056s cubic-bezier(.5,1.7,.5,1), opacity 0.16s ease';
         repostBtn.style.alignSelf = 'center';
         repostBtn.onmousedown = repostBtn.ontouchstart = function() {
             repostBtn.style.transform = 'translate(-50%, -50%) scale(0.88)';
@@ -987,10 +1180,41 @@
         repostBtn.onmouseup = repostBtn.onmouseleave = repostBtn.ontouchend = function() {
             repostBtn.style.transform = 'translate(-50%, -50%)';
         };
+        function showOfflineGainBanner() {
+            try {
+                const raw = localStorage.getItem('fjfeOfflineGainPending');
+                if (!raw) return;
+                localStorage.removeItem('fjfeOfflineGainPending');
+                const gain = parseFloat(raw);
+                if (!Number.isFinite(gain) || gain <= 0) return;
+                const tools = window.fjfeClickerNumbers;
+                const fmt = (tools && tools.formatCounter) ? tools.formatCounter : (x => String(Math.floor(x)));
+                if (!repostBtn.dataset.defaultFont) {
+                    repostBtn.dataset.defaultFont = repostBtn.style.font || "800 19px 'Segoe UI', sans-serif";
+                }
+                if (!repostBtn.dataset.defaultLetterSpacing) {
+                    repostBtn.dataset.defaultLetterSpacing = repostBtn.style.letterSpacing || '0.12em';
+                }
+                repostBtn.textContent = `+${fmt(gain)} thumbs while offline`;
+                repostBtn.style.font = "800 12px 'Segoe UI', sans-serif";
+                repostBtn.style.letterSpacing = '0.02em';
+                repostBtn.style.opacity = '1';
+                setTimeout(() => {
+                    repostBtn.style.opacity = '0';
+                    setTimeout(() => {
+                        repostBtn.textContent = repostBtn.dataset.defaultText || 'REPOST';
+                        repostBtn.style.font = repostBtn.dataset.defaultFont || "800 19px 'Segoe UI', sans-serif";
+                        repostBtn.style.letterSpacing = repostBtn.dataset.defaultLetterSpacing || '0.12em';
+                        repostBtn.style.opacity = '1';
+                    }, 160);
+                }, 3000);
+            } catch(_) {}
+        }
                 let _uiScheduled = false;
                 let _lastPersistMs = 0;
                 let pendingClickDeltaScaled = 0n;
         function _flushUiAndMaybePersist() {
+                    const resetToken = getResetToken();
                     const storage = window.fjfeNumbersStorage;
                     const cur = storage ? storage.readRaw() : { infinite:false, scaled:0n };
                     if (cur.infinite) {
@@ -999,6 +1223,11 @@
                         const txt = (tools && tools.formatCounter) ? tools.formatCounter(Number.POSITIVE_INFINITY) : 'Infinity';
                         countDisplay.textContent = txt;
                         try { if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors(); } catch(_) {}
+                        _uiScheduled = false;
+                        return;
+                    }
+                    if (getResetToken() !== resetToken) {
+                        pendingClickDeltaScaled = 0n;
                         _uiScheduled = false;
                         return;
                     }
@@ -1104,6 +1333,7 @@
             }
         };
         win.append(repostBtn);
+        showOfflineGainBanner();
 
         
 
@@ -1310,6 +1540,7 @@
             if (s.clicker2) {
                 window.fjfeClickerV2Open && window.fjfeClickerV2Open();
                 startPassiveEngine();
+                setTimeout(applyOfflineEarningsOnce, 500);
             } else {
                 window.fjfeClickerV2Close && window.fjfeClickerV2Close();
                 if (typeof closeMenu === 'function') closeMenu();

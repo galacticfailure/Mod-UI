@@ -747,17 +747,19 @@
         return;
       }
       summary.total += 1;
-      const shiMatch = findCategoryRule(entry.descLower, CATEGORY_SHI_RULES);
-      if (shiMatch) {
-        addCategoryReason(summary.categories.shi, shiMatch.label);
-        return;
+      if (entry.isRecent) {
+        const shiMatch = findCategoryRule(entry.descLower, CATEGORY_SHI_RULES);
+        if (shiMatch) {
+          addCategoryReason(summary.categories.shi, shiMatch.label);
+          return;
+        }
+        const blGoreMatch = findCategoryRule(entry.descLower, CATEGORY_BLGORE_RULES);
+        if (blGoreMatch) {
+          addCategoryReason(summary.categories.blGore, blGoreMatch.label);
+          return;
+        }
+        addCategoryReason(summary.categories.other, CATEGORY_OTHER_LABEL);
       }
-      const blGoreMatch = findCategoryRule(entry.descLower, CATEGORY_BLGORE_RULES);
-      if (blGoreMatch) {
-        addCategoryReason(summary.categories.blGore, blGoreMatch.label);
-        return;
-      }
-      addCategoryReason(summary.categories.other, CATEGORY_OTHER_LABEL);
     });
 
     return summary;

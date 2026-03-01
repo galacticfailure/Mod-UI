@@ -1057,6 +1057,12 @@
     try {
       
       if (state.openMenu) {
+        try {
+          const nodes = state.openMenu.querySelectorAll('*');
+          nodes.forEach(n => {
+            if (typeof n._syncFromStorage === 'function') n._syncFromStorage();
+          });
+        } catch (_) {}
         if (typeof window.updateOpenMenuUnlockStates === 'function') window.updateOpenMenuUnlockStates();
         if (typeof window.updateOpenMenuAffordabilityCursors === 'function') window.updateOpenMenuAffordabilityCursors();
       }

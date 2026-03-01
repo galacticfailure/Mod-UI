@@ -1185,7 +1185,22 @@ const setInfoContent = (button, message, imagePath) => {
       panel.style.height = '100%';
       panel.style.overflowY = 'auto';
       panel.style.overflowX = 'hidden';
-      (items || []).forEach((el) => panel.appendChild(el));
+      const resolvedItems = (items || []).filter((el) => el && typeof el === 'object');
+      resolvedItems.forEach((el) => {
+        try {
+          panel.appendChild(el);
+        } catch (_) {}
+      });
+      if (!resolvedItems.length) {
+        const emptyState = document.createElement('div');
+        emptyState.style.color = '#c9c9c9';
+        emptyState.style.font = "600 12px 'Segoe UI', sans-serif";
+        emptyState.textContent = 'No settings available for this tab.';
+        panel.appendChild(emptyState);
+        try {
+          console.warn('[FJFE] SEL tab rendered with no items.');
+        } catch (_) {}
+      }
       return panel;
     };
 

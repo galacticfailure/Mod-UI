@@ -21,7 +21,7 @@
     if (!window.fjTweakerModules) {
       return;
     }
-    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, walcorn, apichk, warn, hunt, batchassist, workingPrev } = window.fjTweakerModules;
+    const { sel, modjs, ratetrack, sccustom, userpop, nextMove, walcorn, apichk, warn, hunt, batchassist, workingPrev, greeble } = window.fjTweakerModules;
     
     if (!__fjfe_baselineInit) {
       if (sel && typeof sel.init === 'function') sel.init();
@@ -37,6 +37,7 @@
       if (ratetrack && typeof ratetrack.init === 'function') ratetrack.init();
       if (userpop && typeof userpop.init === 'function') userpop.init();
       if (warn && typeof warn.init === 'function') warn.init();
+      if (greeble && typeof greeble.init === 'function') greeble.init();
       __fjfe_limitedModulesInit = true;
     };
 
