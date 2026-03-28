@@ -1,9 +1,14 @@
 (function() {
+    console.log('[FJFE-Student][rclick:gate] script loaded on', window.location.href);
+
     /*
      * Lightweight gate that keeps the right-click addon disabled unless
      * the user is both authorized and has the setting enabled.
      */
-    if (!/^(?:www\.)?funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
+    if (!/^(?:www\.)?funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') {
+        console.log('[FJFE-Student][rclick:gate] skipped due to host', window.location.hostname);
+        return;
+    }
 
     let authorized = true;
     // Mirrors apichk so the right-click helper never runs for unauthorized accounts
@@ -36,12 +41,17 @@
 
 
 (function() {
+    console.log('[FJFE-Student][rclick] script loaded on', window.location.href);
+
     /*
      * Right-click helper. Sends context-menu selections back to the
      * background script so the EDU article that matches the element can
      * open instantly. Works for categories, skin buttons, flag radios, etc.
      */
-    if (!/funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') return;
+    if (!/funnyjunk\.com$/i.test(window.location.hostname) && !/\.funnyjunk\.com$/i.test(window.location.hostname) && window.location.hostname !== 'funnyjunk.com') {
+        console.log('[FJFE-Student][rclick] skipped due to host', window.location.hostname);
+        return;
+    }
 
     // Background pings this before letting us open EDU links
     const isAuthorizedNow = () => {

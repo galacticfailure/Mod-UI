@@ -58,6 +58,77 @@
 
   let isEnabled = false;
   let observer = null;
+  let labelVisibilityTick = null;
+  let labelViewportBound = false;
+  const labelUpdaters = new Set();
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
+
+  const runSharedLabelUpdates = () => {
+    if (!labelUpdaters.size) {
+      return;
+    }
+    labelUpdaters.forEach((update) => {
+      try { update(); } catch (_) {}
+    });
+  };
+
+  const stopSharedLabelWatchers = () => {
+    if (labelVisibilityTick) {
+      clearInterval(labelVisibilityTick);
+      labelVisibilityTick = null;
+    }
+    if (labelViewportBound) {
+      window.removeEventListener('scroll', runSharedLabelUpdates);
+      window.removeEventListener('resize', runSharedLabelUpdates);
+      labelViewportBound = false;
+    }
+  };
+
+  const ensureSharedLabelWatchers = () => {
+    if (!isRuntimeFlagEnabled('timerHardening', true)) {
+      return;
+    }
+    if (!labelViewportBound) {
+      window.addEventListener('scroll', runSharedLabelUpdates);
+      window.addEventListener('resize', runSharedLabelUpdates);
+      labelViewportBound = true;
+    }
+    if (!labelVisibilityTick) {
+      labelVisibilityTick = setInterval(() => {
+        if (!labelUpdaters.size) {
+          stopSharedLabelWatchers();
+          return;
+        }
+        runSharedLabelUpdates();
+      }, 500);
+    }
+  };
+
+  const registerLabelUpdater = (updateFn) => {
+    if (typeof updateFn !== 'function') {
+      return;
+    }
+    labelUpdaters.add(updateFn);
+    ensureSharedLabelWatchers();
+  };
+
+  const unregisterLabelUpdater = (updateFn) => {
+    if (typeof updateFn !== 'function') {
+      return;
+    }
+    labelUpdaters.delete(updateFn);
+    if (!labelUpdaters.size) {
+      stopSharedLabelWatchers();
+    }
+  };
 
   document.addEventListener('fjTweakerSettingsChanged', (event) => {
     const settings = event.detail;
@@ -71,7 +142,6 @@
   const enableTextCheck = () => {
     if (isEnabled) return;
     isEnabled = true;
-    console.log('TextCheck: Enabled - Auto-checking content for PC2 or Meta');
     
     startObserver();
     scanExistingContent();
@@ -80,7 +150,6 @@
   const disableTextCheck = () => {
     if (!isEnabled) return;
     isEnabled = false;
-    console.log('TextCheck: Disabled');
     
     stopObserver();
     removeAllLabels();
@@ -313,15 +382,9 @@
     
 
     if (!labelContainer.dataset.hasListeners) {
-
-      window.addEventListener('scroll', updatePositionAndVisibility);
-      window.addEventListener('resize', updatePositionAndVisibility);
-      
-
       const rateBoxObserver = new MutationObserver(() => {
         updatePositionAndVisibility();
       });
-      
 
       const modRaElement = document.getElementById('modRa');
       if (modRaElement) {
@@ -332,7 +395,6 @@
           subtree: true
         });
       }
-      
 
       const rateBox = document.getElementById('rateBoxButtons');
       if (rateBox) {
@@ -343,28 +405,37 @@
           subtree: true
         });
       }
-      
 
       labelContainer.rateBoxObserver = rateBoxObserver;
       labelContainer.dataset.hasListeners = 'true';
-      
+      labelContainer._fjUpdatePosition = updatePositionAndVisibility;
 
-      const visibilityCheckInterval = setInterval(() => {
-        if (!document.body.contains(labelContainer)) {
-          clearInterval(visibilityCheckInterval);
-          rateBoxObserver.disconnect();
-          return;
-        }
-        updatePositionAndVisibility();
-      }, 500);
-      
-      labelContainer.visibilityCheckInterval = visibilityCheckInterval;
+      if (isRuntimeFlagEnabled('timerHardening', true)) {
+        registerLabelUpdater(updatePositionAndVisibility);
+      } else {
+        window.addEventListener('scroll', updatePositionAndVisibility);
+        window.addEventListener('resize', updatePositionAndVisibility);
+        const visibilityCheckInterval = setInterval(() => {
+          if (!document.body.contains(labelContainer)) {
+            clearInterval(visibilityCheckInterval);
+            rateBoxObserver.disconnect();
+            return;
+          }
+          updatePositionAndVisibility();
+        }, 500);
+        labelContainer.visibilityCheckInterval = visibilityCheckInterval;
+      }
     }
   };
 
   const removeAllLabels = () => {
     const existingLabels = document.querySelectorAll('[id^="textcheck-labels-"]');
     existingLabels.forEach(label => {
+      if (label._fjUpdatePosition) {
+        unregisterLabelUpdater(label._fjUpdatePosition);
+        window.removeEventListener('scroll', label._fjUpdatePosition);
+        window.removeEventListener('resize', label._fjUpdatePosition);
+      }
 
       if (label.rateBoxObserver) {
         label.rateBoxObserver.disconnect();
@@ -374,6 +445,9 @@
       }
       label.remove();
     });
+    if (!existingLabels.length) {
+      stopSharedLabelWatchers();
+    }
   };
 
 
@@ -387,12 +461,13 @@
   if (window.fjTweakerSettings) {
     initializeTextCheck();
   } else {
-
-    const settingsInterval = setInterval(() => {
+    const waitForSettings = () => {
       if (window.fjTweakerSettings) {
-        clearInterval(settingsInterval);
         initializeTextCheck();
+        return;
       }
-    }, 100);
+      setTimeout(waitForSettings, 100);
+    };
+    waitForSettings();
   }
 })();

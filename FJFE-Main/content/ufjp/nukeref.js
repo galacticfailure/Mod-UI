@@ -13,6 +13,17 @@
 	let bodyObserver = null;
 	let observedButton = null;
 	let pollTimer = null;
+	let pollInterval = null;
+
+	const isRuntimeFlagEnabled = (flagName, fallback = false) => {
+		try {
+			return window.fjfeRuntimeFlags?.isEnabled
+				? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+				: Boolean(fallback);
+		} catch (_) {
+			return Boolean(fallback);
+		}
+	};
 
 	const isTargetHost = () => {
 		const host = window.location.hostname || '';
@@ -105,18 +116,36 @@
 	};
 
 	const startPolling = () => {
-		if (pollTimer) return;
 		if (!isPollingPath()) return;
-		pollTimer = window.setInterval(() => {
-			if (!enabled) return;
+		if (!isRuntimeFlagEnabled('timerHardening', true)) {
+			if (pollInterval) return;
+			pollInterval = window.setInterval(() => {
+				if (!enabled || !isPollingPath()) return;
+				ensureButtonObserver();
+			}, 1500);
+			return;
+		}
+		if (pollTimer) return;
+		const poll = () => {
+			pollTimer = null;
+			if (!enabled || !isPollingPath()) return;
 			ensureButtonObserver();
-		}, 1000);
+			if (!observedButton) {
+				pollTimer = window.setTimeout(poll, 1500);
+			}
+		};
+		pollTimer = window.setTimeout(poll, 0);
 	};
 
 	const stopPolling = () => {
-		if (!pollTimer) return;
-		clearInterval(pollTimer);
-		pollTimer = null;
+		if (pollTimer) {
+			clearTimeout(pollTimer);
+			pollTimer = null;
+		}
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
+		}
 	};
 
 	const applySetting = (nextEnabled) => {

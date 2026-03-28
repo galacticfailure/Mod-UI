@@ -11,6 +11,7 @@
   const QUEUE_STATUS = {
     PENDING: 'pending',
     APPROVED: 'approved',
+    REJECTED: 'rejected',
     ACKNOWLEDGED: 'acknowledged'
   };
   const CONTENT_INFO_PATH = /\/mods\/contentInfo\/(\d+)/i;
@@ -131,7 +132,9 @@
   };
 
   const normalizeEntryStatus = (value) => (
-    value === QUEUE_STATUS.APPROVED || value === QUEUE_STATUS.ACKNOWLEDGED ? value : QUEUE_STATUS.PENDING
+    value === QUEUE_STATUS.APPROVED || value === QUEUE_STATUS.REJECTED || value === QUEUE_STATUS.ACKNOWLEDGED
+      ? value
+      : QUEUE_STATUS.PENDING
   );
 
   if (window.location.hostname !== targetHost) {
@@ -145,6 +148,16 @@
   let storageListenerBound = false;
   let navListenersBound = false;
   let queueActionWrapper = null;
+  let observerRefreshScheduled = false;
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
 
   const normalizeEntries = (entries) => {
     if (!Array.isArray(entries)) {
@@ -418,26 +431,28 @@
     });
     const merged = [];
     normalizedExisting.forEach((entry) => {
-      if (!entry?.url || !detectedMap.has(entry.url)) {
+      if (!entry?.url) {
         return;
       }
-      const detectedEntry = detectedMap.get(entry.url);
       const nextEntry = { ...entry };
-      if (!nextEntry.rateId && detectedEntry?.rateId) {
-        nextEntry.rateId = detectedEntry.rateId;
-      }
-      if ((!nextEntry.title || nextEntry.title === FALLBACK_QUEUE_TITLE) && detectedEntry?.title) {
-        nextEntry.title = detectedEntry.title;
-      }
-      if (detectedEntry?.status === QUEUE_STATUS.ACKNOWLEDGED) {
-        nextEntry.status = QUEUE_STATUS.ACKNOWLEDGED;
-        delete nextEntry.rejectDetails;
-        if (entry.status === QUEUE_STATUS.REJECTED) {
-          delete nextEntry.approveNote;
+      const detectedEntry = detectedMap.get(entry.url);
+      if (detectedEntry) {
+        if (!nextEntry.rateId && detectedEntry?.rateId) {
+          nextEntry.rateId = detectedEntry.rateId;
         }
+        if ((!nextEntry.title || nextEntry.title === FALLBACK_QUEUE_TITLE) && detectedEntry?.title) {
+          nextEntry.title = detectedEntry.title;
+        }
+        if (detectedEntry.status === QUEUE_STATUS.ACKNOWLEDGED) {
+          nextEntry.status = QUEUE_STATUS.ACKNOWLEDGED;
+          delete nextEntry.rejectDetails;
+          if (entry.status === QUEUE_STATUS.REJECTED) {
+            delete nextEntry.approveNote;
+          }
+        }
+        detectedMap.delete(entry.url);
       }
       merged.push(nextEntry);
-      detectedMap.delete(entry.url);
     });
     detectedMap.forEach((entry) => merged.push(entry));
     return merged;
@@ -685,8 +700,22 @@
     if (observer || !document.body) {
       return;
     }
+    const scheduleEnsureButton = () => {
+      if (!isRuntimeFlagEnabled('observerCoalescing', true)) {
+        ensureButton();
+        return;
+      }
+      if (observerRefreshScheduled) {
+        return;
+      }
+      observerRefreshScheduled = true;
+      requestAnimationFrame(() => {
+        observerRefreshScheduled = false;
+        ensureButton();
+      });
+    };
     observer = new MutationObserver(() => {
-      ensureButton();
+      scheduleEnsureButton();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   };

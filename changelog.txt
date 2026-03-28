@@ -1,3 +1,15 @@
+1.2.1
+- Removed much debug info from console
+- Fixed Batch Assist bug involving rate-acknowledge fail
+- Clicker bugfixes
+- Extended visual refresh to Student branch
+- Added Disable Buttons
+- Added plugin support, moved Farm and Clicker to plugins
+- Fixed: Avoid Next would trigger if cursor was on Next button on page load, even if feature disabled
+- Added Betterments
+- Batch Assist now hides normal instructor buttons
+- General optimizations
+
 1.2.0
 - Added BOS Radar
 - Added Review Assist

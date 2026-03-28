@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "scripting"
   ],
   "host_permissions": [
     "https://funnyjunk.com/*",
@@ -19,23 +20,16 @@
         "https://funnyjunk.com/*"
       ],
       "js": [
-        "content/farm/farmaudio.js",
+        "content/runtime-flags.js",
+        "content/parity-harness.js",
+        "content/assist-common.js",
         "content/apichk.js",
         "content/bs.js",
         "content/info.js",
         "content/sel.js",
         "content/slick.js",
+        "content/betterments.js",
         "content/modjs.js",
-        "content/farm/farmmain.js",
-        "content/farm/farmtt.js",
-        "content/farm/farminteract.js",
-        "content/farm/farmtools.js",
-        "content/farm/farmseeds.js",
-        "content/farm/farmcook.js",
-        "content/farm/farmshop.js",
-        "content/farm/farmtile.js",
-        "content/farm/farminv.js",
-        "content/farm/farmset.js",
         "content/framegif.js",
         "content/ratetrack.js",
         "content/radar.js",
@@ -53,14 +47,8 @@
         "content/warn.js",
         "content/ufjp/mobicon.js",
         "content/ufjp/nukeref.js",
-        "content/funnyjunkModifier.js",
-        "content/repost_clicker/rcinfo.js",
-        "content/repost_clicker/rcsettings.js",
-        "content/repost_clicker/rcstats.js",
-        "content/repost_clicker/rcstore.js",
-        "content/repost_clicker/rcprod.js",
-        "content/repost_clicker/rcmain.js",
-        "content/repost_clicker/rcdebug.js"
+        "content/buttondis.js",
+        "content/funnyjunkModifier.js"
       ],
       "run_at": "document_idle"
     },
@@ -87,16 +75,10 @@
     {
       "resources": [
         "icons/*",
-        "icons/clicker/*",
-        "icons/clicker/production/*",
-        "icons/clicker/upgrades/*",
-        "icons/farm/*",
-        "icons/farm/tiles/*",
-        "icons/farm/plants/*",
-        "icons/farm/tools/*",
-        "icons/farm/objects/*",
-        "icons/farm/sounds/*",
-        "content/farm/farmdebug-page.js",
+        "addons/*/content/*",
+        "addons/*/icons/*",
+        "addons/*/icons/*/*",
+        "addons/*/icons/*/*/*",
         "content/rate-limit-bridge.js"
       ],
       "matches": [

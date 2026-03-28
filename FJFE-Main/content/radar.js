@@ -11,6 +11,18 @@
   const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
   const RADAR_BUTTON_ORDER = 1;
   const RADAR_GLOW_COLOR = 'rgba(88, 255, 140, 0.78)';
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
+  const getAssistCommon = () => (
+    isRuntimeFlagEnabled('assistSharedHelpers', true) ? window.fjfeAssistCommon : null
+  );
 
   if (!window.location.hostname.endsWith(TARGET_HOST)) {
     return;
@@ -104,6 +116,11 @@
         return chrome.runtime.getURL(relativePath);
       }
     } catch (_) {}
+    try {
+      if (typeof browser !== 'undefined' && browser?.runtime?.getURL) {
+        return browser.runtime.getURL(relativePath);
+      }
+    } catch (_) {}
     return relativePath;
   };
 
@@ -154,6 +171,8 @@
   let menuPositionUpdateBound = false;
   let menuPingedWhileOpen = false;
   let menuHideTimeout = null;
+  let radarPingTimer = null;
+  let statusTickTimer = null;
 
   const readStorageValue = (key, fallback) => new Promise((resolve) => {
     try {
@@ -333,6 +352,10 @@
   };
 
   const isElementVisible = (el) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.isElementVisible) {
+      return assistCommon.isElementVisible(el);
+    }
     if (!el) return false;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden') return false;
@@ -342,6 +365,10 @@
   };
 
   const findSearchButton = () => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.findSearchButton) {
+      return assistCommon.findSearchButton();
+    }
     const selectors = [
       '.userbarBttn .fjse',
       '.userbarBttn a[title*="search" i]',
@@ -375,10 +402,26 @@
   };
 
   const isCompressedAnchor = (searchButton) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.isCompressedAnchor) {
+      return assistCommon.isCompressedAnchor(searchButton);
+    }
     return searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')));
   };
 
   const applyButtonStyling = (radarButton, searchButton) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyButtonStyling) {
+      assistCommon.applyButtonStyling(radarButton, searchButton);
+      radarButton.style.background = '#1f7a1f';
+      radarButton.style.borderColor = '#145a14';
+      radarButton.style.color = '#eaffea';
+      radarButton.style.backgroundImage = `url(${resolveAssetUrl(ICON_PATH)})`;
+      radarButton.style.backgroundRepeat = 'no-repeat';
+      radarButton.style.backgroundPosition = 'center';
+      radarButton.style.backgroundSize = '70% 70%';
+      return;
+    }
     if (!radarButton || !searchButton) return;
     const searchStyle = window.getComputedStyle(searchButton);
     radarButton.className = searchButton.className || '';
@@ -434,6 +477,16 @@
 
   const applyIconButtonStyling = (button, searchButton, options) => {
     if (!button) return;
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyIconStyling) {
+      assistCommon.applyIconStyling(button, searchButton, {
+        background: options?.background,
+        border: options?.border,
+        color: options?.color,
+        iconUrl: options?.iconPath ? resolveAssetUrl(options.iconPath) : ''
+      });
+      return;
+    }
     applyButtonStyling(button, searchButton);
     if (!options) return;
     if (options.background) button.style.backgroundColor = options.background;
@@ -721,6 +774,11 @@
   };
 
   const positionCompressedWrapper = (wrapper, anchor) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.positionCompressedWrapper) {
+      assistCommon.positionCompressedWrapper(wrapper, anchor);
+      return;
+    }
     if (!wrapper || !anchor) return;
     const parent = anchor.parentElement;
     if (!parent) return;
@@ -844,6 +902,64 @@
         delete anchor.dataset[ASSIST_ANCHOR_ATTR];
       }
       wrapper.remove();
+    }
+  };
+
+  const stopRadarPingLoop = () => {
+    if (radarPingTimer) {
+      clearTimeout(radarPingTimer);
+      radarPingTimer = null;
+    }
+  };
+
+  const scheduleRadarPingLoop = () => {
+    if (radarPingTimer) {
+      return;
+    }
+    const tick = async () => {
+      radarPingTimer = null;
+      if (getSettingValue() && loadRadarEnabled()) {
+        await runRadarPing();
+      }
+      if (getSettingValue()) {
+        radarPingTimer = setTimeout(tick, PING_INTERVAL_MS);
+      }
+    };
+    radarPingTimer = setTimeout(tick, PING_INTERVAL_MS);
+  };
+
+  const stopStatusTickLoop = () => {
+    if (statusTickTimer) {
+      clearTimeout(statusTickTimer);
+      statusTickTimer = null;
+    }
+  };
+
+  const scheduleStatusTickLoop = () => {
+    if (statusTickTimer) {
+      return;
+    }
+    const tick = () => {
+      statusTickTimer = null;
+      if (getSettingValue()) {
+        updateLastScanLabel();
+        updateAccountAgeLabels();
+        statusTickTimer = setTimeout(tick, 1000);
+      }
+    };
+    statusTickTimer = setTimeout(tick, 1000);
+  };
+
+  const syncRuntimeLoops = () => {
+    if (!isRuntimeFlagEnabled('timerHardening', true)) {
+      return;
+    }
+    if (getSettingValue()) {
+      scheduleRadarPingLoop();
+      scheduleStatusTickLoop();
+    } else {
+      stopRadarPingLoop();
+      stopStatusTickLoop();
     }
   };
 
@@ -1350,18 +1466,7 @@
       }
     }
     if (matchType) {
-      if (sourceLabel) {
-        console.info(`[BOS Radar] ${sourceLabel} match found for`, username);
-      } else {
-        console.info('[BOS Radar] match found for', username);
-      }
       await updatePotentialUsers({ username, matchedType: matchType, accountAgeSeconds });
-    } else {
-      if (sourceLabel) {
-        console.info(`[BOS Radar] ${sourceLabel} no match for`, username);
-      } else {
-        console.info('[BOS Radar] no match for', username);
-      }
     }
   };
 
@@ -1375,43 +1480,33 @@
     writeLocalFlag(PING_LOCK_KEY, String(now));
     try {
       const html = await fetchNewUsers();
-      console.info('[BOS Radar] newusers ping success');
       const { usernames, userIdMap, bannedUsernames, accountAgeMap } = extractUsersFromHtml(html);
-      if (usernames.length) {
-        console.info('[BOS Radar] extracted users:', usernames);
-      } else {
-        console.info('[BOS Radar] no users extracted');
-      }
       await pruneBannedMatches(bannedUsernames);
       const newOnes = await updateSeenUsers(usernames);
       for (const name of newOnes) {
         if (bannedUsernames && bannedUsernames.has(name.toLowerCase())) {
-          console.info('[BOS Radar] skipped banned user', name);
           continue;
         }
         const userId = userIdMap.get(name);
         if (!userId) {
-          console.warn('[BOS Radar] missing userId for', name);
           continue;
         }
         const accountAgeSeconds = accountAgeMap ? accountAgeMap.get(name) : null;
         try {
           const response = await fetchUserIPInfo(userId);
-          console.info('[BOS Radar] superGetUsersByIP success for', name);
           await scanReasonsResponse(name, response, 'IP', accountAgeSeconds);
-        } catch (err) {
-          console.warn('[BOS Radar] superGetUsersByIP failed for', name, err);
+        } catch (_) {
+          
         }
         try {
           const response = await fetchUserFingerprints(userId);
-          console.info('[BOS Radar] getFingerPrints success for', name);
           await scanReasonsResponse(name, response, 'Fingerprints', accountAgeSeconds);
-        } catch (err) {
-          console.warn('[BOS Radar] getFingerPrints failed for', name, err);
+        } catch (_) {
+          
         }
       }
-    } catch (err) {
-      console.warn('[BOS Radar] newusers ping failed', err);
+    } catch (_) {
+      
     }
     writeLocalFlag(LAST_PING_KEY, String(Date.now()));
     writeLocalFlag(PING_LOCK_KEY, null);
@@ -1509,6 +1604,7 @@
     } else {
       removeUI();
     }
+    syncRuntimeLoops();
   };
 
   const init = () => {
@@ -1530,16 +1626,12 @@
     renderPotentialList();
     updateLastScanLabel();
     updateAccountAgeLabels();
-    setInterval(() => {
-      if (getSettingValue() && loadRadarEnabled()) {
-        runRadarPing();
-      }
-    }, PING_INTERVAL_MS);
-    setInterval(() => {
-      updateLastScanLabel();
-      updateAccountAgeLabels();
-    }, 1000);
+    syncRuntimeLoops();
     runRadarPing();
+    window.addEventListener('beforeunload', () => {
+      stopRadarPingLoop();
+      stopStatusTickLoop();
+    }, { capture: true });
   };
 
   if (document.readyState === 'loading') {

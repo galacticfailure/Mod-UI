@@ -71,7 +71,6 @@
   const enableTextCheck = () => {
     if (isEnabled) return;
     isEnabled = true;
-    console.log('TextCheck: Enabled - Auto-checking content for PC2 or Meta');
     
     startObserver();
     scanExistingContent();
@@ -80,7 +79,6 @@
   const disableTextCheck = () => {
     if (!isEnabled) return;
     isEnabled = false;
-    console.log('TextCheck: Disabled');
     
     stopObserver();
     removeAllLabels();

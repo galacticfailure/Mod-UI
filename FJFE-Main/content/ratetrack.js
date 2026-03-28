@@ -57,18 +57,28 @@
     ['Skin 1', 'Skin 2', 'Skin 3'],
     ['PC 1', 'PC 2', 'Glow'],
     ['Politics', 'Anime', 'Gaming', 'Spicy', 'Comics/Art', 'Meta', 'Other/Memes'],
-    ['Index', 'No-Index'],
     [RATE_REVIEW_FLAG_LABEL]
   ];
   const RATE_REVIEW_REASON_ROWS = {
     SKIN: 0,
     PC: 1,
     CATEGORY: 2,
-    INDEX: 3,
-    FLAG: 4
+    FLAG: 3
   };
   const CATEGORY_MULTISELECT_LABELS = new Set(['spicy', 'meta']);
   const CATEGORY_OTHER_MEMES_LABEL = 'other/memes';
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
+  const getAssistCommon = () => (
+    isRuntimeFlagEnabled('assistSharedHelpers', true) ? window.fjfeAssistCommon : null
+  );
   const extractHeadingTitle = () => {
     try {
       const heading = document.querySelector('h1.contentTitle');
@@ -109,6 +119,10 @@
   };
 
   const isAssistElementVisible = (el) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.isElementVisible) {
+      return assistCommon.isElementVisible(el);
+    }
     if (!el) return false;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden') return false;
@@ -118,6 +132,10 @@
   };
 
   const findAssistSearchButton = () => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.findSearchButton) {
+      return assistCommon.findSearchButton();
+    }
     const selectors = [
       '.userbarBttn .fjse',
       '.userbarBttn a[title*="search" i]',
@@ -151,10 +169,17 @@
   };
 
   const isAssistCompressedAnchor = (searchButton) => (
-    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+    getAssistCommon()?.isCompressedAnchor
+      ? getAssistCommon().isCompressedAnchor(searchButton)
+      : (searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn'))))
   );
 
   const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.positionCompressedWrapper) {
+      assistCommon.positionCompressedWrapper(wrapper, anchor);
+      return;
+    }
     if (!wrapper || !anchor) return;
     const parent = anchor.parentElement;
     if (!parent) return;
@@ -167,6 +192,11 @@
   };
 
   const applyAssistButtonStyling = (button, searchButton) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyButtonStyling) {
+      assistCommon.applyButtonStyling(button, searchButton);
+      return;
+    }
     if (!button || !searchButton) return;
     const searchStyle = window.getComputedStyle(searchButton);
     button.className = searchButton.className || '';
@@ -218,6 +248,16 @@
 
   const applyAssistIconButtonStyling = (button, searchButton, options) => {
     if (!button) return;
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyIconStyling) {
+      assistCommon.applyIconStyling(button, searchButton, {
+        background: options?.background,
+        border: options?.border,
+        color: options?.color,
+        iconUrl: options?.iconPath ? getResourceUrl(options.iconPath) : ''
+      });
+      return;
+    }
     applyAssistButtonStyling(button, searchButton);
     if (!options) return;
     if (options.background) button.style.backgroundColor = options.background;
@@ -443,7 +483,7 @@
         return;
       }
 
-      if (normalized.includes('no-index') || normalized === 'indexed') {
+      if (normalized.includes('no-index') || normalized === 'indexed' || normalized === 'index') {
         return;
       }
 
@@ -793,9 +833,6 @@
     if (selections.category) {
       mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.CATEGORY, selections.category) || mutated;
     }
-    if (selections.index) {
-      mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.INDEX, selections.index) || mutated;
-    }
     if (typeof selections.flag === 'boolean') {
       const appliedFlag = setReasonRowSelection(
         RATE_REVIEW_REASON_ROWS.FLAG,
@@ -840,7 +877,8 @@
       return false;
     }
   };
-  const isBatchAssistEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist) && batchAssistToggleEnabled;
+  const isBatchAssistSettingEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist);
+  const isBatchAssistEnabled = () => isBatchAssistSettingEnabled() && batchAssistToggleEnabled;
 
 
   const getSelectedReasonLabelsByRow = (rowIndex) => {
@@ -895,42 +933,22 @@
       .filter(Boolean);
   };
 
-  const normalizeIndexValue = (label) => {
-    if (!label) {
-      return '';
-    }
-    const text = label.toLowerCase();
-    if (text.includes('auto') && text.includes('no')) {
-      return 'Auto-No-Index';
-    }
-    if (text.includes('no-index') || text.includes('no index')) {
-      return 'No-Index';
-    }
-    if (text.includes('index')) {
-      return 'Index';
-    }
-    return label.trim();
-  };
-
   const buildRateReviewRejectSummary = () => {
     const snapshot = {
       skin: normalizeSkinValue(getSkinLabel()),
       pc: normalizePcValue(getPcLabel()),
-      categories: normalizeCategoryValues(getCategoryLabels()),
-      index: normalizeIndexValue(getNoIndexLabel())
+      categories: normalizeCategoryValues(getCategoryLabels())
     };
 
     const overrideSkin = normalizeSkinValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.SKIN));
     const overridePc = normalizePcValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.PC));
     const overrideCategoryLabels = getSelectedReasonLabelsByRow(RATE_REVIEW_REASON_ROWS.CATEGORY);
     const overrideCategories = normalizeCategoryValues(overrideCategoryLabels);
-    const overrideIndex = normalizeIndexValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.INDEX));
     const flagSelected = getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL;
     const hasRejectSelections = Boolean(
       overrideSkin ||
       overridePc ||
       overrideCategories.length ||
-      overrideIndex ||
       flagSelected
     );
 
@@ -967,8 +985,6 @@
     const categoriesOverridden = overrideCategories.length > 0;
     categoryValues.forEach((category) => pushSegment(category, categoriesOverridden));
 
-    pushSegment(overrideIndex || snapshot.index, Boolean(overrideIndex));
-
     if (!segments.length) {
       return null;
     }
@@ -998,10 +1014,6 @@
       selections.category = categorySelections[0];
     } else if (categorySelections.length > 1) {
       selections.category = categorySelections.slice();
-    }
-    const index = selectLabel(RATE_REVIEW_REASON_ROWS.INDEX);
-    if (index) {
-      selections.index = index;
     }
     if (getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL) {
       selections.flag = true;
@@ -1175,7 +1187,7 @@
     return true;
   };
 
-  const removeRateReviewEnhancements = () => {
+  const removeRateReviewEnhancements = ({ showLegacyButtons = true } = {}) => {
     const heading = document.querySelector('h1.contentTitle');
     if (!heading) {
       return;
@@ -1200,7 +1212,7 @@
       clearTimeout(rateReviewApproveHelperTimeout);
       rateReviewApproveHelperTimeout = null;
     }
-    setLegacyRateButtonsHidden(heading, false);
+    setLegacyRateButtonsHidden(heading, !showLegacyButtons);
   };
 
   const ensureRateReviewEnhancements = () => {
@@ -1211,15 +1223,19 @@
     if (!heading) {
       return;
     }
-    if (!isBatchAssistEnabled()) {
-      removeRateReviewEnhancements();
+    if (!isBatchAssistSettingEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: true });
       return;
     }
+    if (!isBatchAssistEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: false });
+      return;
+    }
+    setLegacyRateButtonsHidden(heading, true);
     if (heading.querySelector(`.${RATE_REVIEW_ACTIONS_CLASS}`)) {
       return;
     }
-    const legacyButtonsHidden = setLegacyRateButtonsHidden(heading, true);
-    if (!legacyButtonsHidden) {
+    if (!findLegacyRateButtons(heading).length) {
       return;
     }
     const wrapper = document.createElement('div');
@@ -1648,11 +1664,22 @@
   };
 
   const refreshBatchAssistEnhancements = () => {
-    if (isBatchAssistEnabled()) {
-      ensureRateReviewEnhancements();
-    } else {
-      removeRateReviewEnhancements();
+    ensureRateReviewEnhancements();
+  };
+
+  const scheduleRateReviewEnhancementsRefresh = () => {
+    if (!isRuntimeFlagEnabled('observerCoalescing', true)) {
+      refreshBatchAssistEnhancements();
+      return;
     }
+    if (rateReviewEnhancementsRefreshScheduled) {
+      return;
+    }
+    rateReviewEnhancementsRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      rateReviewEnhancementsRefreshScheduled = false;
+      refreshBatchAssistEnhancements();
+    });
   };
 
   const handleBatchAssistSettingChange = (event) => {
@@ -1660,7 +1687,7 @@
     if (!detail || typeof detail.batchAssist === 'undefined') {
       return;
     }
-    refreshBatchAssistEnhancements();
+    scheduleRateReviewEnhancementsRefresh();
   };
 
   const startRateReviewObserver = () => {
@@ -1674,13 +1701,13 @@
       rateReviewObserverPending = true;
       document.addEventListener('DOMContentLoaded', () => {
         rateReviewObserverPending = false;
-        ensureRateReviewEnhancements();
+        scheduleRateReviewEnhancementsRefresh();
         startRateReviewObserver();
       }, { once: true });
       return;
     }
     rateReviewObserver = new MutationObserver(() => {
-      ensureRateReviewEnhancements();
+      scheduleRateReviewEnhancementsRefresh();
     });
     rateReviewObserver.observe(document.body, { childList: true, subtree: true });
   };
@@ -1768,7 +1795,25 @@
           overridden: segment.overridden === true
         };
       })
+      .filter((segment) => {
+        const text = (segment?.text || '').trim().toLowerCase();
+        return text !== 'index' && text !== 'indexed' && text !== 'no-index' && text !== 'auto-no-index';
+      })
       .filter(Boolean);
+  };
+
+  const sanitizeRejectSummaryText = (value) => {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value
+      .split('/')
+      .map((part) => part.trim())
+      .filter((part) => {
+        const normalized = part.toLowerCase();
+        return normalized !== 'index' && normalized !== 'indexed' && normalized !== 'no-index' && normalized !== 'auto-no-index';
+      })
+      .join('/');
   };
 
   const sanitizeReasonSelections = (value) => {
@@ -1837,10 +1882,6 @@
     if (category) {
       normalized.category = category;
     }
-    const index = selectLabel(value.index);
-    if (index) {
-      normalized.index = index;
-    }
     if (typeof value.flag === 'boolean') {
       normalized.flag = value.flag;
     }
@@ -1851,7 +1892,7 @@
     if (!details || typeof details !== 'object') {
       return null;
     }
-    const summaryText = typeof details.summaryText === 'string' ? details.summaryText.trim() : '';
+    const summaryText = sanitizeRejectSummaryText(details.summaryText);
     const note = typeof details.note === 'string' ? details.note.trim() : '';
     const segments = sanitizeRejectSummarySegments(details.segments || details.summarySegments);
     const reasonSelections = sanitizeReasonSelections(details.reasonSelections);
@@ -2288,8 +2329,11 @@
   let quickMenuClickHandler = null;
   let quickKeydownHandler = null;
   let customShortcutEventListener = null;
+  let contentRefreshScheduled = false;
 
   let historyEntries = [];
+  let historyPersistTimer = null;
+  let counterPersistTimer = null;
   let historyDropdown = null;
   let historyList = null;
   let historyEmptyState = null;
@@ -2304,6 +2348,7 @@
   let historyDropdownViewportHandler = null;
   let rateReviewObserver = null;
   let rateReviewObserverPending = false;
+  let rateReviewEnhancementsRefreshScheduled = false;
   let rateReviewReasonButtons = [];
   let rateReviewRejectNoteInput = null;
   let rateReviewRejectHelper = null;
@@ -2545,10 +2590,6 @@
     if (categories.length) {
       labels.push(...categories);
     }
-    const noIndex = getNoIndexLabel();
-    if (noIndex) {
-      labels.push(noIndex);
-    }
     return labels;
   };
 
@@ -2563,7 +2604,9 @@
       return false;
     }
     const existing = historyEntries[index];
-    const shouldUpdate = JSON.stringify(existing.labels || []) !== JSON.stringify(cleanedLabels);
+    const existingLabels = Array.isArray(existing.labels) ? existing.labels : [];
+    const shouldUpdate = existingLabels.length !== cleanedLabels.length
+      || existingLabels.some((value, idx) => value !== cleanedLabels[idx]);
     if (!shouldUpdate) {
       return false;
     }
@@ -3189,7 +3232,7 @@
     return { ok: true, url, username, range };
   };
 
-  const persistHistoryEntries = () => {
+  const persistHistoryEntriesNow = () => {
     try {
       if (!historyEntries.length) {
         localStorage.removeItem(HISTORY_STORAGE_KEY);
@@ -3198,6 +3241,20 @@
       const payload = JSON.stringify(historyEntries.slice(0, HISTORY_MAX_ENTRIES));
       localStorage.setItem(HISTORY_STORAGE_KEY, payload);
     } catch (_) {}
+  };
+
+  const persistHistoryEntries = () => {
+    if (!isRuntimeFlagEnabled('debouncedStorage', true)) {
+      persistHistoryEntriesNow();
+      return;
+    }
+    if (historyPersistTimer) {
+      clearTimeout(historyPersistTimer);
+    }
+    historyPersistTimer = setTimeout(() => {
+      historyPersistTimer = null;
+      persistHistoryEntriesNow();
+    }, 120);
   };
 
   const loadHistoryEntriesFromStorage = () => {
@@ -3351,10 +3408,37 @@
   };
 
   // Store the latest value asynchronously; failure is non-fatal
-  const persistCounter = async () => {
+  const persistCounterNow = async () => {
     try {
       await storageSet({ [COUNT_KEY]: String(counterValue) });
     } catch (error) {
+    }
+  };
+
+  const persistCounter = () => {
+    if (!isRuntimeFlagEnabled('debouncedStorage', true)) {
+      persistCounterNow();
+      return;
+    }
+    if (counterPersistTimer) {
+      clearTimeout(counterPersistTimer);
+    }
+    counterPersistTimer = setTimeout(() => {
+      counterPersistTimer = null;
+      persistCounterNow();
+    }, 80);
+  };
+
+  const flushPendingStorageWrites = () => {
+    if (historyPersistTimer) {
+      clearTimeout(historyPersistTimer);
+      historyPersistTimer = null;
+      persistHistoryEntriesNow();
+    }
+    if (counterPersistTimer) {
+      clearTimeout(counterPersistTimer);
+      counterPersistTimer = null;
+      persistCounterNow();
     }
   };
 
@@ -4583,15 +4667,32 @@
   };
 
   // MutationObserver keeps button bindings alive while the site reloads markup
+  const scheduleContentRefresh = () => {
+    if (!isRuntimeFlagEnabled('observerCoalescing', true)) {
+      ensureSkinButtonsBound();
+      ensureRateDetailsObserverTargets();
+      scheduleHistoryLabelRefresh();
+      return;
+    }
+    if (contentRefreshScheduled) {
+      return;
+    }
+    contentRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      contentRefreshScheduled = false;
+      ensureSkinButtonsBound();
+      ensureRateDetailsObserverTargets();
+      scheduleHistoryLabelRefresh();
+    });
+  };
+
   const observeContent = () => {
     if (observer || !document.body) {
       return;
     }
 
     observer = new MutationObserver(() => {
-      ensureSkinButtonsBound();
-      ensureRateDetailsObserverTargets();
-      scheduleHistoryLabelRefresh();
+      scheduleContentRefresh();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
@@ -4602,6 +4703,7 @@
       observer.disconnect();
       observer = null;
     }
+    contentRefreshScheduled = false;
   };
 
   // Turns the whole feature on/off and hooks all relevant event sources
@@ -4755,6 +4857,7 @@
         refreshBatchAssistEnhancements();
       }
     });
+    window.addEventListener('beforeunload', flushPendingStorageWrites, { capture: true });
   };
 
   if (!window.fjTweakerModules) {

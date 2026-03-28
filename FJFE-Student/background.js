@@ -9,7 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
     id: 'fjfe-info',
     title: 'More Info',
     contexts: ['all'],
-    documentUrlPatterns: ['https://funnyjunk.com/*']
+    documentUrlPatterns: ['https://funnyjunk.com/*', 'https://*.funnyjunk.com/*']
   });
 });
 

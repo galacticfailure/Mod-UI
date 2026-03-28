@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "FJFE",
   "description": "Bunch of helper stuff.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "permissions": [
     "storage",
     "https://funnyjunk.com/*",
@@ -18,6 +18,7 @@
         "content/info.js",
         "content/sel.js",
         "content/slick.js",
+        "content/betterments.js",
         "content/modjs.js",
         "content/framegif.js",
         "content/ratetrack.js",

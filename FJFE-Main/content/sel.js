@@ -2,6 +2,7 @@
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'sel';
   const SETTINGS_KEY = 'fjTweakerSettings';
+  const ADDON_MESSAGE_TYPE = 'fjfe-get-addons';
   const MISRATE_CHEAT_STORAGE_KEY = 'fjTweakerMisrateCheatOverride';
   const MISRATE_CHEAT_SEQUENCE = [',', '.', '/', '-', '='];
   const BOS_RADAR_PAGINATION_SELECTOR = 'a.paginationSlider.fjdataTopPaginationLinks';
@@ -84,6 +85,8 @@
     avoidNext: false,
     flagCheck: false,
     workingPrev: false,
+    betterments: false,
+    disableButtons: false,
     banCalculator: false,
     hideRateShortcuts: false,
     hideShortcuts: false,
@@ -92,10 +95,8 @@
     modJSExtras: false,
     walcorn: false,
     checkText: false,
-    clicker2: false,
     misrateWarning: false,
     warnOnAll: false,
-    farm: false,
     huntAssist: false,
     batchAssist: false,
     reviewAssist: false,
@@ -111,6 +112,8 @@
     'avoidNext',
     'gifViewer',
     'workingPrev',
+    'betterments',
+    'disableButtons',
     'ufjp'
   ]);
   const ALLOWED_SETTINGS_TIER2 = new Set([
@@ -124,10 +127,89 @@
   const ALLOWED_SETTINGS_TIER3 = new Set([
     ...ALLOWED_SETTINGS_TIER2,
     'hideRateShortcuts',
-    'hideShortcuts',
-    'clicker2',
-    'farm'
+    'hideShortcuts'
   ]);
+
+  const normalizeAddonSettingDefinition = (addon) => {
+    const raw = addon && addon.setting && typeof addon.setting === 'object' ? addon.setting : null;
+    if (!raw) {
+      return null;
+    }
+    const settingName = typeof raw.settingName === 'string' ? raw.settingName.trim() : '';
+    if (!settingName) {
+      return null;
+    }
+    const settingLabel = typeof raw.settingLabel === 'string' && raw.settingLabel.trim()
+      ? raw.settingLabel.trim()
+      : (typeof addon?.name === 'string' && addon.name.trim() ? addon.name.trim() : settingName);
+    const section = typeof raw.section === 'string' && raw.section.trim() ? raw.section.trim() : 'Extras';
+    const category = typeof raw.category === 'string' && raw.category.trim() ? raw.category.trim() : 'Games';
+    const infoText = typeof raw.infoText === 'string' ? raw.infoText : '';
+    const defaultSwitchState = raw.defaultSwitchState === true;
+    return {
+      settingName,
+      settingLabel,
+      section,
+      category,
+      infoText,
+      defaultSwitchState
+    };
+  };
+
+  const fetchAddonSettingDefinitions = () => new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      try { console.info('[FJFE Debug][sel] chrome.runtime.sendMessage unavailable; addon defs = []'); } catch (_) {}
+      resolve([]);
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage({ type: ADDON_MESSAGE_TYPE }, (response) => {
+        if (chrome.runtime.lastError || !response || !Array.isArray(response.addons)) {
+          try {
+            console.warn('[FJFE Debug][sel] addon response invalid', {
+              lastError: chrome.runtime.lastError ? chrome.runtime.lastError.message : null,
+              hasResponse: Boolean(response),
+              addonArray: Array.isArray(response?.addons)
+            });
+          } catch (_) {}
+          resolve([]);
+          return;
+        }
+        try {
+          console.info('[FJFE Debug][sel] addon response received', {
+            addonCount: response.addons.length,
+            addonIds: response.addons.map((a) => a?.id || a?.name || 'unknown')
+          });
+        } catch (_) {}
+        const seen = new Set();
+        const defs = [];
+        response.addons.forEach((addon) => {
+          const normalized = normalizeAddonSettingDefinition(addon);
+          if (!normalized || seen.has(normalized.settingName)) {
+            return;
+          }
+          seen.add(normalized.settingName);
+          defs.push(normalized);
+        });
+        try {
+          console.info('[FJFE Debug][sel] normalized addon setting defs', {
+            defCount: defs.length,
+            defs: defs.map((d) => ({
+              settingName: d.settingName,
+              settingLabel: d.settingLabel,
+              section: d.section,
+              category: d.category,
+              defaultSwitchState: d.defaultSwitchState
+            }))
+          });
+        } catch (_) {}
+        resolve(defs);
+      });
+    } catch (_) {
+      try { console.warn('[FJFE Debug][sel] addon sendMessage threw; addon defs = []'); } catch (__) {}
+      resolve([]);
+    }
+  });
   const FORCED_HIDE_SHORTCUTS_KEY = 'fjTweakerForcedHideShortcuts';
   const computeAccessTier = ({ authorized, level, excluded }) => {
     if (!authorized) return 'unauthorized';
@@ -227,7 +309,7 @@
   };
 
 
-  const createUI = (settings) => {
+  const createUI = (settings, addonSettingDefs = []) => {
     try {
       
     } catch (e) {}
@@ -243,7 +325,7 @@
           if (resolvedEntry) {
             manageEntryObserver.disconnect();
             manageEntryObserver = null;
-            createUI(window.fjTweakerSettings || settings || DEFAULT_SETTINGS);
+            createUI(window.fjTweakerSettings || settings || DEFAULT_SETTINGS, addonSettingDefs);
           }
         });
 
@@ -721,40 +803,11 @@ const createSmallButtonRow = (id, label, onClick) => {
   return { wrapper: row, button: btn, infoButton };
 };
 
-const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow, reviewAssistRow, bosRadarRow, ufjpRow) => {
-  
-  const nextSettings = {
-    avoidNext: avoidNextRow.input.checked,
-    flagCheck: flagCheckRow.input.checked,
-    workingPrev: workingPrevRow.input.checked,
-    banCalculator: banCalculatorRow.input.checked,
-    hideRateShortcuts: hideRateRow.input.checked,
-    hideShortcuts: hideShortcutsRow.input.checked,
-    stopUsernamePopups: stopUserPopupRow.input.checked,
-    trackRates: trackRatesRow.input.checked,
-    modJSExtras: modJSExtrasRow.input.checked,
-    walcorn: walcornRow ? Boolean(walcornRow.input.checked) : false,
-    checkText: checkTextRow.input.checked,
-    clicker2: clicker2Row.input.checked,
-    misrateWarning: misrateWarningRow.input.checked,
-    warnOnAll: warnOnAllRow.input.checked,
-    farm: farmRow ? Boolean(farmRow.input.checked) : false,
-    gifViewer: gifViewerRow.input.checked,
-    huntAssist: huntAssistRow.input.checked,
-    batchAssist: batchAssistRow.input.checked,
-    reviewAssist: reviewAssistRow.input.checked,
-    bosRadar: bosRadarRow.input.checked,
-    ufjp: ufjpRow.input.checked
-  };
-
-  persistSettings(nextSettings);
-  window.fjTweakerSettings = { ...DEFAULT_SETTINGS, ...nextSettings };
-  dispatchSettings(window.fjTweakerSettings);
-};
-
   const avoidNextRow = createCheckboxRow('fj-sel-avoid-next', 'Avoid Next', settings.avoidNext);
   const flagCheckRow = createCheckboxRow('fj-sel-flag-check', 'Flag Check', settings.flagCheck);
   const workingPrevRow = createCheckboxRow('fj-sel-working-prev', 'Working Prev', settings.workingPrev);
+  const bettermentsRow = createCheckboxRow('fj-sel-betterments', 'Betterments', settings.betterments);
+  const disableButtonsRow = createCheckboxRow('fj-sel-disable-buttons', 'Disable Buttons', settings.disableButtons);
   const banCalculatorRow = createCheckboxRow('fj-sel-ban-calculator', 'Ban Calculator', settings.banCalculator);
   const hideRateRow = createCheckboxRow('fj-sel-hide-rate', 'Custom Shortcuts', settings.hideRateShortcuts);
   
@@ -773,12 +826,56 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalcula
   const checkTextRow = createCheckboxRow('fj-sel-check-text', 'Check Text', settings.checkText);
   const misrateWarningRow = createCheckboxRow('fj-sel-misrate-warning', 'Misrate Warning', settings.misrateWarning);
   const warnOnAllRow = createCheckboxRow('fj-sel-warn-on-all', 'Warn on All', settings.warnOnAll);
-  const farmRow = createCheckboxRow('fj-sel-farm', 'Farm', settings.farm);
   const huntAssistRow = createCheckboxRow('fj-sel-hunt-assist', 'Hunt Assist', settings.huntAssist);
   const batchAssistRow = createCheckboxRow('fj-sel-batch-assist', 'Batch Assist', settings.batchAssist);
   const reviewAssistRow = createCheckboxRow('fj-sel-review-assist', 'Review Assist', settings.reviewAssist);
   const bosRadarRow = createCheckboxRow('fj-sel-bos-radar', 'BOS Radar', settings.bosRadar);
   const ufjpRow = createCheckboxRow('fj-sel-ufjp', 'UFJP', settings.ufjp);
+
+  const addonSettingRows = (Array.isArray(addonSettingDefs) ? addonSettingDefs : []).map((def) => {
+    const row = createCheckboxRow(
+      `fj-sel-addon-${def.settingName}`,
+      def.settingLabel,
+      Boolean(settings[def.settingName])
+    );
+    return { def, row };
+  });
+
+  const saveSettingsLive = () => {
+    const nextSettings = {
+      ...DEFAULT_SETTINGS,
+      ...window.fjTweakerSettings,
+      avoidNext: avoidNextRow.input.checked,
+      flagCheck: flagCheckRow.input.checked,
+      workingPrev: workingPrevRow.input.checked,
+      betterments: bettermentsRow.input.checked,
+      disableButtons: disableButtonsRow.input.checked,
+      banCalculator: banCalculatorRow.input.checked,
+      hideRateShortcuts: hideRateRow.input.checked,
+      hideShortcuts: hideShortcutsRow.input.checked,
+      stopUsernamePopups: stopUserPopupRow.input.checked,
+      trackRates: trackRatesRow.input.checked,
+      modJSExtras: modJSExtrasRow.input.checked,
+      walcorn: walcornRow ? Boolean(walcornRow.input.checked) : false,
+      checkText: checkTextRow.input.checked,
+      misrateWarning: misrateWarningRow.input.checked,
+      warnOnAll: warnOnAllRow.input.checked,
+      gifViewer: gifViewerRow.input.checked,
+      huntAssist: huntAssistRow.input.checked,
+      batchAssist: batchAssistRow.input.checked,
+      reviewAssist: reviewAssistRow.input.checked,
+      bosRadar: bosRadarRow.input.checked,
+      ufjp: ufjpRow.input.checked
+    };
+
+    addonSettingRows.forEach(({ def, row }) => {
+      nextSettings[def.settingName] = Boolean(row.input.checked);
+    });
+
+    persistSettings(nextSettings);
+    window.fjTweakerSettings = { ...DEFAULT_SETTINGS, ...nextSettings };
+    dispatchSettings(window.fjTweakerSettings);
+  };
 
   
   const rightClickInfoRow = createSmallButtonRow(
@@ -804,25 +901,6 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalcula
     if (labelEl) labelEl.style.marginLeft = '22px';
   } catch (_) {}
 
-  const clicker2Row = createCheckboxRow('fj-sel-clicker2', 'Clicker', settings.clicker2, (e) => {
-    const checked = e.target.checked;
-    if (checked) {
-      if (window.fjfeClickerV2Open) window.fjfeClickerV2Open();
-      else {
-        const s2 = document.createElement('script');
-        s2.src = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL)
-          ? chrome.runtime.getURL('content/repost_clicker/rcmain.js')
-          : 'content/repost_clicker/rcmain.js';
-        s2.onload = () => { if (window.fjfeClickerV2Open) window.fjfeClickerV2Open(); };
-        document.head.appendChild(s2);
-      }
-    } else {
-  if (window.fjfeClickerV2Close) window.fjfeClickerV2Close();
-    }
-  });
-
-
-
     const addLiveChangeHandlers = () => {
   
   const onToggleMutual = (source) => {
@@ -834,7 +912,7 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalcula
     }
   };
 
-  const saveHandler = () => saveSettingsLive(avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow, reviewAssistRow, bosRadarRow, ufjpRow);
+  const saveHandler = () => saveSettingsLive();
 
       const applyMisrateCheatOverrideState = (triggerSave = false) => {
         if (misrateCheatOverride === null || !misrateWarningRow?.input) return;
@@ -861,32 +939,37 @@ const saveSettingsLive = (avoidNextRow, flagCheckRow, workingPrevRow, banCalcula
         misrateCheatOverride = Boolean(misrateWarningRow.input.checked);
         persistMisrateCheatOverride(misrateCheatOverride);
       };
-      avoidNextRow.input.addEventListener('change', saveHandler);
-      flagCheckRow.input.addEventListener('change', saveHandler);
-      workingPrevRow.input.addEventListener('change', saveHandler);
-      banCalculatorRow.input.addEventListener('change', saveHandler);
+      [
+        avoidNextRow,
+        flagCheckRow,
+        workingPrevRow,
+        bettermentsRow,
+        disableButtonsRow,
+        banCalculatorRow,
+        stopUserPopupRow,
+        trackRatesRow,
+        modJSExtrasRow,
+        walcornRow,
+        checkTextRow,
+        warnOnAllRow,
+        gifViewerRow,
+        huntAssistRow,
+        batchAssistRow,
+        reviewAssistRow,
+        bosRadarRow,
+        ufjpRow
+      ].forEach((row) => {
+        row?.input?.addEventListener('change', saveHandler);
+      });
       hideRateRow.input.addEventListener('change', (e) => { onToggleMutual('custom'); saveHandler(); });
       hideShortcutsRow.input.addEventListener('change', (e) => { onToggleMutual('hide'); saveHandler(); });
-      stopUserPopupRow.input.addEventListener('change', saveHandler);
-      trackRatesRow.input.addEventListener('change', saveHandler);
-      modJSExtrasRow.input.addEventListener('change', saveHandler);
-      walcornRow.input.addEventListener('change', saveHandler);
-      checkTextRow.input.addEventListener('change', saveHandler);
-      clicker2Row.input.addEventListener('change', () => {
-        saveHandler();
-      });
       misrateWarningRow.input.addEventListener('change', () => {
         syncMisrateCheatOverrideFromInput();
         saveHandler();
       });
-      warnOnAllRow.input.addEventListener('change', saveHandler);
-      farmRow.input.addEventListener('change', saveHandler);
-      gifViewerRow.input.addEventListener('change', saveHandler);
-      huntAssistRow.input.addEventListener('change', saveHandler);
-      batchAssistRow.input.addEventListener('change', saveHandler);
-      reviewAssistRow.input.addEventListener('change', saveHandler);
-      bosRadarRow.input.addEventListener('change', saveHandler);
-      ufjpRow.input.addEventListener('change', saveHandler);
+      addonSettingRows.forEach(({ row }) => {
+        row.input.addEventListener('change', saveHandler);
+      });
       return {
         applyMisrateCheatOverrideState,
         toggleMisrateCheatOverrideState
@@ -944,6 +1027,8 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(avoidNextRow.infoButton, '', 'icons/hehe.png');
     setInfoContent(flagCheckRow.infoButton, 'Summarizes flags in Premium History.');
     setInfoContent(workingPrevRow.infoButton, 'Makes the Prev button actually work.');
+    setInfoContent(bettermentsRow.infoButton, 'Some changes to the UI.');
+    setInfoContent(disableButtonsRow.infoButton, "Disables buttons that aren't supposed to be pressed.");
     setInfoContent(banCalculatorRow.infoButton, 'Adds a button to help calculate ban time.');
     setInfoContent(hideRateRow.infoButton, 'Enable custom shortcuts.');
     setInfoContent(hideShortcutsRow.infoButton, 'Completely hides and disabled shortcuts.');
@@ -953,16 +1038,17 @@ const setInfoContent = (button, message, imagePath) => {
     setInfoContent(modJSExtrasRow.infoButton, 'Provides some extra buttons on the ModJS menu to quickly reapply/swap ModJS settings. Recall will reapply last-submitted settings (even after clearing cache), Export provides a code to copy that reflects last-submitted settings, Import takes that code and uses it to apply settings. Also provides info on what ModJS settings do.');
     setInfoContent(walcornRow.infoButton, 'why');
     setInfoContent(checkTextRow.infoButton, 'Auto-checks content for PC2 or Meta.');
-    setInfoContent(clicker2Row.infoButton, 'Clicker UI.');
     setInfoContent(misrateWarningRow.infoButton, 'Adds a small warning when content may be misrated.');
     setInfoContent(warnOnAllRow.infoButton, 'Adds a slightly larger warning when already-rated content may be misrated.\nUseful for fixing rates during regular browsing.');
-    setInfoContent(farmRow.infoButton, 'A farm.');
     setInfoContent(rightClickInfoRow.infoButton, 'Opens relevant FJEdu entries on right-click.');
     setInfoContent(huntAssistRow.infoButton, 'Easier hunting and list-making.');
     setInfoContent(batchAssistRow.infoButton, 'Tools to assist in batch review.');
     setInfoContent(reviewAssistRow.infoButton, 'Fixes the 5-second delay in extermination review.');
     setInfoContent(bosRadarRow.infoButton, 'Scans new users for BOS.');
     setInfoContent(ufjpRow.infoButton, 'Unofficial FunnyJunk Patch. Fixes small bugs on the site.');
+    addonSettingRows.forEach(({ def, row }) => {
+      setInfoContent(row.infoButton, def.infoText || `${def.settingLabel}.`);
+    });
 
     
     const CATEGORY_STATE_KEY = 'fjTweakerCategoryState';
@@ -1064,52 +1150,110 @@ const setInfoContent = (button, message, imagePath) => {
       return next;
     };
 
+    const normalizeSectionKey = (value) => {
+      const raw = String(value || '').trim().toLowerCase();
+      if (raw === 'interface') return 'interface';
+      if (raw === 'tools') return 'tools';
+      return 'extras';
+    };
+
+    const normalizeCategoryLabel = (value, fallback) => {
+      const raw = String(value || '').trim();
+      return raw || fallback;
+    };
+
+    const interfaceUiRows = [stopUserPopupRow.wrapper, workingPrevRow.wrapper, bettermentsRow.wrapper, disableButtonsRow.wrapper];
+    const interfaceEaseRows = [flagCheckRow.wrapper];
+    const toolsSpecialistRows = [bosRadarRow.wrapper, batchAssistRow.wrapper, huntAssistRow.wrapper, reviewAssistRow.wrapper];
+    const toolsRatingRows = [misrateWarningRow.wrapper, warnOnAllRow.wrapper, checkTextRow.wrapper, hideRateRow.wrapper, hideShortcutsRow.wrapper, trackRatesRow.wrapper];
+    const toolsFlaggingRows = [banCalculatorRow.wrapper, gifViewerRow.wrapper];
+    const toolsUiRows = [modJSExtrasRow.wrapper, rightClickInfoRow.wrapper];
+    const extrasUiRows = [avoidNextRow.wrapper, walcornRow.wrapper];
+    const extrasGamesRows = [];
+    const extrasOtherRows = [ufjpRow.wrapper];
+
+    const addonCustomBuckets = {
+      interface: new Map(),
+      tools: new Map(),
+      extras: new Map()
+    };
+
+    const pushAddonCustomRow = (sectionKey, categoryLabel, rowWrapper) => {
+      const map = addonCustomBuckets[sectionKey];
+      if (!map.has(categoryLabel)) {
+        map.set(categoryLabel, []);
+      }
+      map.get(categoryLabel).push(rowWrapper);
+    };
+
+    addonSettingRows.forEach(({ def, row }) => {
+      const sectionKey = normalizeSectionKey(def.section);
+      const categoryLabel = normalizeCategoryLabel(def.category, sectionKey === 'extras' ? 'Games' : 'Other');
+      const categoryKey = categoryLabel.toLowerCase();
+
+      if (sectionKey === 'extras' && categoryKey === 'games') {
+        extrasGamesRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'interface' && categoryKey === 'ui changes') {
+        interfaceUiRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'interface' && categoryKey === 'ease-of-access') {
+        interfaceEaseRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'tools' && categoryKey === 'specialist') {
+        toolsSpecialistRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'tools' && categoryKey === 'rating') {
+        toolsRatingRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'tools' && categoryKey === 'flagging') {
+        toolsFlaggingRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'tools' && categoryKey === 'ui') {
+        toolsUiRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'extras' && categoryKey === 'ui') {
+        extrasUiRows.push(row.wrapper);
+        return;
+      }
+      if (sectionKey === 'extras' && categoryKey === 'other') {
+        extrasOtherRows.push(row.wrapper);
+        return;
+      }
+
+      pushAddonCustomRow(sectionKey, categoryLabel, row.wrapper);
+    });
+
+    const createCustomSections = (tabKey) => {
+      const entries = Array.from(addonCustomBuckets[tabKey].entries());
+      return entries.map(([categoryLabel, rows]) => createCategorySection(tabKey, categoryLabel, rows));
+    };
+
     const baseTabGroups = {
       interface: [
-        createCategorySection('interface', 'UI Changes', [
-          stopUserPopupRow.wrapper,
-          workingPrevRow.wrapper
-        ]),
-        createCategorySection('interface', 'Ease-of-Access', [
-          flagCheckRow.wrapper
-        ])
+        createCategorySection('interface', 'UI Changes', interfaceUiRows),
+        createCategorySection('interface', 'Ease-of-Access', interfaceEaseRows),
+        ...createCustomSections('interface')
       ],
       tools: [
-        createCategorySection('tools', 'Specialist', [
-          bosRadarRow.wrapper,
-          batchAssistRow.wrapper,
-          huntAssistRow.wrapper,
-          reviewAssistRow.wrapper
-        ]),
-        createCategorySection('tools', 'Rating', [
-          misrateWarningRow.wrapper,
-          warnOnAllRow.wrapper,
-          checkTextRow.wrapper,
-          hideRateRow.wrapper,
-          hideShortcutsRow.wrapper,
-          trackRatesRow.wrapper
-        ]),
-        createCategorySection('tools', 'Flagging', [
-          banCalculatorRow.wrapper,
-          gifViewerRow.wrapper
-        ]),
-        createCategorySection('tools', 'UI', [
-          modJSExtrasRow.wrapper,
-          rightClickInfoRow.wrapper
-        ])
+        createCategorySection('tools', 'Specialist', toolsSpecialistRows),
+        createCategorySection('tools', 'Rating', toolsRatingRows),
+        createCategorySection('tools', 'Flagging', toolsFlaggingRows),
+        createCategorySection('tools', 'UI', toolsUiRows),
+        ...createCustomSections('tools')
       ],
       extras: [
-        createCategorySection('extras', 'UI', [
-          avoidNextRow.wrapper,
-          walcornRow.wrapper
-        ]),
-        createCategorySection('extras', 'Games', [
-          clicker2Row.wrapper,
-          farmRow.wrapper
-        ]),
-        createCategorySection('extras', 'Other', [
-          ufjpRow.wrapper
-        ])
+        createCategorySection('extras', 'UI', extrasUiRows),
+        createCategorySection('extras', 'Games', extrasGamesRows),
+        createCategorySection('extras', 'Other', extrasOtherRows),
+        ...createCustomSections('extras')
       ]
     };
 
@@ -1120,6 +1264,8 @@ const setInfoContent = (button, message, imagePath) => {
       avoidNext: avoidNextRow,
       flagCheck: flagCheckRow,
       workingPrev: workingPrevRow,
+      betterments: bettermentsRow,
+      disableButtons: disableButtonsRow,
       banCalculator: banCalculatorRow,
       hideRateShortcuts: hideRateRow,
       hideShortcuts: hideShortcutsRow,
@@ -1128,10 +1274,8 @@ const setInfoContent = (button, message, imagePath) => {
       modJSExtras: modJSExtrasRow,
       walcorn: walcornRow,
       checkText: checkTextRow,
-      clicker2: clicker2Row,
       misrateWarning: misrateWarningRow,
       warnOnAll: warnOnAllRow,
-      farm: farmRow,
       gifViewer: gifViewerRow,
       huntAssist: huntAssistRow,
       batchAssist: batchAssistRow,
@@ -1139,6 +1283,10 @@ const setInfoContent = (button, message, imagePath) => {
       bosRadar: bosRadarRow,
       ufjp: ufjpRow
     };
+
+    addonSettingRows.forEach(({ def, row }) => {
+      checkboxRows[def.settingName] = row;
+    });
 
     const resolveTabKey = (preferred) => {
       if (preferred && currentTabGroups[preferred] && currentTabGroups[preferred].length) {
@@ -1283,7 +1431,10 @@ const setInfoContent = (button, message, imagePath) => {
         if (row.wrapper && row.wrapper.style.display === 'none') {
           row.wrapper.style.display = '';
         }
-        const allowed = !allowedSet || allowedSet.has(key);
+        const isAddonSetting = addonSettingRows.some(({ def }) => def.settingName === key);
+        const allowed = isAddonSetting
+          ? true
+          : (!allowedSet || allowedSet.has(key));
         row.input.disabled = !allowed;
         if (row.wrapper) {
           row.wrapper.style.opacity = allowed ? '' : '0.5';
@@ -1367,7 +1518,7 @@ const setInfoContent = (button, message, imagePath) => {
       }
 
       if (changed) {
-        saveSettingsLive(avoidNextRow, flagCheckRow, workingPrevRow, banCalculatorRow, hideRateRow, hideShortcutsRow, stopUserPopupRow, trackRatesRow, modJSExtrasRow, walcornRow, checkTextRow, clicker2Row, misrateWarningRow, warnOnAllRow, farmRow, gifViewerRow, huntAssistRow, batchAssistRow, reviewAssistRow, bosRadarRow, ufjpRow);
+        saveSettingsLive();
       }
 
       currentTier = normalizedTier;
@@ -1685,15 +1836,34 @@ const setInfoContent = (button, message, imagePath) => {
     });
   };
 
-  const init = () => {
+  const init = async () => {
     if (window.location.hostname !== targetHost) {
       return;
     }
 
+    const addonSettingDefs = await fetchAddonSettingDefinitions();
+    try {
+      console.info('[FJFE Debug][sel] init', {
+        addonSettingDefCount: addonSettingDefs.length,
+        addonSettingNames: addonSettingDefs.map((d) => d.settingName)
+      });
+    } catch (_) {}
+    addonSettingDefs.forEach((def) => {
+      if (typeof DEFAULT_SETTINGS[def.settingName] === 'undefined') {
+        DEFAULT_SETTINGS[def.settingName] = Boolean(def.defaultSwitchState);
+      }
+    });
+
     const currentSettings = loadStoredSettings();
     window.fjTweakerSettings = { ...DEFAULT_SETTINGS, ...currentSettings };
+    try {
+      console.info('[FJFE Debug][sel] effective settings snapshot', {
+        keys: Object.keys(window.fjTweakerSettings || {}),
+        addonKeysPresent: addonSettingDefs.map((d) => ({ key: d.settingName, value: window.fjTweakerSettings[d.settingName] }))
+      });
+    } catch (_) {}
     dispatchSettings(window.fjTweakerSettings);
-    createUI(window.fjTweakerSettings);
+    createUI(window.fjTweakerSettings, addonSettingDefs);
     setBosRadarPaginationBlock(Boolean(window.fjTweakerSettings.bosRadar));
     document.addEventListener('fjTweakerSettingsChanged', (event) => {
       const detail = event.detail || {};

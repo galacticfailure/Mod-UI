@@ -1,4 +1,6 @@
 (() => {
+  console.log('[FJFE-Student][ratetrack] script loaded on', window.location.href);
+
   /*
    * Rate counter widget.
    * Tracks how many pieces of content you've rated, keeps a draggable
@@ -6,7 +8,6 @@
    */
   const targetHost = 'funnyjunk.com';
   const MODULE_KEY = 'ratetrack';
-  const SETTINGS_STORAGE_KEY = 'fjTweakerSettings';
   const COUNT_KEY = 'fjTweakerRateCounter';
   const COUNT_EDITS_KEY = 'fjTweakerRateCountEdits';
   const PANEL_POSITION_KEY = 'fjTweakerRatePanelPosition';
@@ -18,7 +19,6 @@
   const HISTORY_MAX_ENTRIES = 100;
   const HISTORY_VISIBLE_COUNT = 5;
   const HISTORY_MENU_ANIM_MS = 160;
-  const PANEL_ANIM_MS = 160;
   const HISTORY_STORAGE_KEY = 'fjTweakerRateHistory';
   const HISTORY_DROPDOWN_GAP = 4;
   const HISTORY_DROPDOWN_MIN_TOP = 32;
@@ -41,6 +41,7 @@
   const RATE_LIMIT_BRIDGE_PATH = 'content/rate-limit-bridge.js';
   const RATE_LIMIT_BRIDGE_DATA_KEY = 'fjfeRateLimitConfig';
   const RATE_LIMIT_EVENT_ORIGIN_PAGE = 'page';
+  const SCROLLBAR_STYLE_ID = 'fjfe-ratetrack-scrollbar-style';
   const ASSIST_WRAPPER_ID = 'fj-assist-buttons';
   const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
   const ASSIST_BUTTON_ID = 'fj-assist-ratetrack-button';
@@ -54,15 +55,13 @@
     ['Skin 1', 'Skin 2', 'Skin 3'],
     ['PC 1', 'PC 2', 'Glow'],
     ['Politics', 'Anime', 'Gaming', 'Spicy', 'Comics/Art', 'Meta', 'Other/Memes'],
-    ['Index', 'No-Index'],
     [RATE_REVIEW_FLAG_LABEL]
   ];
   const RATE_REVIEW_REASON_ROWS = {
     SKIN: 0,
     PC: 1,
     CATEGORY: 2,
-    INDEX: 3,
-    FLAG: 4
+    FLAG: 3
   };
   const CATEGORY_MULTISELECT_LABELS = new Set(['spicy', 'meta']);
   const CATEGORY_OTHER_MEMES_LABEL = 'other/memes';
@@ -93,16 +92,6 @@
       }
     } catch (_) {}
     return resourcePath;
-  };
-
-  const getStoredSettings = () => {
-    try {
-      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (!raw) return {};
-      return JSON.parse(raw) || {};
-    } catch (_) {
-      return {};
-    }
   };
 
   const isAssistElementVisible = (el) => {
@@ -180,16 +169,37 @@
     button.style.display = 'inline-flex';
     button.style.alignItems = 'center';
     button.style.justifyContent = 'center';
+    button.style.overflow = 'visible';
     const size = parseFloat(searchStyle.height) || parseFloat(searchStyle.width) || 28;
     button.style.width = `${size}px`;
     button.style.height = `${size}px`;
     button.style.minWidth = `${size}px`;
     button.style.minHeight = `${size}px`;
     button.style.padding = '0';
-    button.style.borderRadius = '0';
+    button.style.borderRadius = '6px';
     button.style.backgroundRepeat = 'no-repeat';
     button.style.backgroundPosition = 'center';
     button.style.backgroundSize = '70% 70%';
+    if (!button.dataset.fjAssistBaseShadow) {
+      button.dataset.fjAssistBaseShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.12)';
+    }
+    if (!button.dataset.fjAssistBaseFilter) {
+      button.dataset.fjAssistBaseFilter = button.style.filter || '';
+    }
+    button.style.boxShadow = button.dataset.fjAssistBaseShadow;
+    button.style.transition = 'transform 120ms ease, box-shadow 180ms ease, filter 180ms ease';
+    button.style.transformOrigin = 'center';
+    if (!button.dataset.fjAssistPressBound) {
+      button.dataset.fjAssistPressBound = '1';
+      button.addEventListener('pointerdown', () => {
+        button.style.transform = 'scale(0.92)';
+      });
+      ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+        button.addEventListener(evt, () => {
+          button.style.transform = '';
+        });
+      });
+    }
   };
 
   const applyAssistIconButtonStyling = (button, searchButton, options) => {
@@ -228,12 +238,14 @@
 
   const setAssistButtonActive = (active) => {
     if (!assistButton) return;
+    const baseShadow = assistButton.dataset.fjAssistBaseShadow || '';
+    const baseFilter = assistButton.dataset.fjAssistBaseFilter || '';
     if (active) {
-      assistButton.style.filter = 'brightness(1.25)';
-      assistButton.style.boxShadow = `0 0 6px ${ASSIST_GLOW_COLOR}`;
+      assistButton.style.filter = 'brightness(1.2) saturate(1.1)';
+      assistButton.style.boxShadow = `0 0 10px ${ASSIST_GLOW_COLOR}, 0 0 18px ${ASSIST_GLOW_COLOR}, ${baseShadow}`;
     } else {
-      assistButton.style.filter = '';
-      assistButton.style.boxShadow = '';
+      assistButton.style.filter = baseFilter;
+      assistButton.style.boxShadow = baseShadow;
     }
   };
 
@@ -253,6 +265,8 @@
       wrapper.style.position = 'relative';
       wrapper.style.gap = '6px';
       wrapper.style.zIndex = '999';
+      wrapper.style.overflow = 'visible';
+      wrapper.style.paddingRight = '12px';
       wrapper.style.left = '';
       wrapper.style.top = '';
       anchor.insertAdjacentElement('afterend', wrapper);
@@ -271,7 +285,9 @@
         gap: '6px',
         position: 'relative',
         marginLeft: '6px',
-        verticalAlign: 'middle'
+        verticalAlign: 'middle',
+        overflow: 'visible',
+        paddingRight: '12px'
       });
     }
 
@@ -366,16 +382,6 @@
     }
   };
 
-  const isNsfwPath = () => {
-    try {
-      const path = (window.location?.pathname || '').toLowerCase();
-      return path.includes('/nsfw/');
-    } catch (_) {
-      return false;
-    }
-  };
-
-
   const createRateReviewPrimaryButton = (label, colors = {}) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -390,14 +396,14 @@
       width: 'auto',
       maxWidth: '180px',
       alignSelf: 'flex-start',
-      minHeight: '26px',
-      padding: '6px 12px',
-      borderRadius: '999px',
+      minHeight: '28px',
+      padding: '5px 10px',
+      borderRadius: '4px',
       border: `1px solid ${border}`,
       background,
       color: text,
       fontSize: '11px',
-      fontWeight: '700',
+      fontWeight: '600',
       letterSpacing: '0.06em',
       textTransform: 'uppercase',
       cursor: 'pointer',
@@ -439,11 +445,11 @@
     }
     button.dataset.fjfeSelected = selected ? '1' : '0';
     if (selected) {
-      button.style.background = '#7a1111';
-      button.style.borderColor = '#b82525';
+      button.style.background = '#5a1b1b';
+      button.style.borderColor = '#8a2a2a';
     } else {
-      button.style.background = '#1a1a1a';
-      button.style.borderColor = '#333';
+      button.style.background = '#2a2a2a';
+      button.style.borderColor = '#3a3a3a';
     }
   };
 
@@ -520,14 +526,14 @@
     button.type = 'button';
     button.textContent = label;
     Object.assign(button.style, {
-      padding: '6px 12px',
-      borderRadius: '999px',
-      border: '1px solid #333',
-      background: '#1a1a1a',
+      padding: '5px 9px',
+      borderRadius: '6px',
+      border: '1px solid #3a3a3a',
+      background: '#2a2a2a',
       color: '#f6f6f6',
-      fontSize: '12px',
-      fontWeight: '600',
-      letterSpacing: '0.05em',
+      fontSize: '10px',
+      fontWeight: '500',
+      letterSpacing: '0.04em',
       textTransform: 'uppercase',
       cursor: 'pointer',
       transition: 'background 0.15s ease, border-color 0.15s ease',
@@ -667,9 +673,6 @@
     if (selections.category) {
       mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.CATEGORY, selections.category) || mutated;
     }
-    if (selections.index) {
-      mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.INDEX, selections.index) || mutated;
-    }
     if (typeof selections.flag === 'boolean') {
       const appliedFlag = setReasonRowSelection(
         RATE_REVIEW_REASON_ROWS.FLAG,
@@ -714,7 +717,8 @@
       return false;
     }
   };
-  const isBatchAssistEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist) && batchAssistToggleEnabled;
+  const isBatchAssistSettingEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist);
+  const isBatchAssistEnabled = () => isBatchAssistSettingEnabled() && batchAssistToggleEnabled;
 
 
   const getSelectedReasonLabelsByRow = (rowIndex) => {
@@ -769,42 +773,22 @@
       .filter(Boolean);
   };
 
-  const normalizeIndexValue = (label) => {
-    if (!label) {
-      return '';
-    }
-    const text = label.toLowerCase();
-    if (text.includes('auto') && text.includes('no')) {
-      return 'Auto-No-Index';
-    }
-    if (text.includes('no-index') || text.includes('no index')) {
-      return 'No-Index';
-    }
-    if (text.includes('index')) {
-      return 'Index';
-    }
-    return label.trim();
-  };
-
   const buildRateReviewRejectSummary = () => {
     const snapshot = {
       skin: normalizeSkinValue(getSkinLabel()),
       pc: normalizePcValue(getPcLabel()),
-      categories: normalizeCategoryValues(getCategoryLabels()),
-      index: normalizeIndexValue(getNoIndexLabel())
+      categories: normalizeCategoryValues(getCategoryLabels())
     };
 
     const overrideSkin = normalizeSkinValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.SKIN));
     const overridePc = normalizePcValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.PC));
     const overrideCategoryLabels = getSelectedReasonLabelsByRow(RATE_REVIEW_REASON_ROWS.CATEGORY);
     const overrideCategories = normalizeCategoryValues(overrideCategoryLabels);
-    const overrideIndex = normalizeIndexValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.INDEX));
     const flagSelected = getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL;
     const hasRejectSelections = Boolean(
       overrideSkin ||
       overridePc ||
       overrideCategories.length ||
-      overrideIndex ||
       flagSelected
     );
 
@@ -841,8 +825,6 @@
     const categoriesOverridden = overrideCategories.length > 0;
     categoryValues.forEach((category) => pushSegment(category, categoriesOverridden));
 
-    pushSegment(overrideIndex || snapshot.index, Boolean(overrideIndex));
-
     if (!segments.length) {
       return null;
     }
@@ -872,10 +854,6 @@
       selections.category = categorySelections[0];
     } else if (categorySelections.length > 1) {
       selections.category = categorySelections.slice();
-    }
-    const index = selectLabel(RATE_REVIEW_REASON_ROWS.INDEX);
-    if (index) {
-      selections.index = index;
     }
     if (getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL) {
       selections.flag = true;
@@ -1049,7 +1027,7 @@
     return true;
   };
 
-  const removeRateReviewEnhancements = () => {
+  const removeRateReviewEnhancements = ({ showLegacyButtons = true } = {}) => {
     const heading = document.querySelector('h1.contentTitle');
     if (!heading) {
       return;
@@ -1074,7 +1052,7 @@
       clearTimeout(rateReviewApproveHelperTimeout);
       rateReviewApproveHelperTimeout = null;
     }
-    setLegacyRateButtonsHidden(heading, false);
+    setLegacyRateButtonsHidden(heading, !showLegacyButtons);
   };
 
   const ensureRateReviewEnhancements = () => {
@@ -1085,15 +1063,19 @@
     if (!heading) {
       return;
     }
-    if (!isBatchAssistEnabled()) {
-      removeRateReviewEnhancements();
+    if (!isBatchAssistSettingEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: true });
       return;
     }
+    if (!isBatchAssistEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: false });
+      return;
+    }
+    setLegacyRateButtonsHidden(heading, true);
     if (heading.querySelector(`.${RATE_REVIEW_ACTIONS_CLASS}`)) {
       return;
     }
-    const legacyButtonsHidden = setLegacyRateButtonsHidden(heading, true);
-    if (!legacyButtonsHidden) {
+    if (!findLegacyRateButtons(heading).length) {
       return;
     }
     const wrapper = document.createElement('div');
@@ -1116,9 +1098,9 @@
     };
 
     const skipButton = createRateReviewPrimaryButton('Skip Rate', {
-      background: '#123d73',
-      hover: '#185092',
-      border: '#1f5fb3'
+      background: '#1b3559',
+      hover: '#24426b',
+      border: '#2b4a75'
     });
     skipButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1127,9 +1109,9 @@
     });
 
     const approveButton = createRateReviewPrimaryButton('Approve Rate', {
-      background: '#0f4b1d',
-      hover: '#146329',
-      border: '#1c7f36'
+      background: '#1a3a22',
+      hover: '#21462a',
+      border: '#2b5d35'
     });
     approveButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1148,18 +1130,18 @@
     approveNoteButton.type = 'button';
     approveNoteButton.tabIndex = -1;
     approveNoteButton.setAttribute('aria-label', 'Approve with note');
-    approveNoteButton.dataset.fjfeBaseBackground = '#0f4b1d';
-    approveNoteButton.dataset.fjfeBaseBorder = '#1c7f36';
-    approveNoteButton.dataset.fjfeHoverBackground = '#146329';
+    approveNoteButton.dataset.fjfeBaseBackground = '#1a3a22';
+    approveNoteButton.dataset.fjfeBaseBorder = '#2b5d35';
+    approveNoteButton.dataset.fjfeHoverBackground = '#21462a';
     approveNoteButton.dataset.fjfeLockedHighlight = '0';
     Object.assign(approveNoteButton.style, {
       width: '38px',
       height: '38px',
       minWidth: '38px',
       minHeight: '38px',
-      borderRadius: '999px',
-      border: '1px solid #1c7f36',
-      background: '#0f4b1d',
+      borderRadius: '4px',
+      border: '1px solid #2b5d35',
+      background: '#1a3a22',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -1203,6 +1185,16 @@
     });
 
     approveRow.append(approveButton, approveNoteButton);
+
+    const queueBannerRow = document.createElement('div');
+    queueBannerRow.dataset.fjfeQueueBannerRow = '1';
+    Object.assign(queueBannerRow.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      width: 'fit-content',
+      maxWidth: '100%'
+    });
     const syncApproveNoteButtonSize = () => {
       try {
         const rect = approveButton.getBoundingClientRect();
@@ -1235,17 +1227,17 @@
     });
 
     const approveNoteInput = document.createElement('textarea');
-    approveNoteInput.placeholder = 'Add approval note...';
+    approveNoteInput.placeholder = 'Insert note...';
     approveNoteInput.rows = 2;
     Object.assign(approveNoteInput.style, {
       width: '100%',
-      minHeight: '48px',
+      minHeight: '28px',
       resize: 'vertical',
       background: '#111',
       color: '#f6f6f6',
       borderRadius: '10px',
-      border: '1px solid #2d4d34',
-      padding: '8px 10px',
+      border: '1px solid #333',
+      padding: '5px 8px',
       fontSize: '13px',
       fontFamily: 'inherit'
     });
@@ -1275,9 +1267,9 @@
       justifyContent: 'flex-start'
     });
     const approveNoteDoneButton = createRateReviewPrimaryButton('Done', {
-      background: '#0f4b1d',
-      hover: '#146329',
-      border: '#1c7f36'
+      background: '#1a3a22',
+      hover: '#21462a',
+      border: '#2b5d35'
     });
     approveNoteDoneButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1315,6 +1307,9 @@
     approveNoteButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof collapseRateReviewReasons === 'function') {
+        collapseRateReviewReasons();
+      }
       setApproveNoteExpanded(!approveNoteExpanded);
       if (approveNoteExpanded) {
         approveNoteInput.focus();
@@ -1322,21 +1317,50 @@
     });
 
     const rejectButton = createRateReviewPrimaryButton('Reject Rate', {
-      background: '#5b1111',
-      hover: '#7b1717',
-      border: '#9c2020'
+      background: '#4a1414',
+      hover: '#5a1b1b',
+      border: '#7a2525'
     });
 
     const reasonsWrapper = document.createElement('div');
     Object.assign(reasonsWrapper.style, {
       display: 'none',
       flexDirection: 'column',
-      gap: '8px',
-      paddingTop: '6px',
+      gap: '6px',
+      paddingTop: '4px',
       marginBottom: '12px',
       width: '100%',
       maxWidth: '880px'
     });
+
+    const createInlineDivider = (label) => {
+      const divider = document.createElement('div');
+      Object.assign(divider.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%'
+      });
+      const text = document.createElement('div');
+      text.textContent = label;
+      Object.assign(text.style, {
+        fontSize: '8px',
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        color: '#c2c2c2',
+        fontWeight: '600'
+      });
+      const line = document.createElement('div');
+      Object.assign(line.style, {
+        flex: '1 1 auto',
+        height: '1px',
+        background: '#2b2b2b'
+      });
+      divider.append(text, line);
+      return divider;
+    };
+
+    reasonsWrapper.appendChild(createInlineDivider('Missed Rating'));
 
     const reasonButtons = [];
     const getReasonButtons = () => reasonButtons;
@@ -1346,7 +1370,7 @@
       Object.assign(row.style, {
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '6px',
+        gap: '4px',
         width: '100%',
         justifyContent: 'flex-start'
       });
@@ -1361,6 +1385,8 @@
     rateReviewReasonButtons = reasonButtons;
     rateReviewActionsWrapper = wrapper;
 
+    reasonsWrapper.appendChild(createInlineDivider('Rating Note'));
+
     const noteContainer = document.createElement('div');
     Object.assign(noteContainer.style, {
       display: 'flex',
@@ -1373,13 +1399,13 @@
     noteInput.rows = 2;
     Object.assign(noteInput.style, {
       width: '100%',
-      minHeight: '54px',
+      minHeight: '32px',
       resize: 'vertical',
       background: '#111',
       color: '#f6f6f6',
       borderRadius: '10px',
       border: '1px solid #333',
-      padding: '8px 10px',
+      padding: '5px 8px',
       fontSize: '13px',
       fontFamily: 'inherit'
     });
@@ -1412,9 +1438,9 @@
       marginTop: '2px'
     });
     const doneButton = createRateReviewPrimaryButton('Done', {
-      background: '#5b1111',
-      hover: '#7b1717',
-      border: '#9c2020'
+      background: '#4a1414',
+      hover: '#5a1b1b',
+      border: '#7a2525'
     });
     doneButton.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1448,11 +1474,25 @@
     rejectButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof collapseRateReviewApproveNote === 'function') {
+        collapseRateReviewApproveNote();
+      }
       setRejectExpanded(!rejectExpanded);
     });
 
-    wrapper.append(skipButton, approveRow, approveNoteWrapper, rejectButton, reasonsWrapper);
+    rateReviewPrimaryButtons = [skipButton, approveButton, rejectButton];
+    wrapper.append(skipButton, approveRow, rejectButton, queueBannerRow, approveNoteWrapper, reasonsWrapper);
     heading.appendChild(wrapper);
+    if (!window.fjfeSlickAnimateIn && !wrapper.dataset.fjfeBatchSlideIn) {
+      wrapper.dataset.fjfeBatchSlideIn = '1';
+      wrapper.style.opacity = '0';
+      wrapper.style.transform = 'translateX(12px)';
+      wrapper.style.transition = 'opacity 180ms ease, transform 200ms ease';
+      requestAnimationFrame(() => {
+        wrapper.style.opacity = '1';
+        wrapper.style.transform = 'translateX(0)';
+      });
+    }
     if (window.fjfeSlickAnimateIn) {
       window.fjfeSlickAnimateIn(wrapper);
     } else if (window.fjTweakerModules?.slick?.openTweakerMenu) {
@@ -1464,11 +1504,7 @@
   };
 
   const refreshBatchAssistEnhancements = () => {
-    if (isBatchAssistEnabled()) {
-      ensureRateReviewEnhancements();
-    } else {
-      removeRateReviewEnhancements();
-    }
+    ensureRateReviewEnhancements();
   };
 
   const handleBatchAssistSettingChange = (event) => {
@@ -1534,6 +1570,22 @@
     }
   };
 
+  const normalizeRateId = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const normalized = Math.abs(Math.trunc(value));
+      return normalized ? String(normalized) : '';
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return '';
+      }
+      const match = trimmed.match(/\d+/);
+      return match ? match[0] : '';
+    }
+    return '';
+  };
+
   const sanitizeRejectSummarySegments = (segments) => {
     if (!Array.isArray(segments)) {
       return [];
@@ -1556,7 +1608,25 @@
           overridden: segment.overridden === true
         };
       })
+      .filter((segment) => {
+        const text = (segment?.text || '').trim().toLowerCase();
+        return text !== 'index' && text !== 'indexed' && text !== 'no-index' && text !== 'auto-no-index';
+      })
       .filter(Boolean);
+  };
+
+  const sanitizeRejectSummaryText = (value) => {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value
+      .split('/')
+      .map((part) => part.trim())
+      .filter((part) => {
+        const normalized = part.toLowerCase();
+        return normalized !== 'index' && normalized !== 'indexed' && normalized !== 'no-index' && normalized !== 'auto-no-index';
+      })
+      .join('/');
   };
 
   const sanitizeReasonSelections = (value) => {
@@ -1625,10 +1695,6 @@
     if (category) {
       normalized.category = category;
     }
-    const index = selectLabel(value.index);
-    if (index) {
-      normalized.index = index;
-    }
     if (typeof value.flag === 'boolean') {
       normalized.flag = value.flag;
     }
@@ -1639,7 +1705,7 @@
     if (!details || typeof details !== 'object') {
       return null;
     }
-    const summaryText = typeof details.summaryText === 'string' ? details.summaryText.trim() : '';
+    const summaryText = sanitizeRejectSummaryText(details.summaryText);
     const note = typeof details.note === 'string' ? details.note.trim() : '';
     const segments = sanitizeRejectSummarySegments(details.segments || details.summarySegments);
     const reasonSelections = sanitizeReasonSelections(details.reasonSelections);
@@ -1686,9 +1752,13 @@
       const approveNote = typeof entry.approveNote === 'string' ? entry.approveNote.trim() : '';
       const rejectDetails = sanitizeQueueRejectDetails(entry.rejectDetails);
       const rateActionAdded = Boolean(entry.rateActionAdded);
+      const rateId = normalizeRateId(entry.rateId);
       const normalizedEntry = { url, title: title || QUEUE_FALLBACK_TITLE, status };
       if (rateActionAdded) {
         normalizedEntry.rateActionAdded = true;
+      }
+      if (rateId) {
+        normalizedEntry.rateId = rateId;
       }
       if (approveNote && status === QUEUE_STATUS.APPROVED) {
         normalizedEntry.approveNote = approveNote;
@@ -1770,10 +1840,20 @@
   }) || null;
 
   let queueBannerElement = null;
+  let rateReviewPrimaryButtons = [];
 
   const positionQueueBanner = (banner) => {
     if (!banner) {
       return;
+    }
+    if (rateReviewActionsWrapper && rateReviewActionsWrapper.querySelector) {
+      const bannerRow = rateReviewActionsWrapper.querySelector('[data-fjfe-queue-banner-row="1"]');
+      if (bannerRow) {
+        if (banner.parentElement !== bannerRow) {
+          bannerRow.appendChild(banner);
+        }
+        return;
+      }
     }
     const wrapper = rateReviewActionsWrapper;
     if (wrapper && wrapper.parentElement) {
@@ -1803,17 +1883,23 @@
     }
     const banner = document.createElement('div');
     Object.assign(banner.style, {
-      width: '100%',
-      padding: '10px 14px',
-      background: '#4b1515',
-      border: '1px solid #812222',
-      borderRadius: '8px',
-      color: '#ffe0e0',
+      width: 'auto',
+      minWidth: '240px',
+      padding: '8px 16px',
+      background: '#0f2b1c',
+      border: '1px solid #39ff9f',
+      borderRadius: '4px',
+      color: '#dfffea',
       fontWeight: '600',
+      fontSize: '15px',
+      fontFamily: "'Segoe UI', sans-serif",
       textAlign: 'center',
       marginTop: '6px',
-      marginBottom: '12px',
-      display: 'none'
+      marginBottom: '8px',
+      display: 'none',
+      alignSelf: 'flex-start',
+      boxShadow: '0 0 8px rgba(57, 255, 159, 0.55), 0 0 18px rgba(57, 255, 159, 0.35), inset 0 0 6px rgba(57, 255, 159, 0.3)',
+      textShadow: '0 0 6px rgba(57, 255, 159, 0.65)'
     });
     banner.textContent = '';
     queueBannerElement = banner;
@@ -1824,6 +1910,15 @@
   const showQueueBanner = (message) => {
     const banner = ensureQueueBannerElement();
     banner.textContent = message || '';
+    if (rateReviewPrimaryButtons.length) {
+      const widths = rateReviewPrimaryButtons
+        .map((btn) => btn.getBoundingClientRect?.().width || btn.offsetWidth || 0)
+        .filter((value) => Number.isFinite(value) && value > 0);
+      const maxWidth = widths.length ? Math.max(...widths) : 0;
+      banner.style.width = maxWidth > 0 ? `${Math.round(maxWidth)}px` : 'auto';
+    } else {
+      banner.style.width = 'auto';
+    }
     banner.style.display = 'block';
   };
 
@@ -1980,7 +2075,14 @@
           window.location.href = nextUrl;
         }
       } else {
-        if (actionType === RATE_QUEUE_ACTION.REJECT && typeof collapseRateReviewReasons === 'function') {
+        if (result?.success) {
+          if (typeof collapseRateReviewReasons === 'function') {
+            collapseRateReviewReasons();
+          }
+          if (typeof collapseRateReviewApproveNote === 'function') {
+            collapseRateReviewApproveNote();
+          }
+        } else if (actionType === RATE_QUEUE_ACTION.REJECT && typeof collapseRateReviewReasons === 'function') {
           collapseRateReviewReasons();
         }
         const bannerMessage = result?.success ? QUEUE_COMPLETE_MESSAGE : QUEUE_EMPTY_MESSAGE;
@@ -2076,7 +2178,6 @@
   let lastRateLimitSignalId = null;
   let rateCopyStatus = null;
   let rateCopyStatusTimeout = null;
-  let panelHideTimeout = null;
 
   const showRateCopyStatus = (message, tone = 'info') => {
     if (!rateCopyStatus) {
@@ -2091,9 +2192,6 @@
     rateCopyStatus.textContent = message || '';
     rateCopyStatus.style.color = colors[tone] || colors.info;
     rateCopyStatus.style.opacity = hasMessage ? '1' : '0';
-    rateCopyStatus.style.display = hasMessage ? 'block' : 'none';
-    rateCopyStatus.style.marginTop = hasMessage ? '4px' : '0';
-    rateCopyStatus.style.minHeight = hasMessage ? '18px' : '0';
     if (rateCopyStatusTimeout) {
       clearTimeout(rateCopyStatusTimeout);
       rateCopyStatusTimeout = null;
@@ -2102,9 +2200,6 @@
       rateCopyStatusTimeout = setTimeout(() => {
         if (rateCopyStatus) {
           rateCopyStatus.style.opacity = '0';
-          rateCopyStatus.style.display = 'none';
-          rateCopyStatus.style.marginTop = '0';
-          rateCopyStatus.style.minHeight = '0';
           rateCopyStatus.textContent = '';
         }
       }, 3600);
@@ -2303,10 +2398,6 @@
     const categories = getCategoryLabels();
     if (categories.length) {
       labels.push(...categories);
-    }
-    const noIndex = getNoIndexLabel();
-    if (noIndex) {
-      labels.push(noIndex);
     }
     return labels;
   };
@@ -2606,7 +2697,9 @@
         console[method] = wrapped;
       });
     }
-    // Rate limit detection is handled locally in this build.
+    ensureRateLimitMessageListener();
+    ensureRateLimitDomEventListener();
+    injectPageRateLimitDetector();
   };
 
   const RATE_DETAIL_CLICK_SELECTORS = [
@@ -2705,11 +2798,12 @@
       textAlign: 'left',
       background: '#181818',
       border: '1px solid #262626',
+      borderLeft: '4px solid #262626',
       borderRadius: '6px',
       padding: '8px',
       color: '#f6f6f6',
       fontSize: '13px',
-      fontWeight: '600',
+      fontWeight: '400',
       lineHeight: '1.3',
       cursor: 'pointer',
       whiteSpace: 'normal',
@@ -2746,7 +2840,7 @@
         tag.textContent = label;
         Object.assign(tag.style, {
           fontSize: '12px',
-          fontWeight: '600',
+          fontWeight: '400',
           padding: '2px 6px',
           borderRadius: '4px',
           border: '1px solid #2f2f2f',
@@ -3043,9 +3137,6 @@
     scheduleHistoryLabelRefresh();
   };
 
-  // Default to enabled unless the settings object explicitly disables us
-  const getSettingValue = () => true;
-
   // Pull persisted counter from chrome.storage, migrating old localStorage values once
   const loadCounter = async () => {
     try {
@@ -3093,7 +3184,7 @@
 
   // Helper for applying new values, optionally skipping persistence during init
   const setCounter = (value, shouldPersist = true) => {
-    counterValue = value;
+    counterValue = Math.max(0, Number(value) || 0);
     updateDisplay();
     if (shouldPersist) {
       persistCounter();
@@ -3123,7 +3214,10 @@
       return null;
     }
     const parsed = parseInt(trimmed, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    return parsed < 0 ? null : parsed;
   };
 
   // Visual feedback for invalid manual entries
@@ -3480,6 +3574,58 @@
     window.addEventListener('pointercancel', finishDrag);
   };
 
+  const applyButtonAnimations = (button) => {
+    if (!button || button.dataset.fjfeAnimBound) return;
+    button.dataset.fjfeAnimBound = '1';
+    button.style.transition = 'transform 120ms ease, filter 160ms ease, box-shadow 160ms ease';
+    button.style.transformOrigin = 'center';
+    const press = (event) => {
+      stopPropagation(event);
+      button.style.transform = 'scale(0.96)';
+    };
+    const release = (event) => {
+      stopPropagation(event);
+      button.style.transform = '';
+    };
+    button.addEventListener('pointerdown', press);
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((evt) => {
+      button.addEventListener(evt, release);
+    });
+    button.addEventListener('mouseenter', () => {
+      button.style.filter = 'brightness(1.08)';
+    });
+    button.addEventListener('mouseleave', () => {
+      button.style.filter = '';
+    });
+  };
+
+  const ensureScrollbarStyles = () => {
+    if (document.getElementById(SCROLLBAR_STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = SCROLLBAR_STYLE_ID;
+    style.textContent = `
+      .fjfe-ratetrack-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #6a6a6a transparent;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .fjfe-ratetrack-scroll::-webkit-scrollbar-thumb {
+        background: #6a6a6a;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+    `;
+    document.head?.appendChild(style);
+  };
+
   // Lazily constructs the floating panel UI plus its controls
   const ensurePanel = () => {
     if (panel) {
@@ -3496,7 +3642,7 @@
       top: 'auto',
       right: PANEL_MARGIN + 'px',
       width: '180px',
-      padding: '12px',
+      padding: '0 12px 12px 12px',
       background: '#0d0d0d',
       color: '#f6f6f6',
       border: '1px solid #333',
@@ -3504,9 +3650,6 @@
       boxShadow: '0 6px 18px rgba(0, 0, 0, 0.45)',
       font: "500 15px 'Segoe UI', sans-serif",
       display: 'none',
-      opacity: '0',
-      transform: 'translateY(6px) scale(0.98)',
-      transition: `opacity ${PANEL_ANIM_MS}ms ease, transform ${PANEL_ANIM_MS}ms ease`,
       flexDirection: 'column',
       alignItems: 'center',
       gap: '10px',
@@ -3524,21 +3667,31 @@
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottom: '1px solid #1f1f1f',
-      padding: '2px 0',
+      padding: '6px 0 4px 0',
+      minHeight: '26px',
       gap: '8px'
     });
 
     const dragHandle = document.createElement('div');
     Object.assign(dragHandle.style, {
       cursor: 'move',
-      fontSize: '11px',
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: '#a5a5a5',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      minHeight: '22px',
       userSelect: 'none',
-      flex: '1 1 auto'
+      flex: '0 0 auto'
     });
-    dragHandle.textContent = 'Drag';
+    const dragIcon = document.createElement('img');
+    dragIcon.src = getResourceUrl('icons/menu.png');
+    dragIcon.alt = '';
+    Object.assign(dragIcon.style, {
+      width: '20px',
+      height: '20px',
+      objectFit: 'contain',
+      opacity: '0.75'
+    });
+    dragHandle.append(dragIcon);
     dragHandle.addEventListener('pointerdown', startDrag);
 
     const copyButton = document.createElement('button');
@@ -3546,29 +3699,30 @@
     copyButton.tabIndex = -1;
     copyButton.setAttribute('aria-hidden', 'true');
     Object.assign(copyButton.style, {
-      width: '28px',
-      height: '28px',
+      width: '25px',
+      height: '25px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: '4px',
       border: '1px solid #143462',
-      background: '#12438a',
+      background: 'linear-gradient(180deg, #2f67c0 0%, #12438a 52%, #0c2f61 100%)',
       cursor: 'pointer',
       flex: '0 0 auto',
       padding: '2px'
     });
-    copyButton.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.35)';
-    copyButton.title = 'Copy rate snapshot (coming soon)';
+    copyButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
+    copyButton.title = 'Copy timecode';
     const copyIcon = document.createElement('img');
     copyIcon.src = getResourceUrl('icons/copy.png');
     copyIcon.alt = '';
     Object.assign(copyIcon.style, {
-      width: '18px',
-      height: '18px',
+      width: '17px',
+      height: '17px',
       objectFit: 'contain'
     });
     copyButton.appendChild(copyIcon);
+    applyButtonAnimations(copyButton);
     copyButton.addEventListener('pointerdown', stopPropagation);
     copyButton.addEventListener('click', async (event) => {
       stopPropagation(event);
@@ -3589,28 +3743,35 @@
 
     lockButton = document.createElement('button');
     Object.assign(lockButton.style, {
-      width: '24px',
-      height: '24px',
-      lineHeight: '24px',
+      width: '25px',
+      height: '25px',
+      lineHeight: '25px',
       textAlign: 'center',
-      fontSize: '14px',
-      border: '1px solid #2f2f2f',
+      fontSize: '17px',
+      border: '1px solid #3a3a3a',
       borderRadius: '4px',
       cursor: 'pointer',
-      flex: '0 0 auto'
+      flex: '0 0 auto',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     });
+    applyButtonAnimations(lockButton);
+    lockButton.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35)';
     const applyLockButtonUI = () => {
       if (!lockButton) return;
       if (panelLocked) {
-        lockButton.textContent = '🔒︎';
-        lockButton.style.background = '#142a14';
-        lockButton.style.color = '#66cc66';
-        lockButton.title = 'Locked to screen (toggle)';
-      } else {
         lockButton.textContent = '🔓︎';
-        lockButton.style.background = '#2a1515';
-        lockButton.style.color = '#dd6666';
-        lockButton.title = 'Moves with page (toggle)';
+        lockButton.style.background = 'linear-gradient(180deg, #5a5a5a 0%, #2d2d2d 55%, #1f1f1f 100%)';
+        lockButton.style.color = '#e0e0e0';
+        lockButton.style.borderColor = '#3a3a3a';
+        lockButton.title = 'Unlock position';
+      } else {
+        lockButton.textContent = '🔒︎';
+        lockButton.style.background = 'linear-gradient(180deg, #8c8c8c 0%, #6a6a6a 55%, #515151 100%)';
+        lockButton.style.color = '#1a1a1a';
+        lockButton.style.borderColor = '#7a7a7a';
+        lockButton.title = 'Lock position';
       }
     };
     lockButton.addEventListener('click', (e) => {
@@ -3642,25 +3803,29 @@
     panelLocked = loadPanelLocked();
     applyLockButtonUI();
 
-    header.append(dragHandle, copyButton, lockButton);
-    panel.append(header);
-
     const copyStatusEl = document.createElement('div');
     rateCopyStatus = copyStatusEl;
     Object.assign(copyStatusEl.style, {
-      width: '100%',
-      minHeight: '0',
+      flex: '1 1 auto',
+      minWidth: '0',
       textAlign: 'center',
-      fontSize: '11px',
+      fontSize: '9px',
       color: '#bdd6ff',
-      marginTop: '0',
       opacity: '0',
       transition: 'opacity 0.2s ease',
       pointerEvents: 'none',
-      display: 'none'
+      display: 'block',
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+      lineHeight: '1.1',
+      maxHeight: '24px',
+      overflow: 'hidden',
+      padding: '0 4px'
     });
     copyStatusEl.textContent = '';
-    panel.append(copyStatusEl);
+
+    header.append(dragHandle, copyStatusEl, copyButton, lockButton);
+    panel.append(header);
 
     const countWrapper = document.createElement('div');
     Object.assign(countWrapper.style, {
@@ -3674,8 +3839,9 @@
 
     countDisplay = document.createElement('div');
     Object.assign(countDisplay.style, {
-      fontSize: '32px',
+      fontSize: '48px',
       fontWeight: '700',
+      fontFamily: "'Segoe UI Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif",
       lineHeight: '1',
       textAlign: 'center',
       cursor: 'pointer',
@@ -3696,8 +3862,9 @@
     Object.assign(countInput.style, {
       display: 'none',
       width: '100%',
-      fontSize: '32px',
+      fontSize: '48px',
       fontWeight: '700',
+      fontFamily: "'Segoe UI Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Segoe UI', sans-serif",
       lineHeight: '1',
       textAlign: 'center',
       background: 'rgba(0, 0, 0, 0)',
@@ -3729,6 +3896,20 @@
     countWrapper.append(countDisplay, countInput);
     panel.append(countWrapper);
 
+    const trackedRatesLabel = document.createElement('div');
+    trackedRatesLabel.textContent = 'TRACKED RATES';
+    Object.assign(trackedRatesLabel.style, {
+      fontSize: '9px',
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
+      color: '#9a9a9a',
+      marginTop: '-4px',
+      marginBottom: '2px',
+      textAlign: 'center',
+      width: '100%'
+    });
+    panel.append(trackedRatesLabel);
+
     const adjustRow = document.createElement('div');
     adjustRow.style.display = 'flex';
     adjustRow.style.gap = '10px';
@@ -3744,10 +3925,11 @@
         fontWeight: '600',
         color: '#f8f8f8',
         background: '#1c1c1c',
-        border: '1px solid #2f2f2f',
+        border: '1px solid #3a3a3a',
         borderRadius: '4px',
         cursor: 'pointer'
       });
+      applyButtonAnimations(button);
       button.addEventListener('click', stopPropagation);
       return button;
     };
@@ -3769,21 +3951,27 @@
     resetButton = document.createElement('button');
     resetButton.textContent = 'Reset';
     Object.assign(resetButton.style, {
-      width: '100%',
-      padding: '6px 8px',
+      width: '80%',
+      padding: '5px 8px',
       fontSize: '14px',
-      fontWeight: '600',
+      fontWeight: '500',
       color: '#ffaa00',
       background: '#161616',
-      border: '1px solid #332200',
+      border: '2px solid #332200',
       borderRadius: '4px',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      alignSelf: 'center',
+      marginTop: '4px',
+      marginBottom: '-4px'
     });
+    applyButtonAnimations(resetButton);
     const resetConfirmWrapper = document.createElement('div');
     Object.assign(resetConfirmWrapper.style, {
       width: '100%',
       display: 'none',
-      gap: '8px'
+      gap: '8px',
+      marginTop: '4px',
+      marginBottom: '-4px'
     });
 
     const resetConfirmButton = document.createElement('button');
@@ -3799,6 +3987,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(resetConfirmButton);
 
     const resetCancelButton = document.createElement('button');
     resetCancelButton.textContent = "Don't Reset";
@@ -3813,6 +4002,7 @@
       borderRadius: '4px',
       cursor: 'pointer'
     });
+    applyButtonAnimations(resetCancelButton);
 
     resetConfirmWrapper.append(resetConfirmButton, resetCancelButton);
 
@@ -3848,9 +4038,18 @@
 
     panel.append(resetButton, resetConfirmWrapper);
 
+    const resetHistoryDivider = document.createElement('div');
+    Object.assign(resetHistoryDivider.style, {
+      width: '100%',
+      height: '1px',
+      background: '#232323',
+      margin: '1px 0 0 0'
+    });
+    panel.append(resetHistoryDivider);
+
     historySection = document.createElement('div');
     historySection.style.width = '100%';
-    historySection.style.marginTop = '8px';
+    historySection.style.marginTop = '1px';
     historySection.style.position = 'relative';
     historySection.style.alignSelf = 'stretch';
 
@@ -3860,27 +4059,28 @@
     Object.assign(historyButton.style, {
       width: '100%',
       margin: '0',
-      height: '36px',
-      border: 'none',
+      height: '32px',
+      border: '1px solid #4a4a7a',
       borderRadius: '6px',
-      padding: '0 10px',
+      padding: '0 8px',
       cursor: 'pointer',
       boxShadow: '0 2px 6px #0006',
       outline: 'none',
-      background: '#61afff',
+      background: '#242436',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: '0px'
     });
+    applyButtonAnimations(historyButton);
 
     const makeHistoryArrowIcon = () => {
       const img = document.createElement('img');
       const src = chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL('icons/down_icon.png') : 'icons/down_icon.png';
       img.src = src;
       Object.assign(img.style, {
-        width: '24px',
-        height: '24px',
+        width: '12px',
+        height: '12px',
         objectFit: 'contain',
         pointerEvents: 'none',
         userSelect: 'none',
@@ -3891,14 +4091,16 @@
 
     const historyArrowLeft = makeHistoryArrowIcon();
     const historyArrowRight = makeHistoryArrowIcon();
+    historyArrowLeft.style.marginRight = '2px';
+    historyArrowRight.style.marginLeft = '2px';
 
     const historyLabel = document.createElement('span');
     historyLabel.textContent = 'HISTORY';
     Object.assign(historyLabel.style, {
-      fontWeight: '800',
-      letterSpacing: '0.18em',
-      fontSize: '11px',
-      color: '#191919',
+      fontWeight: '600',
+      letterSpacing: '0.12em',
+      fontSize: '10px',
+      color: '#d9d9e6',
       pointerEvents: 'none',
       userSelect: 'none',
       flex: '1 1 auto',
@@ -3910,23 +4112,8 @@
 
     historyButton.append(historyArrowLeft, historyLabel, historyArrowRight);
 
-    const pressHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = 'scale(0.96)';
-    };
-    const releaseHistoryButton = (event) => {
-      stopPropagation(event);
-      historyButton.style.transform = '';
-    };
-
-    historyButton.addEventListener('pointerdown', pressHistoryButton);
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
-      historyButton.addEventListener(type, releaseHistoryButton);
-    });
-
     historyButton.addEventListener('click', (event) => {
       stopPropagation(event);
-      releaseHistoryButton(event);
       toggleHistoryDropdown();
     });
 
@@ -3969,7 +4156,10 @@
       height: `${HISTORY_DROPDOWN_PADDING_TOP}px`
     });
 
+    ensureScrollbarStyles();
+
     const historyContentWrapper = document.createElement('div');
+    historyContentWrapper.className = 'fjfe-ratetrack-scroll';
     Object.assign(historyContentWrapper.style, {
       maxHeight: String(HISTORY_VISIBLE_COUNT * 64) + 'px',
       overflowY: 'auto',
@@ -4015,36 +4205,14 @@
       if (slickModule && slickModule.openRateCounter) {
         slickModule.openRateCounter(panel);
       } else {
-        if (panelHideTimeout) {
-          clearTimeout(panelHideTimeout);
-          panelHideTimeout = null;
-        }
         panel.style.display = 'flex';
-        panel.style.pointerEvents = 'auto';
-        requestAnimationFrame(() => {
-          if (!panel) {
-            return;
-          }
-          panel.style.opacity = '1';
-          panel.style.transform = 'translateY(0) scale(1)';
-        });
       }
     } else {
       setHistoryDropdownOpen(false);
       if (slickModule && slickModule.closeRateCounter) {
         slickModule.closeRateCounter(panel);
       } else {
-        panel.style.opacity = '0';
-        panel.style.transform = 'translateY(6px) scale(0.98)';
-        panel.style.pointerEvents = 'none';
-        if (panelHideTimeout) {
-          clearTimeout(panelHideTimeout);
-        }
-        panelHideTimeout = setTimeout(() => {
-          if (panel && !featureEnabled) {
-            panel.style.display = 'none';
-          }
-        }, PANEL_ANIM_MS);
+        panel.style.display = 'none';
       }
     }
   };
@@ -4356,8 +4524,11 @@
   // Bootstraps: load counts, honor prefs, and listen for setting toggles
   const init = () => {
     if (window.location.hostname !== targetHost) {
+      console.log('[FJFE-Student][ratetrack] init skipped due to host', window.location.hostname);
       return;
     }
+
+    console.log('[FJFE-Student][ratetrack] init start');
 
     batchAssistToggleEnabled = loadBatchAssistToggle();
     refreshBatchAssistEnhancements();
@@ -4373,7 +4544,7 @@
     })();
     setCountEditsEnabled(loadCountEditsPreference(), false);
     toggleEnabled = loadToggleEnabled();
-    applySetting(getSettingValue());
+    applySetting(true);
     window.addEventListener('fjTweakerBatchAssistToggle', (event) => {
       const detail = event?.detail;
       if (!detail || typeof detail.enabled === 'undefined') {

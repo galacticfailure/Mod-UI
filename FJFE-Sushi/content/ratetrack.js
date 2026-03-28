@@ -57,15 +57,13 @@
     ['Skin 1', 'Skin 2', 'Skin 3'],
     ['PC 1', 'PC 2', 'Glow'],
     ['Politics', 'Anime', 'Gaming', 'Spicy', 'Comics/Art', 'Meta', 'Other/Memes'],
-    ['Index', 'No-Index'],
     [RATE_REVIEW_FLAG_LABEL]
   ];
   const RATE_REVIEW_REASON_ROWS = {
     SKIN: 0,
     PC: 1,
     CATEGORY: 2,
-    INDEX: 3,
-    FLAG: 4
+    FLAG: 3
   };
   const CATEGORY_MULTISELECT_LABELS = new Set(['spicy', 'meta']);
   const CATEGORY_OTHER_MEMES_LABEL = 'other/memes';
@@ -443,7 +441,7 @@
         return;
       }
 
-      if (normalized.includes('no-index') || normalized === 'indexed') {
+      if (normalized.includes('no-index') || normalized === 'indexed' || normalized === 'index') {
         return;
       }
 
@@ -793,9 +791,6 @@
     if (selections.category) {
       mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.CATEGORY, selections.category) || mutated;
     }
-    if (selections.index) {
-      mutated = setReasonRowSelection(RATE_REVIEW_REASON_ROWS.INDEX, selections.index) || mutated;
-    }
     if (typeof selections.flag === 'boolean') {
       const appliedFlag = setReasonRowSelection(
         RATE_REVIEW_REASON_ROWS.FLAG,
@@ -840,7 +835,8 @@
       return false;
     }
   };
-  const isBatchAssistEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist) && batchAssistToggleEnabled;
+  const isBatchAssistSettingEnabled = () => Boolean(window.fjTweakerSettings?.batchAssist);
+  const isBatchAssistEnabled = () => isBatchAssistSettingEnabled() && batchAssistToggleEnabled;
 
 
   const getSelectedReasonLabelsByRow = (rowIndex) => {
@@ -895,42 +891,22 @@
       .filter(Boolean);
   };
 
-  const normalizeIndexValue = (label) => {
-    if (!label) {
-      return '';
-    }
-    const text = label.toLowerCase();
-    if (text.includes('auto') && text.includes('no')) {
-      return 'Auto-No-Index';
-    }
-    if (text.includes('no-index') || text.includes('no index')) {
-      return 'No-Index';
-    }
-    if (text.includes('index')) {
-      return 'Index';
-    }
-    return label.trim();
-  };
-
   const buildRateReviewRejectSummary = () => {
     const snapshot = {
       skin: normalizeSkinValue(getSkinLabel()),
       pc: normalizePcValue(getPcLabel()),
-      categories: normalizeCategoryValues(getCategoryLabels()),
-      index: normalizeIndexValue(getNoIndexLabel())
+      categories: normalizeCategoryValues(getCategoryLabels())
     };
 
     const overrideSkin = normalizeSkinValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.SKIN));
     const overridePc = normalizePcValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.PC));
     const overrideCategoryLabels = getSelectedReasonLabelsByRow(RATE_REVIEW_REASON_ROWS.CATEGORY);
     const overrideCategories = normalizeCategoryValues(overrideCategoryLabels);
-    const overrideIndex = normalizeIndexValue(getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.INDEX));
     const flagSelected = getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL;
     const hasRejectSelections = Boolean(
       overrideSkin ||
       overridePc ||
       overrideCategories.length ||
-      overrideIndex ||
       flagSelected
     );
 
@@ -967,8 +943,6 @@
     const categoriesOverridden = overrideCategories.length > 0;
     categoryValues.forEach((category) => pushSegment(category, categoriesOverridden));
 
-    pushSegment(overrideIndex || snapshot.index, Boolean(overrideIndex));
-
     if (!segments.length) {
       return null;
     }
@@ -998,10 +972,6 @@
       selections.category = categorySelections[0];
     } else if (categorySelections.length > 1) {
       selections.category = categorySelections.slice();
-    }
-    const index = selectLabel(RATE_REVIEW_REASON_ROWS.INDEX);
-    if (index) {
-      selections.index = index;
     }
     if (getSelectedReasonLabelByRow(RATE_REVIEW_REASON_ROWS.FLAG) === RATE_REVIEW_FLAG_LABEL) {
       selections.flag = true;
@@ -1175,7 +1145,7 @@
     return true;
   };
 
-  const removeRateReviewEnhancements = () => {
+  const removeRateReviewEnhancements = ({ showLegacyButtons = true } = {}) => {
     const heading = document.querySelector('h1.contentTitle');
     if (!heading) {
       return;
@@ -1200,7 +1170,7 @@
       clearTimeout(rateReviewApproveHelperTimeout);
       rateReviewApproveHelperTimeout = null;
     }
-    setLegacyRateButtonsHidden(heading, false);
+    setLegacyRateButtonsHidden(heading, !showLegacyButtons);
   };
 
   const ensureRateReviewEnhancements = () => {
@@ -1211,15 +1181,19 @@
     if (!heading) {
       return;
     }
-    if (!isBatchAssistEnabled()) {
-      removeRateReviewEnhancements();
+    if (!isBatchAssistSettingEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: true });
       return;
     }
+    if (!isBatchAssistEnabled()) {
+      removeRateReviewEnhancements({ showLegacyButtons: false });
+      return;
+    }
+    setLegacyRateButtonsHidden(heading, true);
     if (heading.querySelector(`.${RATE_REVIEW_ACTIONS_CLASS}`)) {
       return;
     }
-    const legacyButtonsHidden = setLegacyRateButtonsHidden(heading, true);
-    if (!legacyButtonsHidden) {
+    if (!findLegacyRateButtons(heading).length) {
       return;
     }
     const wrapper = document.createElement('div');
@@ -1648,11 +1622,7 @@
   };
 
   const refreshBatchAssistEnhancements = () => {
-    if (isBatchAssistEnabled()) {
-      ensureRateReviewEnhancements();
-    } else {
-      removeRateReviewEnhancements();
-    }
+    ensureRateReviewEnhancements();
   };
 
   const handleBatchAssistSettingChange = (event) => {
@@ -1752,7 +1722,25 @@
           overridden: segment.overridden === true
         };
       })
+      .filter((segment) => {
+        const text = (segment?.text || '').trim().toLowerCase();
+        return text !== 'index' && text !== 'indexed' && text !== 'no-index' && text !== 'auto-no-index';
+      })
       .filter(Boolean);
+  };
+
+  const sanitizeRejectSummaryText = (value) => {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value
+      .split('/')
+      .map((part) => part.trim())
+      .filter((part) => {
+        const normalized = part.toLowerCase();
+        return normalized !== 'index' && normalized !== 'indexed' && normalized !== 'no-index' && normalized !== 'auto-no-index';
+      })
+      .join('/');
   };
 
   const sanitizeReasonSelections = (value) => {
@@ -1821,10 +1809,6 @@
     if (category) {
       normalized.category = category;
     }
-    const index = selectLabel(value.index);
-    if (index) {
-      normalized.index = index;
-    }
     if (typeof value.flag === 'boolean') {
       normalized.flag = value.flag;
     }
@@ -1835,7 +1819,7 @@
     if (!details || typeof details !== 'object') {
       return null;
     }
-    const summaryText = typeof details.summaryText === 'string' ? details.summaryText.trim() : '';
+    const summaryText = sanitizeRejectSummaryText(details.summaryText);
     const note = typeof details.note === 'string' ? details.note.trim() : '';
     const segments = sanitizeRejectSummarySegments(details.segments || details.summarySegments);
     const reasonSelections = sanitizeReasonSelections(details.reasonSelections);
@@ -2524,10 +2508,6 @@
     const categories = getCategoryLabels();
     if (categories.length) {
       labels.push(...categories);
-    }
-    const noIndex = getNoIndexLabel();
-    if (noIndex) {
-      labels.push(noIndex);
     }
     return labels;
   };

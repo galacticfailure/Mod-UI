@@ -1,10 +1,11 @@
 (() => {
   /*
-   * Credentials/authorization bootstrapper.
-   * Pulls rank data from FunnyJunk endpoints, caches it, exposes helpers
-   * over window.fjApichk, and wires the SEL footer button used to force
-   * a refresh. Also drives the daily auto-refresh timer that reloads the
-   * page if access level changes.
+   * credentials/auth bootstrapper.
+   * drags rank data out of funnyjunk endpoints, caches it so it doesn't keep
+   * hammering the same thing, exposes helpers on window.fjapichk, and wires
+   * the sel footer button so users can force a refresh if everything breaks.
+   * also runs the daily auto-refresh timer that reloads the page if access
+   * level changes.
    */
   const MODULE_KEY = 'apichk';
   const TARGET_HOST = 'funnyjunk.com';
@@ -13,7 +14,7 @@
   const AUTO_REFRESH_KEY = '__fj_apichk_last_auto_refresh__';
   const AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000; 
   const AUTO_RETRY_MS = 60 * 60 * 1000; 
-  const EXCLUDED_USERNAMES = ['galacticfailure', 'gubbels','Shisui'];
+  const EXCLUDED_USERNAMES = ['galacticfailure'];
   const LEVEL_OVERRIDE_KEY = '__fj_apichk_override_level__';
   const LEVEL_OVERRIDE_MIN = 1;
   const LEVEL_OVERRIDE_MAX = 10;
@@ -28,8 +29,8 @@
   let autoRefreshTimer = null;
   let overrideLevel = null;
 
-  // Allow power users to temporarily spoof a level for testing restricted UIs.
-  // Sanitize user-entered override levels before persisting them.
+  // lets certain users spoof a level for testing restricted ui stuff.
+  // cleans user input before saving it.
   const normalizeOverrideLevel = (value) => {
     if (value === null || typeof value === 'undefined') return null;
     const num = Number(String(value).trim());
@@ -39,6 +40,7 @@
     return int;
   };
 
+  // stores override level in localstorage, or nukes it when value is null.
   const persistOverrideLevel = (value) => {
     if (value === null || typeof value === 'undefined') {
       try { localStorage.removeItem(LEVEL_OVERRIDE_KEY); } catch (_) {}
@@ -47,6 +49,7 @@
     try { localStorage.setItem(LEVEL_OVERRIDE_KEY, String(value)); } catch (_) {}
   };
 
+  // reads override level from storage and cleans up junk values.
   const readStoredOverrideLevel = () => {
     try {
       const raw = localStorage.getItem(LEVEL_OVERRIDE_KEY);
@@ -64,8 +67,10 @@
 
   overrideLevel = readStoredOverrideLevel();
 
+  // returns active override level when valid, otherwise null.
   const getOverrideLevel = () => (Number.isFinite(overrideLevel) ? overrideLevel : null);
 
+  // returns the raw cached level without override stuff.
   const getRawCachedLevel = () => {
     if (!cached) return null;
     if (typeof cached.level === 'number') return cached.level;
@@ -73,7 +78,7 @@
     return Number.isFinite(parsed) ? parsed : null;
   };
 
-  // True when the cache contains a rank entry from the mod ranks endpoint.
+  // true only when cache actually has rank data from the mod ranks endpoint.
   const isAuthorized = () => {
     
     return Boolean(cached && cached.rankText && (cached.level !== null && typeof cached.level !== 'undefined'));
@@ -85,6 +90,7 @@
     return getRawCachedLevel();
   };
 
+  // normalizes usernames so case and whitespace stops mattering.
   const normalizeUsername = (username) => {
     if (!username || typeof username !== 'string') return '';
     return username.trim().toLowerCase();
@@ -100,6 +106,7 @@
     return Boolean(isUsernameExcluded(cached && cached.username));
   };
 
+  // restriction means authorized + not excluded + level 1
   const isRestricted = () => {
     const level = getLevel();
     if (!isAuthorized()) return false;
@@ -107,7 +114,7 @@
     return level === 1;
   };
 
-  // Broadcast current credential info so other modules can react instantly.
+  // notes current credential state so other modules can react immediately.
   const dispatchStatus = () => {
     try {
       const detail = {
@@ -148,15 +155,15 @@
     return true;
   };
 
-  // Manual refresh button is rate-limited so it cannot spam the API endpoints.
-  // Manual refresh button has a rolling window; read/validate the window + remaining uses.
+  // manual refresh is rate-limited so admin doesn't kill me later.
+  // reads and validates rolling window state plus remaining uses.
   const readRefreshState = () => {
     let windowStart = 0; let usesLeft = REFRESH_MAX_USES;
     try { windowStart = parseInt(localStorage.getItem(REFRESH_WINDOW_START_KEY), 10); if (!Number.isFinite(windowStart)) windowStart = 0; } catch(_) { windowStart = 0; }
     try { usesLeft = parseInt(localStorage.getItem(REFRESH_USES_LEFT_KEY), 10); if (!Number.isFinite(usesLeft)) usesLeft = REFRESH_MAX_USES; } catch(_) { usesLeft = REFRESH_MAX_USES; }
     const now = Date.now();
     if (!windowStart || (now - windowStart) >= REFRESH_WINDOW_MS) {
-      
+      // reset the window and refill uses when it's expired.
       windowStart = 0;
       usesLeft = REFRESH_MAX_USES;
     }
@@ -168,6 +175,7 @@
     try { localStorage.setItem(REFRESH_USES_LEFT_KEY, String(Math.max(0, usesLeft))); } catch(_) {}
   };
 
+  // checks whether manual refresh is allowed right now and when cooldown ends.
   const canUseManualRefresh = () => {
     const { windowStart, usesLeft } = readRefreshState();
     const now = Date.now();
@@ -189,7 +197,7 @@
     return { windowStart, usesLeft };
   };
 
-  // Fetch helper that inherits FunnyJunk cookies (needed for auth-only endpoints).
+  // fetch helper that keeps fj cookies attached for auth endpoints.
   const sameOriginFetch = async (path) => {
     const url = path.startsWith('http') ? path : (location.origin + (path.startsWith('/') ? '' : '/') + path);
     const res = await fetch(url, { credentials: 'include' });
@@ -197,6 +205,7 @@
     return res;
   };
 
+  // gets current username from userbar endpoint.
   const getUsername = async () => {
     try {
       const res = await sameOriginFetch('/userbar/getnewdata?extGet=1');
@@ -207,6 +216,7 @@
     return null;
   };
 
+  // grabs full mod rank list from backend.
   const getModRanksList = async () => {
     const res = await sameOriginFetch('/ajax/getModRanksList');
     try {
@@ -216,19 +226,21 @@
     }
   };
 
+  // finds the rank entry that matches a username, case-insensitive.
   const findRankForUser = (list, username) => {
     if (!Array.isArray(list) || !username) return null;
     const uname = String(username).toLowerCase();
     return list.find(x => (x && typeof x.username === 'string' && x.username.toLowerCase() === uname)) || null;
   };
 
+  // extracts numeric level from rank text.
   const extractLevel = (rankText) => {
     if (!rankText || typeof rankText !== 'string') return null;
     const m = rankText.match(/level\s*(\d+)/i);
     return m ? parseInt(m[1], 10) : null;
   };
 
-  // Keep network usage low by caching the last rank response for 10 minutes.
+  // keeps network noise down by caching the last rank response for 10 minutes.
   const loadCache = () => {
     try {
       const raw = localStorage.getItem(CACHE_KEY);
@@ -252,7 +264,7 @@
     } catch (_) {}
   };
 
-  // Main fetch pipeline: username -> rank list -> cache + status broadcast.
+  // main fetch chain: username -> rank list -> cache it -> broadcast status.
   const ensureRankFetched = async (force = false) => {
     if (!force) {
       const fromStore = loadCache();
@@ -289,7 +301,7 @@
     }
   };
 
-  // The SEL module renders a footer line with the local version; piggyback on it for UI.
+  // sel button render.
   const findVersionLabel = () => {
     try {
       const menu = document.getElementById('fj-sel-menu');
@@ -304,7 +316,7 @@
     return null;
   };
 
-  // Inject/update the "Update Credentials" button under the SEL footer once authorized.
+  // injects/updates the "update credentials" button under sel footer.
   const ensureFooterUI = () => {
     try {
       const menu = document.getElementById('fj-sel-menu');
@@ -316,11 +328,10 @@
       try {
         const unauthorized = window.fjApichk && typeof window.fjApichk.isAuthorized === 'function' ? !window.fjApichk.isAuthorized() : false;
         if (unauthorized) {
-          // Still show the refresh button so users can re-auth.
+          // still show refresh so users can re-auth.
         }
       } catch (_) {}
-
-      
+      // build the row wrapper.
       let row = label.closest('[data-fjFooterRow="1"]');
       let right;
       if (!row) {
@@ -359,7 +370,7 @@
         btn.type = 'button';
         right.appendChild(btn);
       } else {
-        
+        // swap button node to clear old listeners.
         const clone = btn.cloneNode(true);
         btn.replaceWith(clone);
         btn = clone;
@@ -396,7 +407,7 @@
       btn.addEventListener('click', async () => {
         const st = canUseManualRefresh();
         if (!st.allowed) {
-          // Cooldown message mirrors the restriction logic so users know when to retry.
+          // cooldown message matches restriction logic so users know when to try again.
           try {
             const now = Date.now();
             const minutesLeft = st.resetAt ? Math.ceil(Math.max(0, st.resetAt - now) / 60000) : 5;
@@ -411,23 +422,19 @@
         btn.textContent = 'Updating…';
         try {
           const res = await ensureRankFetched(true);
-          console.log('[FJFE:apichk] Credentials refreshed', {
-            username: res.username || null,
-            rank: res.rankText || null,
-            level: res.level || null
-          });
           const nowAuthorized = (res && res.rankText && (res.level !== null && typeof res.level !== 'undefined')) ? true : false;
           if (prevAuthorized !== null && nowAuthorized !== prevAuthorized) {
             try { writeLastAutoRefresh(Date.now()); } catch(_) {}
             setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
           }
         } catch (e) {
-          console.warn('[FJFE:apichk] Refresh failed', e);
+          void e;
         }
         btn.textContent = prevText;
         btn.disabled = false;
       });
 
+      // if footer ui shows up, work.
       return { label, refreshBtn: btn };
     } catch (_) {
       return null;
@@ -439,11 +446,11 @@
     return Boolean(ensureFooterUI());
   };
 
-  // SEL footer renders asynchronously, so keep watching the DOM until the label exists.
-  // Wait for SEL to finish rendering before trying to append the credential button.
+  // sel footer renders eventually, so watch dom until label exists.
+  // wait for sel to finish before appending the credential button, or it just fails silently.
   const observeMenuAndApply = async () => {
     await ensureRankFetched();
-    
+    // try once immediately in case the menu already exists.
     if (applyRankToVersionLabel()) return;
     
     const obs = new MutationObserver(() => {
@@ -463,6 +470,7 @@
     try {
       if (location.hostname !== TARGET_HOST) return;
       if (window.__fjApichkInitDone) return;
+      // one-time init guard so this module doesn't double-wire everything.
       window.__fjApichkInitDone = true;
       observeMenuAndApply();
       scheduleDailyAutoRefresh();
@@ -481,6 +489,7 @@
 
   };
 
+  // writes last successful auto-refresh timestamp.
   const writeLastAutoRefresh = (ts) => {
     try {
       localStorage.setItem(AUTO_REFRESH_KEY, String(ts));
@@ -488,12 +497,12 @@
  catch (_) {}
   };
 
-  // Keep credential state fresh by forcing a fetch every 24h (with 1h retry on failure).
+  // forces a credential refresh every 24h, with a 1h retry in case of failure.
   const scheduleDailyAutoRefresh = () => {
     try { if (autoRefreshTimer) { clearTimeout(autoRefreshTimer); autoRefreshTimer = null; } } catch (_) {}
     const now = Date.now();
     const last = readLastAutoRefresh();
-    
+    // no prior timestamp means first run, so kick a quick refresh and move on.
     if (!last || last <= 0) {
       try {
         autoRefreshTimer = setTimeout(runDailyAutoRefresh, 5000);
@@ -503,7 +512,7 @@
     }
     const next = last + AUTO_INTERVAL_MS;
     if (now >= next) {
-      
+      // interval already elapsed, so run now instead of waiting.
       try {
         autoRefreshTimer = setTimeout(runDailyAutoRefresh, 0);
       }
@@ -517,7 +526,7 @@
  catch (_) {}
   };
 
-  // Compare authorization before/after – if it changes, reload so SEL can re-tier modules.
+  // compares auth before/after; if it changes, reload so sel can re-tier modules.
   const runDailyAutoRefresh = async () => {
     try {
       const prevAuth = isAuthorized();
@@ -529,34 +538,33 @@
         return;
       }
       writeLastAutoRefresh(Date.now());
-      
+      // schedule the next normal cycle after a successful refresh.
       try {
         if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
       }
  catch (_) {}
       autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_INTERVAL_MS);
       try {
-        console.log('[FJFE:apichk] Daily credentials refresh completed.');
+        // no-op; avoid logging blocks.
       }
  catch (_) {}
     } catch (e) {
-      
+      // retry later instead of hard failing forever.
       try {
         if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
       }
  catch (_) {}
       autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_RETRY_MS);
       try {
-        console.warn('[FJFE:apichk] Daily credentials refresh failed; will retry in 1h.', e);
+        void e;
       }
  catch (_) {}
     }
   };
-
   if (!window.fjTweakerModules) window.fjTweakerModules = {};
   window.fjTweakerModules[MODULE_KEY] = { init };
-
   
+  // public api surface for other modules that need credential/rank state.
   window.fjApichk = {
     ensureFetched: ensureRankFetched,
     isAuthorized,
@@ -581,15 +589,9 @@
       consumeManualRefresh();
       const prevAuth = isAuthorized();
       const res = await ensureRankFetched(true);
-      try {
-        console.log('[FJFE:apichk] Credentials refreshed', {
-          username: res.username || null,
-          rank: res.rankText || null,
-          level: res.level || null
-        });
-      } catch (_) {}
       const nowAuth = Boolean(res && res.rankText && (res.level !== null && typeof res.level !== 'undefined'));
       
+      // keep behavior consistent with manual button: reload if auth state flipped.
       if (prevAuth !== nowAuth) {
         try { writeLastAutoRefresh(Date.now()); } catch (_) {}
         setTimeout(() => { try { location.reload(); } catch (_) {} }, 200);

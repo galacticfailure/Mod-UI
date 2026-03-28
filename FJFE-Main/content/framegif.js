@@ -64,6 +64,16 @@
     return null;
   })();
 
+  const isRuntimeFlagEnabled = (flagName, fallback = false) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : Boolean(fallback);
+    } catch (_) {
+      return Boolean(fallback);
+    }
+  };
+
   const sendExtensionMessage = (payload) => {
     return new Promise((resolve, reject) => {
       if (!runtimeAdapter?.api?.sendMessage) {
@@ -92,7 +102,11 @@
     if (!url) {
       throw new Error('GIF URL missing.');
     }
-    const response = await sendExtensionMessage({ type: 'fjfe-framegif-fetch', url });
+    const response = await sendExtensionMessage({
+      type: 'fjfe-framegif-fetch',
+      url,
+      binaryBridge: isRuntimeFlagEnabled('gifBinaryBridge', true)
+    });
     if (!response || !response.ok || !response.buffer) {
       throw new Error(response?.error || 'Extension fetch failed.');
     }

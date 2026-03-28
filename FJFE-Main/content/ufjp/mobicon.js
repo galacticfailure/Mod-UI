@@ -16,6 +16,16 @@
 	let observedContainer = null;
 	const mobileMap = new Map();
 
+	const isRuntimeFlagEnabled = (flagName, fallback = false) => {
+		try {
+			return window.fjfeRuntimeFlags?.isEnabled
+				? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+				: Boolean(fallback);
+		} catch (_) {
+			return Boolean(fallback);
+		}
+	};
+
 	const isTargetHost = () => {
 		const host = window.location.hostname || '';
 		return host === targetHost || host.endsWith(`.${targetHost}`);
@@ -176,9 +186,13 @@
 				const shouldCheck = isUpdateUrl(url);
 				return originalFetch.apply(this, args).then((response) => {
 					if (enabled && shouldCheck) {
-						try {
-							response.clone().text().then(() => scheduleApply()).catch(() => {});
-						} catch (_) {}
+						if (!isRuntimeFlagEnabled('mobiconFetchLightweight', true)) {
+							try {
+								response.clone().text().then(() => scheduleApply()).catch(() => {});
+							} catch (_) {}
+						} else {
+							scheduleApply();
+						}
 					}
 					return response;
 				});

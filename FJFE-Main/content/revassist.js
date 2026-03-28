@@ -9,13 +9,25 @@
   let enabled = false;
   let queue = [];
   let lastSentAt = 0;
-  let intervalId = null;
+  let processTimer = null;
+  let processInterval = null;
+  let processQueueRunning = false;
   let clickHandlerBound = false;
   let backendError = false;
   let statusWrap = null;
   let statusText = null;
   let statusSpinner = null;
   let statusObserver = null;
+
+  const isRuntimeFlagEnabled = (flagName, fallback = false) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : Boolean(fallback);
+    } catch (_) {
+      return Boolean(fallback);
+    }
+  };
 
   const storageGet = (key) => new Promise((resolve) => {
     try {
@@ -63,6 +75,9 @@
     queue.push(item);
     persistQueue();
     updateStatusUI();
+    if (enabled) {
+      scheduleProcessLoop();
+    }
   };
 
   const ensureStatusStyles = () => {
@@ -237,18 +252,75 @@
     persistQueue();
   };
 
+  const getNextProcessDelayMs = () => {
+    if (!enabled || backendError || queue.length === 0) {
+      return null;
+    }
+    const now = Date.now();
+    let delay = 0;
+    if (lastSentAt) {
+      delay = Math.max(delay, SEND_INTERVAL_MS - (now - lastSentAt));
+    }
+    const next = queue[0];
+    if (next?.nextAttemptAt) {
+      delay = Math.max(delay, next.nextAttemptAt - now);
+    }
+    return Math.max(0, delay);
+  };
+
+  const runProcessLoop = async () => {
+    processTimer = null;
+    if (processQueueRunning) {
+      return;
+    }
+    processQueueRunning = true;
+    try {
+      await processQueue();
+    } finally {
+      processQueueRunning = false;
+      scheduleProcessLoop();
+    }
+  };
+
+  const scheduleProcessLoop = () => {
+    if (processTimer || !enabled || backendError) {
+      return;
+    }
+    const delay = getNextProcessDelayMs();
+    if (delay === null) {
+      return;
+    }
+    processTimer = setTimeout(() => {
+      runProcessLoop();
+    }, delay);
+  };
+
   const startInterval = () => {
-    if (intervalId) return;
-    intervalId = setInterval(() => {
-      processQueue();
-    }, 1000);
-    processQueue();
+    if (!isRuntimeFlagEnabled('timerHardening', true)) {
+      if (processInterval) return;
+      processInterval = setInterval(async () => {
+        if (processQueueRunning) return;
+        processQueueRunning = true;
+        try {
+          await processQueue();
+        } finally {
+          processQueueRunning = false;
+        }
+      }, 1000);
+      return;
+    }
+    scheduleProcessLoop();
   };
 
   const stopInterval = () => {
-    if (!intervalId) return;
-    clearInterval(intervalId);
-    intervalId = null;
+    if (processTimer) {
+      clearTimeout(processTimer);
+      processTimer = null;
+    }
+    if (processInterval) {
+      clearInterval(processInterval);
+      processInterval = null;
+    }
   };
 
   const handleClickCapture = (event) => {

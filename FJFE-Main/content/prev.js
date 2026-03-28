@@ -26,6 +26,7 @@
   let currentUrl = '';
   let unloadHandled = false;
   let mutationObserver = null;
+  let observerRefreshScheduled = false;
   let navigationLock = false;
   let pendingListNavigation = false;
   const availabilityCache = new Map();
@@ -33,6 +34,15 @@
   let openTabRenewTimer = null;
   let openTabsSnapshot = {};
   let skipHistoryBecauseRestored = false;
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
 
   const normalizeContentUrl = (raw) => {
     try {
@@ -690,7 +700,18 @@
   const startObservers = () => {
     if (!isContentView || mutationObserver || !document.body) return;
     mutationObserver = new MutationObserver(() => {
-      attachButtonOverrides();
+      if (!isRuntimeFlagEnabled('observerCoalescing', true)) {
+        attachButtonOverrides();
+        return;
+      }
+      if (observerRefreshScheduled) {
+        return;
+      }
+      observerRefreshScheduled = true;
+      requestAnimationFrame(() => {
+        observerRefreshScheduled = false;
+        attachButtonOverrides();
+      });
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   };
@@ -700,6 +721,7 @@
       mutationObserver.disconnect();
       mutationObserver = null;
     }
+    observerRefreshScheduled = false;
   };
 
   const attach = () => {

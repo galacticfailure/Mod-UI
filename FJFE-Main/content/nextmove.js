@@ -10,13 +10,13 @@
   let observer = null;
   let currentButton = null;
   let pointerHandler = null;
-  let featureEnabled = true;
+  let featureEnabled = false;
 
-  // Defaults to on unless fjTweaker toggles it explicitly
+  // Defaults to off until SEL settings are available
   const getSettings = () => {
     const settings = window.fjTweakerSettings || {};
     if (typeof settings[SETTING_KEY] === 'undefined') {
-      return true;
+      return false;
     }
     return Boolean(settings[SETTING_KEY]);
   };
@@ -112,7 +112,10 @@
 
     currentButton = button;
     pointerHandler = () => {
-      relocateRandomly(currentButton);
+      if (!featureEnabled || currentButton !== button) {
+        return;
+      }
+      relocateRandomly(button);
     };
 
     currentButton.addEventListener('pointerenter', pointerHandler, { passive: true });

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FJFE Student",
   "description": "Student-focused subset of FJFE modules.",
-  "version": "1.1.1",
+  "version": "1.2.1",
   "permissions": [
     "storage",
     "contextMenus"
@@ -16,7 +16,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://funnyjunk.com/*"
+        "https://funnyjunk.com/*",
+        "https://*.funnyjunk.com/*"
       ],
       "js": [
         "content/apichk.js",
@@ -44,6 +45,7 @@
       ],
       "matches": [
         "https://funnyjunk.com/*",
+        "https://*.funnyjunk.com/*",
         "https://fjme.me/*"
       ]
     }

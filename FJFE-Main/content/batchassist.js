@@ -40,6 +40,18 @@
   const ASSIST_ICON_PATH = 'icons/batchassist.png';
   const TOGGLE_STORAGE_KEY = 'fjTweakerBatchAssistToggle';
   const ASSIST_GLOW_COLOR = 'rgba(88, 164, 255, 0.75)';
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
+  const getAssistCommon = () => (
+    isRuntimeFlagEnabled('assistSharedHelpers', true) ? window.fjfeAssistCommon : null
+  );
 
   let featureEnabled = false;
   let settingEnabled = false;
@@ -64,6 +76,7 @@
   let storageListenerBound = false;
   let waitingForPanelMount = false;
   let invalidDialogObserver = null;
+  let invalidDialogRefreshScheduled = false;
   let loadingIndicator = null;
   let percentIndicator = null;
   let noteElement = null;
@@ -103,6 +116,10 @@
   };
 
   const isAssistElementVisible = (el) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.isElementVisible) {
+      return assistCommon.isElementVisible(el);
+    }
     if (!el) return false;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden') return false;
@@ -112,6 +129,10 @@
   };
 
   const findAssistSearchButton = () => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.findSearchButton) {
+      return assistCommon.findSearchButton();
+    }
     const selectors = [
       '.userbarBttn .fjse',
       '.userbarBttn a[title*="search" i]',
@@ -145,10 +166,17 @@
   };
 
   const isAssistCompressedAnchor = (searchButton) => (
-    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+    getAssistCommon()?.isCompressedAnchor
+      ? getAssistCommon().isCompressedAnchor(searchButton)
+      : (searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn'))))
   );
 
   const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.positionCompressedWrapper) {
+      assistCommon.positionCompressedWrapper(wrapper, anchor);
+      return;
+    }
     if (!wrapper || !anchor) return;
     const parent = anchor.parentElement;
     if (!parent) return;
@@ -161,6 +189,11 @@
   };
 
   const applyAssistButtonStyling = (button, searchButton) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyButtonStyling) {
+      assistCommon.applyButtonStyling(button, searchButton, { transformGpu: true });
+      return;
+    }
     if (!button || !searchButton) return;
     const searchStyle = window.getComputedStyle(searchButton);
     button.className = searchButton.className || '';
@@ -215,6 +248,16 @@
 
   const applyAssistIconButtonStyling = (button, searchButton, options) => {
     if (!button) return;
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyIconStyling) {
+      assistCommon.applyIconStyling(button, searchButton, {
+        background: options?.background,
+        border: options?.border,
+        color: options?.color,
+        iconUrl: options?.iconPath ? getAssetUrl(options.iconPath) : ''
+      }, { transformGpu: true });
+      return;
+    }
     applyAssistButtonStyling(button, searchButton);
     if (!options) return;
     if (options.background) button.style.backgroundColor = options.background;
@@ -579,6 +622,14 @@
     return normalized;
   };
 
+  const isIndexSummaryLabel = (value) => {
+    if (typeof value !== 'string') {
+      return false;
+    }
+    const squashed = value.trim().toLowerCase().replace(/[^a-z]/g, '');
+    return squashed === 'index' || squashed === 'indexed' || squashed === 'noindex' || squashed === 'autonoindex';
+  };
+
   const sanitizeRejectSummarySegments = (segments) => {
     if (!Array.isArray(segments)) {
       return [];
@@ -601,7 +652,19 @@
           overridden: segment.overridden === true
         };
       })
+      .filter((segment) => !isIndexSummaryLabel(segment?.text || ''))
       .filter(Boolean);
+  };
+
+  const sanitizeRejectSummaryText = (value) => {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value
+      .split('/')
+      .map((part) => part.trim())
+      .filter((part) => part && !isIndexSummaryLabel(part))
+      .join('/');
   };
 
   const sanitizeReasonSelections = (value) => {
@@ -673,10 +736,6 @@
     if (category) {
       normalized.category = category;
     }
-    const index = selectLabel(value.index);
-    if (index) {
-      normalized.index = index;
-    }
     if (typeof value.flag === 'boolean') {
       normalized.flag = value.flag;
     }
@@ -687,7 +746,7 @@
     if (!details || typeof details !== 'object') {
       return null;
     }
-    const summaryText = typeof details.summaryText === 'string' ? details.summaryText.trim() : '';
+    const summaryText = sanitizeRejectSummaryText(details.summaryText);
     const note = typeof details.note === 'string' ? details.note.trim() : '';
     const segments = sanitizeRejectSummarySegments(details.segments || details.summarySegments);
     const reasonSelections = sanitizeReasonSelections(details.reasonSelections);
@@ -940,13 +999,28 @@
     });
   };
 
+  const scheduleInvalidDialogCleanup = () => {
+    if (!isRuntimeFlagEnabled('observerCoalescing', true)) {
+      removeInvalidDialogs();
+      return;
+    }
+    if (invalidDialogRefreshScheduled) {
+      return;
+    }
+    invalidDialogRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      invalidDialogRefreshScheduled = false;
+      removeInvalidDialogs();
+    });
+  };
+
   const ensureInvalidDialogObserver = () => {
     if (invalidDialogObserver || typeof MutationObserver === 'undefined' || !document.body) {
       return;
     }
-    removeInvalidDialogs();
+    scheduleInvalidDialogCleanup();
     invalidDialogObserver = new MutationObserver(() => {
-      removeInvalidDialogs();
+      scheduleInvalidDialogCleanup();
     });
     invalidDialogObserver.observe(document.body, { childList: true, subtree: true });
   };
@@ -956,6 +1030,7 @@
       invalidDialogObserver.disconnect();
       invalidDialogObserver = null;
     }
+    invalidDialogRefreshScheduled = false;
   };
 
   const markDocument = (active) => {
@@ -1493,13 +1568,13 @@
       return '';
     }
     if (typeof details.summaryText === 'string') {
-      const trimmed = details.summaryText.trim();
+      const trimmed = sanitizeRejectSummaryText(details.summaryText);
       if (trimmed) {
         return trimmed;
       }
     }
     if (Array.isArray(details.segments) && details.segments.length) {
-      const text = details.segments
+      const text = sanitizeRejectSummarySegments(details.segments)
         .map((segment) => (typeof segment?.text === 'string' ? segment.text.trim() : ''))
         .filter(Boolean)
         .join('/');
@@ -1551,12 +1626,11 @@
     return approvals;
   };
 
-  const collectRateIdTargets = () => {
+  const collectRateIdTargets = (options = {}) => {
+    const includeStatuses = Array.isArray(options.includeStatuses) && options.includeStatuses.length
+      ? new Set(options.includeStatuses)
+      : new Set([QUEUE_STATUS.APPROVED]);
     if (!Array.isArray(queueLinks) || !queueLinks.length) {
-      console.debug('[BatchAssist] collectRateIdTargets: queue is empty or invalid.', {
-        hasQueueLinks: Array.isArray(queueLinks),
-        queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
-      });
       return [];
     }
     const seen = new Set();
@@ -1571,43 +1645,21 @@
     };
     queueLinks.forEach((entry, index) => {
       const status = entry?.status || QUEUE_STATUS.PENDING;
-      if (status !== QUEUE_STATUS.APPROVED) {
+      if (!includeStatuses.has(status)) {
         stats.skippedStatusMismatch += 1;
-        console.debug('[BatchAssist] collectRateIdTargets skip: non-approved status', {
-          index,
-          url: entry?.url,
-          status
-        });
         return;
       }
       if (entry?.rateActionAdded) {
         stats.skippedRateActionAdded += 1;
-        console.debug('[BatchAssist] collectRateIdTargets skip: rateActionAdded', {
-          index,
-          url: entry?.url,
-          status: entry?.status
-        });
         return;
       }
       const rateId = normalizeRateId(entry?.rateId);
       if (!rateId) {
         stats.skippedMissingRateId += 1;
-        console.debug('[BatchAssist] collectRateIdTargets skip: missing rateId', {
-          index,
-          url: entry?.url,
-          status: entry?.status,
-          rawRateId: entry?.rateId
-        });
         return;
       }
       if (seen.has(rateId)) {
         stats.skippedDuplicateRateId += 1;
-        console.debug('[BatchAssist] collectRateIdTargets skip: duplicate rateId', {
-          index,
-          url: entry?.url,
-          status: entry?.status,
-          rateId
-        });
         return;
       }
       seen.add(rateId);
@@ -1621,91 +1673,8 @@
       });
       stats.added += 1;
     });
-    console.debug('[BatchAssist] collectRateIdTargets summary.', stats);
+    void stats;
     return targets;
-  };
-
-  const logVerboseAcknowledgeSuccess = ({
-    rateId,
-    url,
-    title,
-    status,
-    approveNote,
-    index,
-    total,
-    elapsedMs,
-    result,
-    token,
-    successCount,
-    failureCount
-  }) => {
-    const now = new Date();
-    const tokenPreview = token ? `${token.slice(0, 4)}...${token.slice(-4)}` : '';
-    const bodyPreview = typeof result?.bodyText === 'string'
-      ? result.bodyText.slice(0, 500)
-      : '';
-
-    console.groupCollapsed(`✅ [BatchAssist][Ack Success ${index}/${total}] rateId=${rateId}`);
-    console.info('[BatchAssist] Acknowledge success summary', {
-      timestampIso: now.toISOString(),
-      timestampLocal: now.toLocaleString(),
-      step: `${index}/${total}`,
-      progressPercent: Math.round((index / Math.max(1, total)) * 100),
-      elapsedMs,
-      rateId,
-      url,
-      title,
-      originalStatus: status,
-      resultingStatus: QUEUE_STATUS.ACKNOWLEDGED,
-      approveNote: approveNote || null,
-      responseStatus: result?.status ?? null,
-      responseOk: Boolean(result?.ok),
-      responseRateLimited: Boolean(result?.rateLimited),
-      responseHasParsed: result?.parsed !== null && typeof result?.parsed !== 'undefined',
-      responseParsedType: result?.parsed === null ? 'null' : typeof result?.parsed,
-      tokenPresent: Boolean(token),
-      tokenLength: token ? token.length : 0,
-      tokenPreview,
-      runningTotals: {
-        successCount,
-        failureCount,
-        attempted: index,
-        remaining: Math.max(0, total - index)
-      }
-    });
-    console.debug('[BatchAssist] Raw acknowledge response body (trimmed)', bodyPreview);
-    console.debug('[BatchAssist] Parsed acknowledge response payload', result?.parsed ?? null);
-    console.table([
-      {
-        metric: 'rateId',
-        value: rateId
-      },
-      {
-        metric: 'url',
-        value: url || '(missing)'
-      },
-      {
-        metric: 'title',
-        value: title || '(untitled)'
-      },
-      {
-        metric: 'elapsedMs',
-        value: elapsedMs
-      },
-      {
-        metric: 'httpStatus',
-        value: result?.status ?? '(none)'
-      },
-      {
-        metric: 'queueIndex',
-        value: `${index}/${total}`
-      },
-      {
-        metric: 'tokenLength',
-        value: token ? token.length : 0
-      }
-    ]);
-    console.groupEnd();
   };
 
   const buildQueueErrorClipboardPayload = () => {
@@ -2480,7 +2449,73 @@
 
     confirmWrapper.append(confirmClearButton, confirmCancelButton);
 
-    const acknowledgeConfirmText = 'Acknowledge all rates?';
+    const getApprovedRateCount = () => {
+      if (!Array.isArray(queueLinks) || !queueLinks.length) {
+        return 0;
+      }
+      return queueLinks.reduce((count, entry) => (
+        entry?.status === QUEUE_STATUS.APPROVED ? count + 1 : count
+      ), 0);
+    };
+    const getQueueStatusCounts = () => {
+      const counts = {
+        total: 0,
+        approved: 0,
+        pending: 0,
+        rejected: 0,
+        acknowledged: 0
+      };
+      if (!Array.isArray(queueLinks) || !queueLinks.length) {
+        return counts;
+      }
+      queueLinks.forEach((entry) => {
+        counts.total += 1;
+        const status = entry?.status || QUEUE_STATUS.PENDING;
+        if (status === QUEUE_STATUS.APPROVED) {
+          counts.approved += 1;
+        } else if (status === QUEUE_STATUS.PENDING) {
+          counts.pending += 1;
+        } else if (status === QUEUE_STATUS.REJECTED) {
+          counts.rejected += 1;
+        } else if (status === QUEUE_STATUS.ACKNOWLEDGED) {
+          counts.acknowledged += 1;
+        }
+      });
+      return counts;
+    };
+    const getAcknowledgePlan = () => {
+      const counts = getQueueStatusCounts();
+      if (!counts.total || counts.acknowledged === counts.total) {
+        return {
+          mode: 'none',
+          canConfirm: false,
+          text: 'Queue already acknowledged.',
+          includeStatuses: []
+        };
+      }
+      if (counts.approved === 0 && counts.pending === 0 && counts.rejected > 0) {
+        return {
+          mode: 'none',
+          canConfirm: false,
+          text: 'Rejected rates cannot be acknowledged.',
+          includeStatuses: []
+        };
+      }
+      if (counts.approved === 0 && counts.pending > 0 && counts.rejected > 0) {
+        return {
+          mode: 'pending',
+          canConfirm: true,
+          text: 'No approved rates. Acknowledge pending?',
+          includeStatuses: [QUEUE_STATUS.PENDING]
+        };
+      }
+      return {
+        mode: 'approved',
+        canConfirm: counts.approved > 0,
+        text: `Acknowledge ${getApprovedRateCount()} rates?`,
+        includeStatuses: [QUEUE_STATUS.APPROVED]
+      };
+    };
     const acknowledgeButton = document.createElement('button');
     acknowledgeButton.type = 'button';
     acknowledgeButton.textContent = 'Acknowledge';
@@ -2547,7 +2582,6 @@
     let ackProgressMessage = '';
 
     const hasMisattributedRates = () => Array.isArray(queueLinks) && queueLinks.some((entry) => entry?.rateActionAdded);
-    const hasRejectedRates = () => Array.isArray(queueLinks) && queueLinks.some((entry) => entry?.status === QUEUE_STATUS.REJECTED);
 
     const updateNoteForState = () => {
       if (!noteSingle || !noteRemaining || !noteError || !progressBar || !progressApproved || !progressRejected) {
@@ -2574,12 +2608,11 @@
         noteRemaining.style.display = 'none';
         noteError.style.display = 'none';
         progressBar.style.display = 'none';
-        if (hasRejectedRates()) {
-          noteSingle.innerHTML = `${acknowledgeConfirmText}<br>Rejected rates are still present!`;
-        } else if (hasMisattributedRates()) {
-          noteSingle.innerHTML = `${acknowledgeConfirmText}<br>Misattributed rates won't be acknowledged.`;
+        const acknowledgePlan = getAcknowledgePlan();
+        if (hasMisattributedRates() && acknowledgePlan.canConfirm) {
+          noteSingle.innerHTML = `${acknowledgePlan.text}<br>Misattributed rates won't be acknowledged.`;
         } else {
-          noteSingle.textContent = acknowledgeConfirmText;
+          noteSingle.textContent = acknowledgePlan.text;
         }
         return;
       }
@@ -2651,7 +2684,7 @@
 
     const updateButtonInteractivity = () => {
       const disabled = acknowledgeInProgress;
-      [resetButton, confirmClearButton, confirmCancelButton, acknowledgeButton, acknowledgeConfirmYesButton, acknowledgeConfirmNoButton].forEach((button) => {
+      [resetButton, confirmClearButton, confirmCancelButton, acknowledgeButton, acknowledgeConfirmNoButton].forEach((button) => {
         if (!button) {
           return;
         }
@@ -2659,6 +2692,14 @@
         button.style.opacity = disabled ? '0.6' : '';
         button.style.cursor = disabled ? 'default' : 'pointer';
       });
+      if (!acknowledgeConfirmYesButton) {
+        return;
+      }
+      const acknowledgePlan = getAcknowledgePlan();
+      const yesDisabled = disabled || (acknowledgeConfirmVisible && !acknowledgePlan.canConfirm);
+      acknowledgeConfirmYesButton.disabled = yesDisabled;
+      acknowledgeConfirmYesButton.style.opacity = yesDisabled ? '0.6' : '';
+      acknowledgeConfirmYesButton.style.cursor = yesDisabled ? 'default' : 'pointer';
     };
 
     const setClearConfirmVisible = (visible) => {
@@ -2727,29 +2768,25 @@
       if (acknowledgeInProgress) {
         return;
       }
+      const acknowledgePlan = getAcknowledgePlan();
+      if (!acknowledgePlan.canConfirm) {
+        setTransientNoteMessage(acknowledgePlan.text, 3600);
+        return;
+      }
       setAcknowledgeConfirmVisible(false);
       setTransientNoteMessage('');
       const token = readMemeToken();
       if (!token) {
-        console.warn('[BatchAssist] Acknowledge aborted: missing review token.', {
-          storageKey: MEME_TOKEN_STORAGE_KEY,
-          queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
-        });
         setTransientNoteMessage('Review token not found on funnyjunk.com (PT_memeToken).', 4800);
         return;
       }
-      const targets = collectRateIdTargets();
-      console.info('[BatchAssist] Acknowledge requested.', {
-        targetCount: targets.length,
-        hasToken: Boolean(token),
-        tokenLength: token.length,
-        queueLength: Array.isArray(queueLinks) ? queueLinks.length : null
-      });
+      const targets = collectRateIdTargets({ includeStatuses: acknowledgePlan.includeStatuses });
       if (!targets.length) {
-        console.warn('[BatchAssist] Acknowledge aborted: no rate IDs found.', {
-          queueSample: Array.isArray(queueLinks) ? queueLinks.slice(0, 3) : null
-        });
-        setTransientNoteMessage('No approved rates available to acknowledge.', 3600);
+        if (acknowledgePlan.mode === 'pending') {
+          setTransientNoteMessage('No pending rates available to acknowledge.', 3600);
+        } else {
+          setTransientNoteMessage('No approved rates available to acknowledge.', 3600);
+        }
         return;
       }
       acknowledgeInProgress = true;
@@ -2765,91 +2802,20 @@
       const successfulRateIds = new Set();
 
       for (let index = 0; index < targets.length; index += 1) {
-        const {
-          rateId,
-          url,
-          title,
-          status,
-          approveNote
-        } = targets[index];
+        const { rateId } = targets[index];
         ackProgressMessage = `Acknowledging ${index + 1}/${targets.length}...`;
         updateNoteForState();
-        console.debug('[BatchAssist] Acknowledge attempt starting.', {
-          index: index + 1,
-          total: targets.length,
-          rateId,
-          url
-        });
-        const startedAt = Date.now();
         const result = await sendAcknowledgeRequest(rateId, token);
-        const elapsedMs = Date.now() - startedAt;
-        console.info('[BatchAssist] Acknowledge response received.', {
-          index: index + 1,
-          total: targets.length,
-          rateId,
-          url,
-          status: result.status,
-          ok: result.ok,
-          rateLimited: result.rateLimited,
-          bodyText: result.bodyText,
-          parsed: result.parsed,
-          elapsedMs
-        });
         if (result.ok) {
           successCount += 1;
           successfulRateIds.add(rateId);
-          console.debug('[BatchAssist] Acknowledge attempt succeeded.', {
-            index: index + 1,
-            total: targets.length,
-            rateId,
-            url,
-            elapsedMs
-          });
-          logVerboseAcknowledgeSuccess({
-            rateId,
-            url,
-            title,
-            status,
-            approveNote,
-            index: index + 1,
-            total: targets.length,
-            elapsedMs,
-            result,
-            token,
-            successCount,
-            failureCount
-          });
         } else if (result.rateLimited) {
           rateLimited = true;
-          console.warn('[BatchAssist] Rate limit encountered while acknowledging rate', {
-            index: index + 1,
-            total: targets.length,
-            rateId,
-            url,
-            elapsedMs,
-            status: result.status,
-            bodyText: result.bodyText
-          });
           break;
         } else {
           failureCount += 1;
-          console.warn('[BatchAssist] Failed to acknowledge rate', {
-            index: index + 1,
-            total: targets.length,
-            rateId,
-            url,
-            elapsedMs,
-            status: result.status,
-            bodyText: result.bodyText,
-            networkError: result.networkError,
-            error: result.error
-          });
         }
         if (index < targets.length - 1) {
-          console.debug('[BatchAssist] Acknowledge attempt waiting before next request.', {
-            nextIndex: index + 2,
-            delayMs: ACK_REQUEST_DELAY_MS
-          });
           await sleep(ACK_REQUEST_DELAY_MS);
         }
       }
@@ -2861,20 +2827,14 @@
       updateButtonInteractivity();
       updateNoteForState();
 
-      console.info('[BatchAssist] Acknowledge flow complete.', {
-        total: targets.length,
-        successCount,
-        failureCount,
-        rateLimited
-      });
-
       if (queueLinks.length && successfulRateIds.size) {
+        const acknowledgeStatuses = new Set(acknowledgePlan.includeStatuses);
         const nextLinks = queueLinks.map((entry) => {
           if (!entry) {
             return entry;
           }
           const normalizedRateId = normalizeRateId(entry.rateId);
-          if (entry.status === QUEUE_STATUS.APPROVED && normalizedRateId && successfulRateIds.has(normalizedRateId)) {
+          if (acknowledgeStatuses.has(entry.status) && normalizedRateId && successfulRateIds.has(normalizedRateId)) {
             const nextEntry = { ...entry, status: QUEUE_STATUS.ACKNOWLEDGED };
             delete nextEntry.rejectDetails;
             return nextEntry;

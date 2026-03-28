@@ -41,10 +41,7 @@
     try {
       return fn();
     } catch (e) {
-      try {
-        console.warn('fjTweaker(slick): animation helper error', e);
-      }
- catch (e) {}
+      void e;
       return null;
     }
   };
@@ -94,10 +91,6 @@
       if (!host) return resolve();
       const ok = safe(() => {
         try {
-          console.debug('fjTweaker(slick): closeTweakerMenu start');
-        }
- catch(e) {}
-        try {
           if (host.style.display === 'none') host.style.display = 'block';
           host.style.visibility = '';
         } catch (e) {}
@@ -127,19 +120,11 @@
             host.style.transition = ''; host.style.willChange = '';
           }
  catch (e) {}
-          try {
-            console.debug('fjTweaker(slick): closeTweakerMenu cleanup');
-          }
- catch(e) {}
           resolve();
         };
 
         const onEnd = (ev) => {
           if (ev.target !== host) return;
-          try {
-            console.debug('fjTweaker(slick): transitionend fired for close');
-          }
- catch(e) {}
           cleanup();
         };
 
@@ -150,10 +135,6 @@
         } catch (e) {}
 
         setTimeout(() => {
-          try {
-            console.debug('fjTweaker(slick): closeTweakerMenu timeout fallback');
-          }
- catch(e) {}
           cleanup();
         }, 420);
         return true;

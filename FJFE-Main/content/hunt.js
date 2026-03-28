@@ -14,6 +14,7 @@
   const HUNTED_LINKS_KEY = 'fjTweakerHuntedLinks';
   const CUSTOM_CROSSHAIR_KEY = 'fjTweakerCustomCrosshair';
   const CROSSHAIR_SIZE_KEY = 'fjTweakerCrosshairSize';
+  const HUNTER_GAP_INFO_KEY = 'fjTweakerHuntAssistGapInfo';
   const DEFAULT_CROSSHAIR_SIZE = 40;
   const ASSIST_WRAPPER_ID = 'fj-assist-buttons';
   const ASSIST_ANCHOR_ATTR = 'fjAssistAnchor';
@@ -22,6 +23,18 @@
   const ASSIST_ICON_PATH = 'icons/huntassist.png';
   const TOGGLE_STORAGE_KEY = 'fjTweakerHuntAssistToggle';
   const ASSIST_GLOW_COLOR = 'rgba(255, 96, 96, 0.75)';
+  const isRuntimeFlagEnabled = (flagName, fallback = true) => {
+    try {
+      return window.fjfeRuntimeFlags?.isEnabled
+        ? window.fjfeRuntimeFlags.isEnabled(flagName, fallback)
+        : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  };
+  const getAssistCommon = () => (
+    isRuntimeFlagEnabled('assistSharedHelpers', true) ? window.fjfeAssistCommon : null
+  );
 
   
   // Keep hunt-specific tooltip text from overflowing by forcing pre-line.
@@ -78,8 +91,158 @@
   let customCrosshairSrc = null;
   let crosshairSize = DEFAULT_CROSSHAIR_SIZE;
   let isCommentsPage = false;
+  let huntersGapInfo = null;
 
   const resolve = (p) => (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL(p) : p;
+
+  const TARGET_HUNTER_LINK_PREFIX = '/Hunters/gobNNtb/';
+
+  const normalizeCommentHref = (href) => {
+    if (!href) return '';
+    try {
+      const parsed = new URL(href, window.location.origin);
+      return `${parsed.pathname}${parsed.hash || ''}`;
+    } catch (_) {
+      return href;
+    }
+  };
+
+  const isTargetHunterHref = (href) => normalizeCommentHref(href).startsWith(TARGET_HUNTER_LINK_PREFIX);
+
+  const parseCommentListNumber = (commentEl) => {
+    if (!commentEl) return null;
+    const numberEl = commentEl.querySelector('.ccc9');
+    if (!numberEl) return null;
+    const match = numberEl.textContent.match(/#\s*(\d+)/);
+    if (!match) return null;
+    const value = Number(match[1]);
+    return Number.isFinite(value) ? value : null;
+  };
+
+  const saveHunterGapInfo = () => {
+    try {
+      if (huntersGapInfo) {
+        localStorage.setItem(HUNTER_GAP_INFO_KEY, JSON.stringify(huntersGapInfo));
+      } else {
+        localStorage.removeItem(HUNTER_GAP_INFO_KEY);
+      }
+    } catch (_) {}
+  };
+
+  const loadHunterGapInfo = () => {
+    try {
+      const raw = localStorage.getItem(HUNTER_GAP_INFO_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      // Ignore stale objects from older matching logic.
+      if (parsed.targetPrefix !== TARGET_HUNTER_LINK_PREFIX) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const getTotalCommentsCount = () => {
+    const comments = document.querySelectorAll('.com');
+    return comments.length;
+  };
+
+  const computeHunterCommentGap = () => {
+    if (!isCommentsPage) {
+      huntersGapInfo = {
+        targetPrefix: TARGET_HUNTER_LINK_PREFIX,
+        firstLink: null,
+        secondLink: null,
+        firstCommentNumber: null,
+        secondCommentNumber: null,
+        commentsBetween: null,
+        mode: 'not-comments-page'
+      };
+      window.fjTweakerHuntAssistGap = huntersGapInfo;
+      return huntersGapInfo;
+    }
+
+    const selectorPrefix = TARGET_HUNTER_LINK_PREFIX.replace(/"/g, '\\"');
+    const anchors = document.querySelectorAll(`a.bold.commentNumber[href*="${selectorPrefix}"]`);
+
+    const matches = [];
+    let lastCommentEl = null;
+    for (const anchor of anchors) {
+      const href = anchor.getAttribute('href');
+      if (!href) continue;
+      if (!isTargetHunterHref(href)) continue;
+
+      const commentEl = anchor.closest('.com');
+      if (!commentEl || commentEl === lastCommentEl) continue;
+
+      const listNumber = parseCommentListNumber(commentEl);
+      if (listNumber === null) continue;
+
+      matches.push({ href: normalizeCommentHref(href), listNumber });
+      lastCommentEl = commentEl;
+      if (matches.length === 2) break;
+    }
+
+    let nextGapInfo = null;
+    if (matches.length >= 2) {
+      const first = matches[0];
+      const second = matches[1];
+      nextGapInfo = {
+        targetPrefix: TARGET_HUNTER_LINK_PREFIX,
+        firstLink: first.href,
+        secondLink: second.href,
+        firstCommentNumber: first.listNumber,
+        secondCommentNumber: second.listNumber,
+        commentsBetween: second.listNumber - first.listNumber - 1,
+        mode: 'two-links'
+      };
+    } else if (matches.length === 1) {
+      const first = matches[0];
+      nextGapInfo = {
+        targetPrefix: TARGET_HUNTER_LINK_PREFIX,
+        firstLink: first.href,
+        secondLink: null,
+        firstCommentNumber: first.listNumber,
+        secondCommentNumber: null,
+        commentsBetween: Math.max(0, first.listNumber - 1),
+        mode: 'single-link-fallback'
+      };
+    } else {
+      const totalComments = getTotalCommentsCount();
+      nextGapInfo = {
+        targetPrefix: TARGET_HUNTER_LINK_PREFIX,
+        firstLink: null,
+        secondLink: null,
+        firstCommentNumber: null,
+        secondCommentNumber: null,
+        commentsBetween: Math.max(0, totalComments - 1),
+        mode: 'no-link-fallback',
+        totalComments
+      };
+    }
+
+    huntersGapInfo = nextGapInfo;
+    saveHunterGapInfo();
+
+    window.fjTweakerHuntAssistGap = huntersGapInfo;
+    console.log('[FJFE Hunt] Hunter comment gap:', huntersGapInfo);
+    return huntersGapInfo;
+  };
+
+  const logHunterGapOnPageLoad = () => {
+    if (!isCommentsPage) return;
+
+    if (!huntersGapInfo) {
+      huntersGapInfo = loadHunterGapInfo();
+    }
+
+    if (!huntersGapInfo) {
+      computeHunterCommentGap();
+    }
+
+    console.log('[FJFE Hunt] Hunter comment gap (page load):', huntersGapInfo);
+  };
 
   const getStoredSettings = () => {
     try {
@@ -92,6 +255,10 @@
   };
 
   const isAssistElementVisible = (el) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.isElementVisible) {
+      return assistCommon.isElementVisible(el);
+    }
     if (!el) return false;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden') return false;
@@ -101,6 +268,10 @@
   };
 
   const findAssistSearchButton = () => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.findSearchButton) {
+      return assistCommon.findSearchButton();
+    }
     const selectors = [
       '.userbarBttn .fjse',
       '.userbarBttn a[title*="search" i]',
@@ -134,10 +305,17 @@
   };
 
   const isAssistCompressedAnchor = (searchButton) => (
-    searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn')))
+    getAssistCommon()?.isCompressedAnchor
+      ? getAssistCommon().isCompressedAnchor(searchButton)
+      : (searchButton && (searchButton.classList.contains('fjse') || (searchButton.tagName === 'A' && searchButton.closest('.userbarBttn'))))
   );
 
   const positionAssistCompressedWrapper = (wrapper, anchor) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.positionCompressedWrapper) {
+      assistCommon.positionCompressedWrapper(wrapper, anchor);
+      return;
+    }
     if (!wrapper || !anchor) return;
     const parent = anchor.parentElement;
     if (!parent) return;
@@ -150,6 +328,11 @@
   };
 
   const applyAssistButtonStyling = (button, searchButton) => {
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyButtonStyling) {
+      assistCommon.applyButtonStyling(button, searchButton);
+      return;
+    }
     if (!button || !searchButton) return;
     const searchStyle = window.getComputedStyle(searchButton);
     button.className = searchButton.className || '';
@@ -201,6 +384,16 @@
 
   const applyAssistIconButtonStyling = (button, searchButton, options) => {
     if (!button) return;
+    const assistCommon = getAssistCommon();
+    if (assistCommon?.applyIconStyling) {
+      assistCommon.applyIconStyling(button, searchButton, {
+        background: options?.background,
+        border: options?.border,
+        color: options?.color,
+        iconUrl: options?.iconPath ? resolve(options.iconPath) : ''
+      });
+      return;
+    }
     applyAssistButtonStyling(button, searchButton);
     if (!options) return;
     if (options.background) button.style.backgroundColor = options.background;
@@ -579,6 +772,11 @@
 
   // Generate the !hunt message the mods post in chat + copy it to the clipboard.
   const copyMenuContent = () => {
+    if (isCommentsPage) {
+      computeHunterCommentGap();
+      console.log('[FJFE Hunt] Hunter comment gap (copy button):', huntersGapInfo);
+    }
+
     let text = '!hunt\n';
     huntedLinks.forEach((item, index) => {
       const num = index + 1;
@@ -599,9 +797,7 @@
           }
         }, 1400);
       }
-    }).catch(err => {
-      console.error('Failed to copy:', err);
-    });
+    }).catch(() => {});
   };
 
   // Rebuild the panel list whenever links or notes change.
@@ -1707,6 +1903,7 @@
       huntedLinks = [];
       saveHuntedLinks();
       updateMenuContent();
+      computeHunterCommentGap();
     });
 
     
@@ -1953,6 +2150,10 @@
       if (sizeInput) {
         sizeInput.value = crosshairSize;
       }
+    } else if (e.key === HUNTER_GAP_INFO_KEY) {
+      huntersGapInfo = loadHunterGapInfo();
+      window.fjTweakerHuntAssistGap = huntersGapInfo;
+      console.log('[FJFE Hunt] Hunter comment gap (storage):', huntersGapInfo);
     }
   };
 
@@ -1976,6 +2177,21 @@
     loadHuntedLinks();
     loadCustomCrosshair();
     createCrosshair();
+
+    huntersGapInfo = loadHunterGapInfo();
+    if (huntersGapInfo) {
+      window.fjTweakerHuntAssistGap = huntersGapInfo;
+      console.log('[FJFE Hunt] Hunter comment gap (persisted):', huntersGapInfo);
+    } else {
+      computeHunterCommentGap();
+    }
+    logHunterGapOnPageLoad();
+
+    // Some comment lists are hydrated after init; print again once the page fully loads.
+    window.addEventListener('load', () => {
+      computeHunterCommentGap();
+      logHunterGapOnPageLoad();
+    }, { once: true });
 
     ensurePanel();
     if (menuContentEl) {

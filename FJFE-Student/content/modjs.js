@@ -1,4 +1,6 @@
 (() => {
+  console.log('[FJFE-Student][modjs] script loaded on', window.location.href);
+
   /*
    * Legacy mod.js enhancer.
    * Adds inline info buttons, blocks known-broken toggles, suppresses

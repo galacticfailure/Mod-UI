@@ -1,4 +1,6 @@
 (() => {
+  console.log('[FJFE-Student][info] script loaded on', window.location.href);
+
   /*
    * Shared tooltip/info button helper used throughout the suite.
    * Exposes fjTweakerInfo.createInfoButton/updateTooltip so every

@@ -1,7 +1,7 @@
   /*
    * Shortcut customization system.
    * Rebuilds the SFW mod quick-rate buttons so mods can assign skins,
-   * PCs, categories, and no-index toggles.
+  * PCs and categories.
    */
 
   const originalButtonState = window.fjCustomShortcutOriginals || {};
@@ -63,8 +63,8 @@
   }
 
   
-  // Replaces the /skin/pc/n text while stripping old copies
-  function updateShortcutSuffix(el, skin, pc, noIndex) {
+  // Replaces the /skin/pc text while stripping old copies
+  function updateShortcutSuffix(el, skin, pc) {
     try {
       const suffixClass = 'sccustom-suffix';
       
@@ -82,7 +82,7 @@
       
       const s = (skin ? parseInt(skin, 10) : 1) || 1;
       const p = (pc ? parseInt(pc, 10) : 1) || 1;
-      const suffixStr = `/${s}/${p}${noIndex ? '/n' : ''}`;
+      const suffixStr = `/${s}/${p}`;
       const span = document.createElement('span');
       span.className = suffixClass;
       span.textContent = suffixStr;
@@ -145,8 +145,6 @@
     const skinBtnIds = ['skinLevel1', 'skinLevel2', 'skinLevel3'];
     const pcBtnIds = ['pcLevel1', 'pcLevel2', 'pcLevel3'];
 
-    
-    const noIndexBtn = document.getElementById('noIndexEasy') || document.getElementById('mNIX');
     
     const catBtns = {};
     document.querySelectorAll('#catControls .ctButton4').forEach(btn => {
@@ -269,8 +267,7 @@
       
       const skinForLabel = (settings.skin || origSkin || 1);
       const pcForLabel = (settings.pc || origPC || 1);
-      const noIndexForLabel = !!settings.noIndex;
-      updateShortcutSuffix(el, skinForLabel, pcForLabel, noIndexForLabel);
+      updateShortcutSuffix(el, skinForLabel, pcForLabel);
 
       
       (() => {
@@ -285,8 +282,6 @@
           arg = m ? m[1] : null;
         }
         if (arg) {
-          if (settings.noIndex && !/\/n$/.test(arg)) arg += '/n';
-          if (!settings.noIndex && /\/n$/.test(arg)) arg = arg.replace(/\/n$/, '');
           el.setAttribute('data-sccustom-quickm', arg);
         } else {
           el.removeAttribute('data-sccustom-quickm');
@@ -345,44 +340,7 @@
           }, 80);
 
           
-          if (settingsForBtn.noIndex && noIndexBtn) {
-            const readNIState = () => {
-              try {
-                const oc = noIndexBtn.getAttribute('onclick') || '';
-                let currentNI = null;
-                if (/,\s*0\s*,/.test(oc)) currentNI = true; 
-                else if (/,\s*1\s*,/.test(oc)) currentNI = false; 
-                if (currentNI === null) {
-                  const txt = (noIndexBtn.textContent || '').toLowerCase();
-                  if (txt.includes('manually no indexed') || txt.includes('auto: no indexed')) currentNI = true;
-                  else if (txt.includes('no index')) currentNI = false;
-                }
-                return currentNI;
-              } catch (_) {
-                return null;
-              }
-
-            };
-            const ensureNoIndexOn = (attempt) => {
-              const current = readNIState();
-              if (current === true) {
-                return;
-              }
-              if (attempt <= 0) {
-                return;
-              }
-              try {
-                noIndexBtn.click();
-              } catch (_) {}
-              setTimeout(() => ensureNoIndexOn(attempt - 1), 140);
-            };
-            
-            setTimeout(() => ensureNoIndexOn(3), 140);
-          }
-
-          
-          
-          const scheduleMs = settingsForBtn.noIndex ? 900 : 200;
+          const scheduleMs = 200;
           const orig = (el.id && originalButtonState[el.id]) ? originalButtonState[el.id] : null;
           setTimeout(() => {
             let quickMArg = null;
@@ -401,11 +359,7 @@
               quickMArg = m ? m[1] : null;
             }
             
-            let useNoIndex = (settingsForBtn.noIndex === true);
             if (quickMArg) {
-              if (useNoIndex && !/\/n$/.test(quickMArg)) quickMArg += '/n';
-              if (!useNoIndex && /\/n$/.test(quickMArg)) quickMArg = quickMArg.replace(/\/n$/, '');
-              
               const newOnclick = `quickM('${quickMArg}', this)`;
               try {
                 el.setAttribute('onclick', newOnclick);
@@ -733,27 +687,6 @@
   applyCustomShortcutsHijack();
       });
       row.appendChild(select);
-
-      
-      const noIndexLabel = document.createElement('label');
-      noIndexLabel.style.display = 'flex';
-      noIndexLabel.style.alignItems = 'center';
-      noIndexLabel.style.gap = '3px';
-      noIndexLabel.style.marginLeft = '8px';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = (customSettings[i] && customSettings[i].noIndex) || false;
-      cb.addEventListener('change', function() {
-  if (!customSettings[i]) customSettings[i] = {};
-  customSettings[i].noIndex = cb.checked;
-  saveCustomSettings();
-  applyCustomShortcutsHijack();
-      });
-      noIndexLabel.appendChild(cb);
-      const cbText = document.createElement('span');
-      cbText.textContent = 'No Index';
-      noIndexLabel.appendChild(cbText);
-      row.appendChild(noIndexLabel);
 
       
       const resetBtn = document.createElement('button');

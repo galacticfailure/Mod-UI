@@ -1,0 +1,27 @@
+{
+  "id": "farm",
+  "name": "Farm",
+  "access": "independent",
+  "moduleKey": "farm",
+  "setting": {
+    "settingName": "farm",
+    "settingLabel": "Farm",
+    "defaultSwitchState": false,
+    "infoText": "A farm.",
+    "category": "Games",
+    "section": "Extras"
+  },
+  "scripts": [
+    "farmaudio.js",
+    "farmtt.js",
+    "farmseeds.js",
+    "farmtools.js",
+    "farminteract.js",
+    "farminv.js",
+    "farmcook.js",
+    "farmshop.js",
+    "farmtile.js",
+    "farmset.js",
+    "farmmain.js"
+  ]
+}

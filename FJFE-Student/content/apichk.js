@@ -1,4 +1,6 @@
 (() => {
+  console.log('[FJFE-Student][apichk] script loaded on', window.location.href);
+
   /*
    * Credentials/authorization bootstrapper.
    * Pulls rank data from FunnyJunk endpoints, caches it, exposes helpers
@@ -398,18 +400,13 @@
         btn.textContent = 'Updating…';
         try {
           const res = await ensureRankFetched(true);
-          console.log('[FJFE:apichk] Credentials refreshed', {
-            username: res.username || null,
-            rank: res.rankText || null,
-            level: res.level || null
-          });
           const nowAuthorized = (res && res.rankText && (res.level !== null && typeof res.level !== 'undefined')) ? true : false;
           if (prevAuthorized !== null && nowAuthorized !== prevAuthorized) {
             try { writeLastAutoRefresh(Date.now()); } catch(_) {}
             setTimeout(() => { try { location.reload(); } catch(_) {} }, 200);
           }
         } catch (e) {
-          console.warn('[FJFE:apichk] Refresh failed', e);
+          void e;
         }
         btn.textContent = prevText;
         btn.disabled = false;
@@ -523,7 +520,7 @@
  catch (_) {}
       autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_INTERVAL_MS);
       try {
-        console.log('[FJFE:apichk] Daily credentials refresh completed.');
+        
       }
  catch (_) {}
     } catch (e) {
@@ -534,7 +531,7 @@
  catch (_) {}
       autoRefreshTimer = setTimeout(runDailyAutoRefresh, AUTO_RETRY_MS);
       try {
-        console.warn('[FJFE:apichk] Daily credentials refresh failed; will retry in 1h.', e);
+        void e;
       }
  catch (_) {}
     }
@@ -568,13 +565,6 @@
       consumeManualRefresh();
       const prevAuth = isAuthorized();
       const res = await ensureRankFetched(true);
-      try {
-        console.log('[FJFE:apichk] Credentials refreshed', {
-          username: res.username || null,
-          rank: res.rankText || null,
-          level: res.level || null
-        });
-      } catch (_) {}
       const nowAuth = Boolean(res && res.rankText && (res.level !== null && typeof res.level !== 'undefined'));
       
       if (prevAuth !== nowAuth) {

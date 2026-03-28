@@ -1,0 +1,22 @@
+{
+  "id": "clicker",
+  "name": "Clicker",
+  "access": "independent",
+  "setting": {
+    "settingName": "clicker2",
+    "settingLabel": "Clicker",
+    "defaultSwitchState": false,
+    "infoText": "A clicker.",
+    "category": "Games",
+    "section": "Extras"
+  },
+  "scripts": [
+    "rcmain.js",
+    "rcprod.js",
+    "rcstore.js",
+    "rcstats.js",
+    "rcinfo.js",
+    "rcsettings.js",
+    "rcdebug.js"
+  ]
+}
